@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -135,11 +135,12 @@ export default function Settings() {
   };
 
   // Load email config into form when available
-  useState(() => {
+  // Pre-fill email form with current configuration when data loads
+  useEffect(() => {
     if (emailConfig) {
       emailForm.reset(emailConfig);
     }
-  });
+  }, [emailConfig]);
 
   return (
     <div className="container mx-auto py-6 space-y-6">

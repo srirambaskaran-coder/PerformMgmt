@@ -650,6 +650,9 @@ export class DatabaseStorage implements IStorage {
       console.log(`Setting initial password for OIDC user: ${userId}`);
     } else {
       // For accounts with existing passwords, validate current password
+      if (!currentPassword) {
+        throw new Error('Current password is required for accounts with existing passwords');
+      }
       const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
       if (!isCurrentPasswordValid) {
         throw new Error('Current password is incorrect');

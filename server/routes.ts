@@ -778,7 +778,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "New password must be at least 6 characters long" });
       }
 
-      await storage.changePassword(userId, currentPassword, newPassword);
+      // Convert empty string to undefined for OIDC accounts
+      const sanitizedCurrentPassword = currentPassword && currentPassword.trim() !== '' ? currentPassword : undefined;
+      await storage.changePassword(userId, sanitizedCurrentPassword, newPassword);
       res.json({ message: "Password changed successfully" });
     } catch (error: any) {
       console.error("Error changing password:", error);
@@ -807,7 +809,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/settings/email', isAuthenticated, requireRoles(['admin']), async (req, res) => {
     try {
-      const { host, port, username, password, secure, fromEmail, fromName } = req.body;
+      // Validate request body with Zod schema
+      const validationResult = insertEmailConfigSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid email configuration data",
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const { host, port, username, password, secure, fromEmail, fromName } = validationResult.data;
       
       const emailConfigData = {
         smtpHost: host,
