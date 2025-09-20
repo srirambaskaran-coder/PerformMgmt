@@ -29,7 +29,7 @@ import {
   type InsertAccessToken,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, like, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, like, inArray, or, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations - mandatory for Replit Auth
@@ -109,13 +109,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    // Normalize role and roles fields for consistency
+    const normalizedData = { ...userData };
+    
+    if (normalizedData.roles && normalizedData.roles.length > 0) {
+      // Deduplicate roles and ensure at least one role
+      normalizedData.roles = Array.from(new Set(normalizedData.roles));
+      normalizedData.role = normalizedData.roles[0] as any; // Set single role to first role
+    } else if (normalizedData.role) {
+      // If only single role provided, create roles array
+      normalizedData.roles = [normalizedData.role];
+    } else {
+      // Default fallback
+      normalizedData.role = 'employee' as any;
+      normalizedData.roles = ['employee'];
+    }
+    
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values(normalizedData)
       .onConflictDoUpdate({
         target: users.id,
         set: {
-          ...userData,
+          ...normalizedData,
           updatedAt: new Date(),
         },
       })
@@ -183,7 +199,13 @@ export class DatabaseStorage implements IStorage {
   async getUsers(filters?: { role?: string; department?: string; status?: string }): Promise<User[]> {
     const conditions = [];
     if (filters?.role) {
-      conditions.push(eq(users.role, filters.role as any));
+      // Support filtering by both single role and roles array
+      conditions.push(
+        or(
+          eq(users.role, filters.role as any),
+          sql`${users.roles} @> ARRAY[${filters.role}]::text[]`
+        )
+      );
     }
     if (filters?.status) {
       conditions.push(eq(users.status, filters.status as any));
@@ -211,6 +233,20 @@ export class DatabaseStorage implements IStorage {
       code: user.code && user.code.trim() !== '' ? user.code : null,
     };
     
+    // Normalize role and roles fields for consistency
+    if (userData.roles && userData.roles.length > 0) {
+      // Deduplicate roles and ensure at least one role
+      userData.roles = Array.from(new Set(userData.roles));
+      userData.role = userData.roles[0] as any; // Set single role to first role
+    } else if (userData.role) {
+      // If only single role provided, create roles array
+      userData.roles = [userData.role];
+    } else {
+      // Default fallback
+      userData.role = 'employee' as any;
+      userData.roles = ['employee'];
+    }
+    
     const [newUser] = await db.insert(users).values(userData).returning();
     return newUser;
   }
@@ -222,6 +258,22 @@ export class DatabaseStorage implements IStorage {
       code: user.code !== undefined ? (user.code && user.code.trim() !== '' ? user.code : null) : undefined,
       updatedAt: new Date(),
     };
+    
+    // Normalize role and roles fields for consistency
+    if (userData.roles !== undefined) {
+      if (userData.roles && userData.roles.length > 0) {
+        // Deduplicate roles and ensure at least one role
+        userData.roles = Array.from(new Set(userData.roles));
+        userData.role = userData.roles[0] as any; // Set single role to first role
+      } else {
+        // If roles is empty, set default
+        userData.role = 'employee' as any;
+        userData.roles = ['employee'];
+      }
+    } else if (userData.role !== undefined && userData.role) {
+      // If only single role provided, create roles array
+      userData.roles = [userData.role];
+    }
     
     const [updatedUser] = await db
       .update(users)
