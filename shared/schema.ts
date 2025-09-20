@@ -73,6 +73,7 @@ export const companies = pgTable("companies", {
   contactNumber: varchar("contact_number"),
   gstNumber: varchar("gst_number"),
   logoUrl: varchar("logo_url"),
+  url: varchar("url"),
   status: statusEnum("status").default('active'),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
