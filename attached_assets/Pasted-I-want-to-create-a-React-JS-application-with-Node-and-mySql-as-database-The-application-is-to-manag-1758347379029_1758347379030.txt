@@ -1,0 +1,42 @@
+I want to create a React JS application with Node and mySql as database. The application is to manage employee performance evaluation and review in an organisation with approval process for the reviews. 
+
+There should be 5 roles with login access to be created, (1) Super Administrator (2) Administrator (3) HR Manager (4) Employee (5) Manager 
+
+The Super Administrator should be able to,
+1. Add a new company detail (Company Name, Address, Client Contact, Email ID, Contact Number, GST Number, Company Logo (upload option), Status)
+2. Add a new role (Code, Name, Designation, Date of Joining, Email ID, Mobile Number, Reporting Manager, Location, Role (Administrator, Employee, Manager, HR Manager), Status, Change Password)
+
+The Administrator should be able to,
+1. Add a new user (Code, Name, Designation, Date of Joining, Email ID, Mobile Number, Reporting Manager, Location, Role (Administrator, Employee, Manager, HR Manager), Status, Change Password)
+2.Add a new location (Code, Name, State, Country, Status)
+3. Configure Email Service.
+4. Configure a questionnaire template for employee like the one mentioned below.
+What went well during this cycle?
+Projects/tasks you worked on.
+Challenges faced and how you addressed them.
+Areas for improvement.
+Skills learned or enhanced.
+Support/resources needed.
+Overall performance rating (1–5).
+5. Configure a questionnaire template for manager like the one mentioned below.
+What went well for the employee.
+Key projects/tasks successfully delivered.
+Areas for improvement.
+Overall performance rating (1–5).
+6. Map a questionnaire against a particular year.
+
+The HR Manager should be able to,
+1. Select one/multiple employees from a listing page to share the performance review mail. A mail needs to be shared on the email ids of the selected employee using the configured email service. This email should contain a link which when clicked should open a form where the self-evaluation will be filled by the employee by answering a pre-configured questionnaire template.  
+2. View the progress of the evaluation progress of each employee in a listing page. The listing page should have relevant filters to refine and show results.
+
+The employee should be able to,
+1. Fill the questionnaire sent to them on their mail or login into the system and fill the form that shows up in their dashboard.
+2. Export the filled questionnaire into .docx/.pdf format
+3. Submit the questionnaire.
+4. The employee should be able initiate the one-on-one discussion with the reporting member by choosing a date if the evaluation has been filled and submitted by the manager. The system should send a calendar invite to the reporting manager using the email service. 
+
+The manager should be able to,
+1. Review the submitted questionnaire and add his/her remarks against each response. Finally the manager should be able to Submit the form with the Overall Evaluation remarks.
+2. The manager should be able initiate the one-on-one discussion with the reporting member by choosing a date. The system should send a calendar invite to the reporting member using the email service. 
+3. The manager should be able to add and save Meeting Notes against the submitted response of a reporting member once the one-on-one meeting is completed.
+4. The manager should be able to Mark the evaluation as completed. The manager’s notes/comments should be made visible to the employee. A mail should be shared with the employee with cc to the HR Manager, Manager on the completion of the evaluation along with the responses submitted by the employee, review comments of the manager, notes from the one-on-one meeting.
