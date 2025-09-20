@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
+import DevLogin from "@/pages/DevLogin";
 import Dashboard from "@/pages/Dashboard";
 import CompanyManagement from "@/pages/CompanyManagement";
 import EmployeeManagement from "@/pages/EmployeeManagement";
@@ -23,7 +24,7 @@ function Router() {
   return (
     <Switch>
       {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
+        <Route path="/" component={import.meta.env.DEV ? DevLogin : Landing} />
       ) : (
         <>
           <Route path="/" component={Dashboard} />

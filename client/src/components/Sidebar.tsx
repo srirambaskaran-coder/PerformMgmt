@@ -48,7 +48,7 @@ export function Sidebar() {
 
   const filteredNavItems = navItems.filter((item) => {
     if (!item.roles) return true;
-    return item.roles.includes(user?.role || "employee");
+    return item.roles.includes((user as any)?.role || "employee");
   });
 
   return (
@@ -79,16 +79,16 @@ export function Sidebar() {
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center">
             <span className="text-accent-foreground text-sm font-medium">
-              {user?.firstName?.[0]}{user?.lastName?.[0]}
+              {(user as any)?.firstName?.[0]}{(user as any)?.lastName?.[0]}
             </span>
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm truncate" data-testid="user-name">
-                {user?.firstName} {user?.lastName}
+                {(user as any)?.firstName} {(user as any)?.lastName}
               </p>
               <p className="text-xs text-muted-foreground capitalize" data-testid="user-role">
-                {user?.role?.replace('_', ' ')}
+                {(user as any)?.role?.replace('_', ' ')}
               </p>
             </div>
           )}
@@ -113,19 +113,19 @@ export function Sidebar() {
           const Icon = item.icon;
 
           return (
-            <Link key={item.href} href={item.href}>
-              <a
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-                data-testid={`nav-${item.href.replace('/', '') || 'dashboard'}`}
-              >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
-              </a>
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              )}
+              data-testid={`nav-${item.href.replace('/', '') || 'dashboard'}`}
+            >
+              <Icon className="h-5 w-5 flex-shrink-0" />
+              {!collapsed && <span>{item.label}</span>}
             </Link>
           );
         })}

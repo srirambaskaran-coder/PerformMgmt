@@ -698,40 +698,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Development endpoints for user seeding and testing
-  app.post('/api/dev/seed-users', async (req, res) => {
-    try {
-      await seedTestUsers();
-      res.json({ 
-        message: "Test users seeded successfully",
-        users: testUsers.map(u => ({ 
-          role: u.role, 
-          email: u.email, 
-          name: `${u.firstName} ${u.lastName}` 
-        }))
-      });
-    } catch (error) {
-      console.error("Error seeding users:", error);
-      res.status(500).json({ message: "Failed to seed users" });
-    }
-  });
+  // Development endpoints - only available in development environment
+  if (process.env.NODE_ENV === 'development') {
+    app.post('/api/dev/seed-users', async (req, res) => {
+      try {
+        await seedTestUsers();
+        res.json({ 
+          message: "Test users seeded successfully",
+          users: testUsers.map(u => ({ 
+            role: u.role, 
+            email: u.email, 
+            name: `${u.firstName} ${u.lastName}` 
+          }))
+        });
+      } catch (error) {
+        console.error("Error seeding users:", error);
+        res.status(500).json({ message: "Failed to seed users" });
+      }
+    });
 
-  app.get('/api/dev/test-users', async (req, res) => {
-    try {
-      res.json({
-        message: "Available test user accounts",
-        instructions: "After seeding, you can login with any Replit account and manually change your role in the database, or use the 'Switch User' functionality if implemented",
-        testUsers: testUsers.map(u => ({
-          role: u.role,
-          email: u.email,
-          name: `${u.firstName} ${u.lastName}`,
-          id: u.id
-        }))
-      });
-    } catch (error) {
-      console.error("Error getting test users:", error);
-      res.status(500).json({ message: "Failed to get test users" });
-    }
-  });
+    app.get('/api/dev/test-users', async (req, res) => {
+      try {
+        res.json({
+          message: "Available test user accounts",
+          instructions: "After seeding, you can login with any Replit account and manually change your role in the database, or use the 'Switch User' functionality if implemented",
+          testUsers: testUsers.map(u => ({
+            role: u.role,
+            email: u.email,
+            name: `${u.firstName} ${u.lastName}`,
+            id: u.id
+          }))
+        });
+      } catch (error) {
+        console.error("Error getting test users:", error);
+        res.status(500).json({ message: "Failed to get test users" });
+      }
+    });
+
+    // Development login endpoint to bypass OAuth
+    app.post('/api/dev/login', async (req, res) => {
+      try {
+        const { userId } = req.body;
+        
+        if (!userId) {
+          return res.status(400).json({ message: "User ID is required" });
+        }
+
+        // Get the user from storage
+        const user = await storage.getUser(userId);
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        // Set the user in the session (mimicking OAuth flow)
+        const expires_at = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 days from now
+        
+        (req.session as any).passport = {
+          user: {
+            id: user.id,
+            claims: {
+              sub: user.id,
+              email: user.email,
+              first_name: user.firstName,
+              last_name: user.lastName,
+              exp: expires_at
+            },
+            expires_at: expires_at,
+            access_token: 'dev-token',
+            refresh_token: 'dev-refresh-token'
+          }
+        };
+
+        // Mark request as authenticated for immediate use
+        (req as any).user = (req.session as any).passport.user;
+
+        res.json({ 
+          message: "Logged in successfully",
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role
+          }
+        });
+      } catch (error) {
+        console.error("Error in dev login:", error);
+        res.status(500).json({ message: "Failed to login" });
+      }
+    });
+  } else {
+    // In production, return 404 for all dev endpoints
+    app.all('/api/dev/*', (req, res) => {
+      res.status(404).json({ message: "Not found" });
+    });
+  }
 
   const httpServer = createServer(app);
   return httpServer;
