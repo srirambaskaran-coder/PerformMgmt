@@ -123,11 +123,11 @@ export class DatabaseStorage implements IStorage {
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     // UpsertUser only contains basic auth fields from Replit Auth
-    // Set default role and roles for new users from Replit Auth
+    // Set default role and roles for new users from Replit Auth, but preserve existing roles if provided
     const normalizedData: any = { 
       ...userData,
-      role: 'employee' as any,
-      roles: ['employee']
+      role: (userData as any).role || 'employee' as any,
+      roles: (userData as any).roles || [(userData as any).role || 'employee']
     };
     
     const [user] = await db
@@ -257,9 +257,24 @@ export class DatabaseStorage implements IStorage {
       if (creator) {
         userData.createdById = creatorId;
         
-        // SECURITY: If creator is admin, enforce their company mapping
-        if (creator.role === 'admin' && creator.companyId) {
-          userData.companyId = creator.companyId;
+        // SECURITY: If creator is admin, enforce their company mapping and role restrictions
+        if (creator.role === 'admin') {
+          if (creator.companyId) {
+            userData.companyId = creator.companyId;
+          }
+          
+          // SECURITY: Admins can only assign employee, manager, hr_manager roles - never admin or super_admin
+          const allowedRoles = ['employee', 'manager', 'hr_manager'];
+          if (userData.role && !allowedRoles.includes(userData.role)) {
+            userData.role = 'employee'; // Force to employee if trying to assign restricted role
+          }
+          if (userData.roles && Array.isArray(userData.roles)) {
+            userData.roles = userData.roles.filter((role: string) => allowedRoles.includes(role));
+            if (userData.roles.length === 0) {
+              userData.roles = ['employee']; // Ensure at least one role
+            }
+            userData.role = userData.roles[0] as any; // Set primary role to first allowed role
+          }
         }
       }
     }
@@ -336,6 +351,24 @@ export class DatabaseStorage implements IStorage {
       const requestingUser = await this.getUser(requestingUserId);
       if (!requestingUser) {
         throw new Error('Requesting user not found');
+      }
+      
+      // SECURITY: Admin role restrictions - admins can only assign specific roles
+      if (requestingUser.role === 'admin') {
+        const allowedRoles = ['employee', 'manager', 'hr_manager'];
+        
+        // Check direct role assignment
+        if (userData.role && !allowedRoles.includes(userData.role)) {
+          throw new Error('Insufficient privileges: Administrators can only assign employee, manager, or hr_manager roles');
+        }
+        
+        // Check roles array for restricted roles
+        if (userData.roles && Array.isArray(userData.roles)) {
+          const hasRestrictedRole = userData.roles.some((role: string) => !allowedRoles.includes(role));
+          if (hasRestrictedRole) {
+            throw new Error('Insufficient privileges: Administrators can only assign employee, manager, or hr_manager roles');
+          }
+        }
       }
       
       // CRITICAL: Only super_admin can assign super_admin role to anyone

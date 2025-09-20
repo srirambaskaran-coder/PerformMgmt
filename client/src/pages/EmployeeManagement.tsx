@@ -29,6 +29,7 @@ export default function EmployeeManagement() {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
   const isSuperAdmin = currentUser?.role === 'super_admin';
+  const isAdmin = currentUser?.role === 'admin';
 
   // Build query string from filters
   const queryParams = new URLSearchParams();
@@ -56,6 +57,9 @@ export default function EmployeeManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ predicate: (query) => 
+        Array.isArray(query.queryKey) && query.queryKey[0] === "/api/users" 
+      });
       setIsCreateModalOpen(false);
       toast({
         title: "Success",
@@ -77,6 +81,9 @@ export default function EmployeeManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ predicate: (query) => 
+        Array.isArray(query.queryKey) && query.queryKey[0] === "/api/users" 
+      });
       setEditingUser(null);
       toast({
         title: "Success",
@@ -98,6 +105,9 @@ export default function EmployeeManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ predicate: (query) => 
+        Array.isArray(query.queryKey) && query.queryKey[0] === "/api/users" 
+      });
       toast({
         title: "Success",
         description: "User deleted successfully",
@@ -465,8 +475,8 @@ export default function EmployeeManagement() {
                     />
                   </div>
 
-                  {/* Password fields - only for Super Admin */}
-                  {isSuperAdmin && (
+                  {/* Password fields - for Super Admin and Admin */}
+                  {(isSuperAdmin || isAdmin) && (
                     <div className="border-t pt-4">
                       <div className="flex items-center gap-2 mb-4">
                         <Key className="h-4 w-4" />
