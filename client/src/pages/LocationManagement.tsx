@@ -18,7 +18,7 @@ import { Plus, Search, Edit, Trash2, MapPin } from "lucide-react";
 
 export default function LocationManagement() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
 
@@ -145,7 +145,7 @@ export default function LocationManagement() {
       location.state?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       location.country?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesStatus = statusFilter === "" || location.status === statusFilter;
+    const matchesStatus = statusFilter === "all" || location.status === statusFilter;
     
     return matchesSearch && matchesStatus;
   });
@@ -308,7 +308,7 @@ export default function LocationManagement() {
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
