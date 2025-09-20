@@ -160,8 +160,9 @@ export default function CompanyManagement() {
   };
 
   const handleUploadComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    if (result.successful.length > 0) {
-      const uploadURL = result.successful[0].uploadURL;
+    const successful = result.successful ?? [];
+    if (successful.length > 0) {
+      const uploadURL = successful[0].uploadURL;
       try {
         const response = await apiRequest("PUT", "/api/company-logos", { logoURL: uploadURL });
         const data = await response.json();
@@ -230,7 +231,7 @@ export default function CompanyManagement() {
                       <FormItem>
                         <FormLabel>Address</FormLabel>
                         <FormControl>
-                          <Textarea {...field} data-testid="input-address" />
+                          <Textarea {...field} value={field.value ?? ""} data-testid="input-address" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -244,7 +245,7 @@ export default function CompanyManagement() {
                       <FormItem>
                         <FormLabel>Company URL</FormLabel>
                         <FormControl>
-                          <Input type="url" {...field} placeholder="https://company.example.com" data-testid="input-company-url" />
+                          <Input type="url" {...field} value={field.value ?? ""} placeholder="https://company.example.com" data-testid="input-company-url" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -259,7 +260,7 @@ export default function CompanyManagement() {
                         <FormItem>
                           <FormLabel>Client Contact</FormLabel>
                           <FormControl>
-                            <Input {...field} data-testid="input-client-contact" />
+                            <Input {...field} value={field.value ?? ""} data-testid="input-client-contact" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -272,7 +273,7 @@ export default function CompanyManagement() {
                         <FormItem>
                           <FormLabel>Email</FormLabel>
                           <FormControl>
-                            <Input type="email" {...field} data-testid="input-email" />
+                            <Input type="email" {...field} value={field.value ?? ""} data-testid="input-email" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -288,7 +289,7 @@ export default function CompanyManagement() {
                         <FormItem>
                           <FormLabel>Contact Number</FormLabel>
                           <FormControl>
-                            <Input {...field} data-testid="input-contact-number" />
+                            <Input {...field} value={field.value ?? ""} data-testid="input-contact-number" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -301,7 +302,7 @@ export default function CompanyManagement() {
                         <FormItem>
                           <FormLabel>GST Number</FormLabel>
                           <FormControl>
-                            <Input {...field} data-testid="input-gst-number" />
+                            <Input {...field} value={field.value ?? ""} data-testid="input-gst-number" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -318,7 +319,7 @@ export default function CompanyManagement() {
                           <FormLabel>Company Logo</FormLabel>
                           <FormControl>
                             <div className="space-y-2">
-                              <Input {...field} placeholder="Logo URL" data-testid="input-logo-url" />
+                              <Input {...field} value={field.value ?? ""} placeholder="Logo URL" data-testid="input-logo-url" />
                               <ObjectUploader
                                 maxNumberOfFiles={1}
                                 maxFileSize={5242880} // 5MB
@@ -340,7 +341,7 @@ export default function CompanyManagement() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value ?? "active"}>
                             <FormControl>
                               <SelectTrigger data-testid="select-status">
                                 <SelectValue placeholder="Select status" />
