@@ -30,6 +30,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, like, inArray, or, sql } from "drizzle-orm";
+import bcrypt from "bcrypt";
 
 export interface IStorage {
   // User operations - mandatory for Replit Auth
@@ -109,21 +110,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    // Normalize role and roles fields for consistency
-    const normalizedData = { ...userData };
-    
-    if (normalizedData.roles && normalizedData.roles.length > 0) {
-      // Deduplicate roles and ensure at least one role
-      normalizedData.roles = Array.from(new Set(normalizedData.roles));
-      normalizedData.role = normalizedData.roles[0] as any; // Set single role to first role
-    } else if (normalizedData.role) {
-      // If only single role provided, create roles array
-      normalizedData.roles = [normalizedData.role];
-    } else {
-      // Default fallback
-      normalizedData.role = 'employee' as any;
-      normalizedData.roles = ['employee'];
-    }
+    // UpsertUser only contains basic auth fields from Replit Auth
+    // Set default role and roles for new users from Replit Auth
+    const normalizedData: any = { 
+      ...userData,
+      role: 'employee' as any,
+      roles: ['employee']
+    };
     
     const [user] = await db
       .insert(users)
@@ -228,10 +221,20 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(user: InsertUser): Promise<User> {
     // Handle empty codes by converting to null to avoid unique constraint violations
-    const userData = {
+    const userData: any = {
       ...user,
       code: user.code && user.code.trim() !== '' ? user.code : null,
     };
+    
+    // Handle password hashing
+    if (user.password) {
+      const saltRounds = 12;
+      userData.passwordHash = await bcrypt.hash(user.password, saltRounds);
+    }
+    
+    // Remove password fields from userData as they don't exist in the database
+    delete userData.password;
+    delete userData.confirmPassword;
     
     // Normalize role and roles fields for consistency
     if (userData.roles && userData.roles.length > 0) {
@@ -253,11 +256,21 @@ export class DatabaseStorage implements IStorage {
 
   async updateUser(id: string, user: Partial<InsertUser>): Promise<User> {
     // Handle empty codes by converting to null to avoid unique constraint violations
-    const userData = {
+    const userData: any = {
       ...user,
       code: user.code !== undefined ? (user.code && user.code.trim() !== '' ? user.code : null) : undefined,
       updatedAt: new Date(),
     };
+    
+    // Handle password hashing
+    if (user.password) {
+      const saltRounds = 12;
+      userData.passwordHash = await bcrypt.hash(user.password, saltRounds);
+    }
+    
+    // Remove password fields from userData as they don't exist in the database
+    delete userData.password;
+    delete userData.confirmPassword;
     
     // Normalize role and roles fields for consistency
     if (userData.roles !== undefined) {

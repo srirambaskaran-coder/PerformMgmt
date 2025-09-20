@@ -14,8 +14,9 @@ import { insertUserSchema, type User, type InsertUser } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
+import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Plus, Search, Filter, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Edit, Trash2, Key } from "lucide-react";
 
 export default function EmployeeManagement() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -26,6 +27,8 @@ export default function EmployeeManagement() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.role === 'super_admin';
 
   // Build query string from filters
   const queryParams = new URLSearchParams();
@@ -118,9 +121,14 @@ export default function EmployeeManagement() {
       code: "",
       designation: "",
       mobileNumber: "",
+      locationId: "",
+      companyId: "",
+      reportingManagerId: "",
       role: "employee",
       roles: ["employee"],
       status: "active",
+      password: "",
+      confirmPassword: "",
     },
   });
 
@@ -147,6 +155,8 @@ export default function EmployeeManagement() {
       role: user.role || "employee",
       roles: (user as any).roles || [user.role] || ["employee"],
       status: user.status || "active",
+      password: "",
+      confirmPassword: "",
     });
   };
 
@@ -174,9 +184,14 @@ export default function EmployeeManagement() {
       code: "",
       designation: "",
       mobileNumber: "",
+      locationId: "",
+      companyId: "",
+      reportingManagerId: "",
       role: "employee",
       roles: ["employee"],
       status: "active",
+      password: "",
+      confirmPassword: "",
     });
   };
 
@@ -299,6 +314,108 @@ export default function EmployeeManagement() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
+                      name="locationId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Location</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-location">
+                                <SelectValue placeholder="Select location" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">No Location</SelectItem>
+                              {locations.map((location: any) => (
+                                <SelectItem key={location.id} value={location.id}>
+                                  {location.name} ({location.code})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="companyId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Company</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-company">
+                                <SelectValue placeholder="Select company" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">No Company</SelectItem>
+                              {companies.map((company: any) => (
+                                <SelectItem key={company.id} value={company.id}>
+                                  {company.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="reportingManagerId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Reporting Manager</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-manager">
+                                <SelectValue placeholder="Select reporting manager" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">No Manager</SelectItem>
+                              {users.filter((user: any) => user.id !== editingUser?.id).map((user: any) => (
+                                <SelectItem key={user.id} value={user.id}>
+                                  {user.firstName} {user.lastName} ({user.email})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-status">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <FormField
+                      control={form.control}
                       name="roles"
                       render={({ field }) => (
                         <FormItem>
@@ -338,28 +455,58 @@ export default function EmployeeManagement() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-status">
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="inactive">Inactive</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </div>
+
+                  {/* Password fields - only for Super Admin and in edit mode */}
+                  {isSuperAdmin && editingUser && (
+                    <div className="border-t pt-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Key className="h-4 w-4" />
+                        <h3 className="text-lg font-medium">Change Password</h3>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>New Password</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="password"
+                                  placeholder="Enter new password"
+                                  {...field}
+                                  data-testid="input-password"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="confirmPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Confirm Password</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="password"
+                                  placeholder="Confirm new password"
+                                  {...field}
+                                  data-testid="input-confirm-password"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Leave password fields empty if you don't want to change the password.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="flex gap-3 pt-4">
                     <Button

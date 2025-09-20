@@ -179,7 +179,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/users/:id', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req, res) => {
     try {
       const { id } = req.params;
-      const userData = insertUserSchema.partial().parse(req.body);
+      // Parse with the full schema to get password validation, then pass to storage
+      const userData = insertUserSchema.parse(req.body);
       const user = await storage.updateUser(id, userData);
       res.json(user);
     } catch (error) {

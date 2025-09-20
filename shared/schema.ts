@@ -59,6 +59,8 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").default('employee'),
   roles: text("roles").array(),
   status: statusEnum("status").default('active'),
+  // Password field for admin-managed accounts
+  passwordHash: varchar("password_hash"),
 });
 
 // Companies table
@@ -233,8 +235,19 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  passwordHash: true,
 }).extend({
   roles: z.array(z.enum(['super_admin', 'admin', 'hr_manager', 'employee', 'manager'])).optional().default(['employee']),
+  password: z.string().min(8, "Password must be at least 8 characters").optional(),
+  confirmPassword: z.string().optional(),
+}).refine((data) => {
+  if (data.password || data.confirmPassword) {
+    return data.password === data.confirmPassword;
+  }
+  return true;
+}, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 export const insertCompanySchema = createInsertSchema(companies).omit({
