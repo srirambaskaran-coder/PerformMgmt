@@ -27,7 +27,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: ChartPie },
   { href: "/companies", label: "Company Management", icon: Building, roles: ["super_admin", "admin"] },
-  { href: "/users", label: "Employee Management", icon: Users, roles: ["super_admin", "admin"] },
+  { href: "/users", label: "User Management", icon: Users, roles: ["super_admin", "admin"] },
   { href: "/locations", label: "Location Management", icon: MapPin, roles: ["admin"] },
   { href: "/performance-reviews", label: "Performance Reviews", icon: ClipboardList, roles: ["hr_manager"] },
   { href: "/review-progress", label: "Review Progress", icon: ChartBar, roles: ["hr_manager"] },

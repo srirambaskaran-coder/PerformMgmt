@@ -57,6 +57,7 @@ export const users = pgTable("users", {
   locationId: varchar("location_id"),
   companyId: varchar("company_id"),
   role: userRoleEnum("role").default('employee'),
+  roles: text("roles").array(),
   status: statusEnum("status").default('active'),
 });
 
@@ -232,6 +233,8 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  roles: z.array(z.enum(['super_admin', 'admin', 'hr_manager', 'employee', 'manager'])).optional().default(['employee']),
 });
 
 export const insertCompanySchema = createInsertSchema(companies).omit({

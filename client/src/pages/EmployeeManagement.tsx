@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
@@ -118,6 +119,7 @@ export default function EmployeeManagement() {
       designation: "",
       mobileNumber: "",
       role: "employee",
+      roles: ["employee"],
       status: "active",
     },
   });
@@ -143,6 +145,7 @@ export default function EmployeeManagement() {
       companyId: user.companyId || "",
       reportingManagerId: user.reportingManagerId || "",
       role: user.role || "employee",
+      roles: (user as any).roles || [user.role] || ["employee"],
       status: user.status || "active",
     });
   };
@@ -172,6 +175,7 @@ export default function EmployeeManagement() {
       designation: "",
       mobileNumber: "",
       role: "employee",
+      roles: ["employee"],
       status: "active",
     });
   };
@@ -181,8 +185,8 @@ export default function EmployeeManagement() {
       <div className="space-y-6" data-testid="employee-management">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold">Employee Management</h1>
-            <p className="text-muted-foreground">Manage employee profiles and roles</p>
+            <h1 className="text-2xl font-semibold">User Management</h1>
+            <p className="text-muted-foreground">Manage user profiles and roles</p>
           </div>
           <Dialog open={isCreateModalOpen || !!editingUser} onOpenChange={(open) => {
             if (!open) {
@@ -193,14 +197,14 @@ export default function EmployeeManagement() {
             <DialogTrigger asChild>
               <Button onClick={() => setIsCreateModalOpen(true)} data-testid="add-user-button">
                 <Plus className="h-4 w-4 mr-2" />
-                Add Employee
+                Add User
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>{editingUser ? "Edit Employee" : "Add New Employee"}</DialogTitle>
+                <DialogTitle>{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
                 <DialogDescription>
-                  {editingUser ? "Update employee information" : "Create a new employee profile"}
+                  {editingUser ? "Update user information" : "Create a new user profile"}
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
@@ -295,24 +299,41 @@ export default function EmployeeManagement() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="role"
+                      name="roles"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Role</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-role">
-                                <SelectValue placeholder="Select role" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="employee">Employee</SelectItem>
-                              <SelectItem value="manager">Manager</SelectItem>
-                              <SelectItem value="hr_manager">HR Manager</SelectItem>
-                              <SelectItem value="admin">Administrator</SelectItem>
-                              <SelectItem value="super_admin">Super Administrator</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <FormLabel>Roles</FormLabel>
+                          <div className="space-y-2" data-testid="select-roles">
+                            {[
+                              { value: "employee", label: "Employee" },
+                              { value: "manager", label: "Manager" },
+                              { value: "hr_manager", label: "HR Manager" },
+                              { value: "admin", label: "Administrator" },
+                              { value: "super_admin", label: "Super Administrator" }
+                            ].map((role) => (
+                              <div key={role.value} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={role.value}
+                                  checked={field.value?.includes(role.value)}
+                                  onCheckedChange={(checked) => {
+                                    const currentRoles = field.value || [];
+                                    if (checked) {
+                                      field.onChange([...currentRoles, role.value]);
+                                    } else {
+                                      field.onChange(currentRoles.filter((r: string) => r !== role.value));
+                                    }
+                                  }}
+                                  data-testid={`checkbox-role-${role.value}`}
+                                />
+                                <label
+                                  htmlFor={role.value}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {role.label}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
                           <FormMessage />
                         </FormItem>
                       )}
