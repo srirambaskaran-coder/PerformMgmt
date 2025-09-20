@@ -155,3 +155,31 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return;
   }
 };
+
+// Role-based authorization middleware
+export const requireRoles = (allowedRoles: string[]): RequestHandler => {
+  return async (req, res, next) => {
+    const user = req.user as any;
+    
+    if (!user?.claims?.sub) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    try {
+      // Get the full user profile with role information
+      const userProfile = await storage.getUser(user.claims.sub);
+      if (!userProfile || !userProfile.role) {
+        return res.status(403).json({ message: "Access forbidden - no role assigned" });
+      }
+
+      if (!allowedRoles.includes(userProfile.role)) {
+        return res.status(403).json({ message: "Access forbidden - insufficient permissions" });
+      }
+
+      next();
+    } catch (error) {
+      console.error("Error checking user role:", error);
+      res.status(500).json({ message: "Error validating permissions" });
+    }
+  };
+};

@@ -18,16 +18,24 @@ import { Plus, Search, Filter, Edit, Trash2 } from "lucide-react";
 
 export default function EmployeeManagement() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Build query string from filters
+  const queryParams = new URLSearchParams();
+  if (roleFilter && roleFilter !== "all") queryParams.set("role", roleFilter);
+  if (statusFilter && statusFilter !== "all") queryParams.set("status", statusFilter);
+  const queryString = queryParams.toString();
+
   const { data: users = [], isLoading } = useQuery<User[]>({
-    queryKey: ["/api/users", { role: roleFilter, status: statusFilter }],
+    queryKey: queryString 
+      ? ["/api/users", queryString] 
+      : ["/api/users"],
   });
 
   const { data: locations = [] } = useQuery({
@@ -101,9 +109,7 @@ export default function EmployeeManagement() {
   });
 
   const form = useForm<InsertUser>({
-    resolver: zodResolver(insertUserSchema.extend({
-      password: insertUserSchema.shape.password?.optional(),
-    })),
+    resolver: zodResolver(insertUserSchema),
     defaultValues: {
       firstName: "",
       lastName: "",
@@ -383,7 +389,7 @@ export default function EmployeeManagement() {
                   <SelectValue placeholder="All Roles" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Roles</SelectItem>
+                  <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="employee">Employee</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
                   <SelectItem value="hr_manager">HR Manager</SelectItem>
@@ -396,7 +402,7 @@ export default function EmployeeManagement() {
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>

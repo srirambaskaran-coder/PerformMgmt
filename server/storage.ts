@@ -9,6 +9,7 @@ import {
   emailConfig,
   type User,
   type UpsertUser,
+  type InsertUser,
   type Company,
   type InsertCompany,
   type Location,
@@ -49,8 +50,8 @@ export interface IStorage {
   // User management operations
   getUsers(filters?: { role?: string; department?: string; status?: string }): Promise<User[]>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  createUser(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User>;
-  updateUser(id: string, user: Partial<User>): Promise<User>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<InsertUser>): Promise<User>;
   deleteUser(id: string): Promise<void>;
   getUsersByManager(managerId: string): Promise<User[]>;
   
@@ -187,15 +188,28 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createUser(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
-    const [newUser] = await db.insert(users).values(user).returning();
+  async createUser(user: InsertUser): Promise<User> {
+    // Handle empty codes by converting to null to avoid unique constraint violations
+    const userData = {
+      ...user,
+      code: user.code && user.code.trim() !== '' ? user.code : null,
+    };
+    
+    const [newUser] = await db.insert(users).values(userData).returning();
     return newUser;
   }
 
-  async updateUser(id: string, user: Partial<User>): Promise<User> {
+  async updateUser(id: string, user: Partial<InsertUser>): Promise<User> {
+    // Handle empty codes by converting to null to avoid unique constraint violations
+    const userData = {
+      ...user,
+      code: user.code !== undefined ? (user.code && user.code.trim() !== '' ? user.code : null) : undefined,
+      updatedAt: new Date(),
+    };
+    
     const [updatedUser] = await db
       .update(users)
-      .set({ ...user, updatedAt: new Date() })
+      .set(userData)
       .where(eq(users.id, id))
       .returning();
     return updatedUser;

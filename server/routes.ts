@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated, requireRoles } from "./replitAuth";
 import { 
   insertUserSchema,
   insertCompanySchema,
@@ -148,7 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User management routes
-  app.get('/api/users', isAuthenticated, async (req, res) => {
+  app.get('/api/users', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req, res) => {
     try {
       const { role, department, status } = req.query;
       const filters = {
@@ -164,7 +164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/users', isAuthenticated, async (req, res) => {
+  app.post('/api/users', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req, res) => {
     try {
       const userData = insertUserSchema.parse(req.body);
       const user = await storage.createUser(userData);
@@ -175,7 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/users/:id', isAuthenticated, async (req, res) => {
+  app.put('/api/users/:id', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req, res) => {
     try {
       const { id } = req.params;
       const userData = insertUserSchema.partial().parse(req.body);
@@ -187,7 +187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/users/:id', isAuthenticated, async (req, res) => {
+  app.delete('/api/users/:id', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deleteUser(id);
