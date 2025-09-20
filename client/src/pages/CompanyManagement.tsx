@@ -178,7 +178,7 @@ export default function CompanyManagement() {
   };
 
   return (
-    <RoleGuard allowedRoles={["super_admin"]}>
+    <RoleGuard allowedRoles={["super_admin", "admin"]}>
       <div className="space-y-6" data-testid="company-management">
         <div className="flex items-center justify-between">
           <div>

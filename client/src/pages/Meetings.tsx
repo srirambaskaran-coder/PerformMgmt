@@ -46,18 +46,6 @@ export default function Meetings() {
     select: (data) => data.filter(evaluation => 
       evaluation.employeeId === user?.id || evaluation.managerId === user?.id
     ),
-    onError: (error) => {
-      if (isUnauthorizedError(error as Error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-      }
-    },
   });
 
   const scheduleMeetingMutation = useMutation({

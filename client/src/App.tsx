@@ -43,20 +43,28 @@ function Router() {
   );
 }
 
-function App() {
+function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
 
   return (
+    <>
+      <Toaster />
+      {isLoading || !isAuthenticated ? (
+        <Router />
+      ) : (
+        <Layout>
+          <Router />
+        </Layout>
+      )}
+    </>
+  );
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        {isLoading || !isAuthenticated ? (
-          <Router />
-        ) : (
-          <Layout>
-            <Router />
-          </Layout>
-        )}
+        <AppContent />
       </TooltipProvider>
     </QueryClientProvider>
   );

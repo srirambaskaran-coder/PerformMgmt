@@ -51,18 +51,6 @@ export default function Evaluations() {
 
   const { data: evaluations = [], isLoading } = useQuery<EvaluationWithDetails[]>({
     queryKey: ["/api/evaluations", { employeeId: user?.id }],
-    onError: (error) => {
-      if (isUnauthorizedError(error as Error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-      }
-    },
   });
 
   const submitEvaluationMutation = useMutation({

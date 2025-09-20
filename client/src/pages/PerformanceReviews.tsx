@@ -29,18 +29,6 @@ export default function PerformanceReviews() {
 
   const { data: reviewCycles = [], isLoading } = useQuery<ReviewCycle[]>({
     queryKey: ["/api/review-cycles"],
-    onError: (error) => {
-      if (isUnauthorizedError(error as Error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-      }
-    },
   });
 
   const { data: employees = [] } = useQuery<User[]>({

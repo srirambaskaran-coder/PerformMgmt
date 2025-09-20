@@ -28,18 +28,6 @@ export default function EmployeeManagement() {
 
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users", { role: roleFilter, status: statusFilter }],
-    onError: (error) => {
-      if (isUnauthorizedError(error as Error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-      }
-    },
   });
 
   const { data: locations = [] } = useQuery({

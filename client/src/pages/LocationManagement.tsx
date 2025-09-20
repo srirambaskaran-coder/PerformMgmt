@@ -27,18 +27,6 @@ export default function LocationManagement() {
 
   const { data: locations = [], isLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
-    onError: (error) => {
-      if (isUnauthorizedError(error as Error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-      }
-    },
   });
 
   const createLocationMutation = useMutation({
