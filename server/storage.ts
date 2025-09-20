@@ -64,11 +64,11 @@ export interface IStorage {
   deleteLocation(id: string): Promise<void>;
   
   // User management operations
-  getUsers(filters?: { role?: string; department?: string; status?: string }): Promise<SafeUser[]>;
+  getUsers(filters?: { role?: string; department?: string; status?: string }, requestingUserId?: string): Promise<SafeUser[]>;
   getUserByEmail(email: string): Promise<User | undefined>; // Keep as User for internal auth
-  createUser(user: InsertUser): Promise<SafeUser>;
+  createUser(user: InsertUser, creatorId?: string): Promise<SafeUser>;
   updateUser(id: string, user: Partial<InsertUser>, requestingUserId?: string): Promise<SafeUser>;
-  deleteUser(id: string): Promise<void>;
+  deleteUser(id: string, requestingUserId?: string): Promise<void>;
   getUsersByManager(managerId: string): Promise<SafeUser[]>;
   
   // Questionnaire template operations
@@ -201,8 +201,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   // User management operations
-  async getUsers(filters?: { role?: string; department?: string; status?: string }): Promise<SafeUser[]> {
+  async getUsers(filters?: { role?: string; department?: string; status?: string }, requestingUserId?: string): Promise<SafeUser[]> {
     const conditions = [];
+    
+    // SECURITY: Administrator isolation - only see users they created
+    if (requestingUserId) {
+      const requestingUser = await this.getUser(requestingUserId);
+      if (requestingUser && requestingUser.role === 'admin') {
+        // Administrators can only see users they created
+        conditions.push(eq(users.createdById, requestingUserId));
+      }
+      // Super admins and other roles can see all users (no additional filter)
+    }
+    
     if (filters?.role) {
       // Support filtering by both single role and roles array
       conditions.push(
@@ -233,12 +244,25 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createUser(user: InsertUser): Promise<SafeUser> {
+  async createUser(user: InsertUser, creatorId?: string): Promise<SafeUser> {
     // Handle empty codes by converting to null to avoid unique constraint violations
     const userData: any = {
       ...user,
       code: user.code && user.code.trim() !== '' ? user.code : null,
     };
+    
+    // SECURITY: Set createdById and enforce company mapping for administrators
+    if (creatorId) {
+      const creator = await this.getUser(creatorId);
+      if (creator) {
+        userData.createdById = creatorId;
+        
+        // SECURITY: If creator is admin, enforce their company mapping
+        if (creator.role === 'admin' && creator.companyId) {
+          userData.companyId = creator.companyId;
+        }
+      }
+    }
     
     // Handle password hashing
     if (user.password) {
@@ -269,6 +293,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: string, user: Partial<InsertUser>, requestingUserId?: string): Promise<SafeUser> {
+    // SECURITY: Administrator isolation - only update users they created
+    if (requestingUserId) {
+      const requestingUser = await this.getUser(requestingUserId);
+      if (requestingUser && requestingUser.role === 'admin') {
+        // Check if the admin created this user
+        const targetUser = await this.getUser(id);
+        if (!targetUser || targetUser.createdById !== requestingUserId) {
+          throw new Error('Forbidden: You can only update users you created');
+        }
+      }
+    }
+    
     // SECURITY: Explicitly strip dangerous fields that should never be directly updated
     const {
       passwordHash,
@@ -345,7 +381,20 @@ export class DatabaseStorage implements IStorage {
     return sanitizeUser(updatedUser);
   }
 
-  async deleteUser(id: string): Promise<void> {
+  async deleteUser(id: string, requestingUserId?: string): Promise<void> {
+    // SECURITY: Administrator isolation - only delete users they created
+    if (requestingUserId) {
+      const requestingUser = await this.getUser(requestingUserId);
+      if (requestingUser && requestingUser.role === 'admin') {
+        // Check if the admin created this user
+        const targetUser = await this.getUser(id);
+        if (!targetUser || targetUser.createdById !== requestingUserId) {
+          throw new Error('Forbidden: You can only delete users you created');
+        }
+      }
+      // Super admins can delete any user (no additional check)
+    }
+    
     await db.delete(users).where(eq(users.id, id));
   }
 

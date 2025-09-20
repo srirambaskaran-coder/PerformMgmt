@@ -61,6 +61,8 @@ export const users = pgTable("users", {
   status: statusEnum("status").default('active'),
   // Password field for admin-managed accounts
   passwordHash: varchar("password_hash"),
+  // Track which Administrator created this user (for user isolation)
+  createdById: varchar("created_by_id"),
 });
 
 // Companies table
@@ -180,8 +182,19 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   reportingManager: one(users, {
     fields: [users.reportingManagerId],
     references: [users.id],
+    relationName: "reportingManager",
   }),
-  directReports: many(users),
+  directReports: many(users, {
+    relationName: "reportingManager",
+  }),
+  createdBy: one(users, {
+    fields: [users.createdById],
+    references: [users.id],
+    relationName: "createdByUser",
+  }),
+  createdUsers: many(users, {
+    relationName: "createdByUser",
+  }),
   location: one(locations, {
     fields: [users.locationId],
     references: [locations.id],
@@ -237,6 +250,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
   updatedAt: true,
   passwordHash: true,
+  createdById: true,
 }).extend({
   roles: z.array(z.enum(['super_admin', 'admin', 'hr_manager', 'employee', 'manager'])).optional().default(['employee']),
   password: z.string().min(8, "Password must be at least 8 characters").optional(),
@@ -304,6 +318,7 @@ export const updateUserSchema = createInsertSchema(users).omit({
   createdAt: true,
   updatedAt: true,
   passwordHash: true,
+  createdById: true,
 }).extend({
   roles: z.array(z.enum(['super_admin', 'admin', 'hr_manager', 'employee', 'manager'])).optional(),
 }).partial().strict();

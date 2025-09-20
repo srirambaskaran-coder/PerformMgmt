@@ -43,7 +43,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard metrics
   app.get('/api/dashboard/metrics', isAuthenticated, async (req: any, res) => {
     try {
-      const users = await storage.getUsers();
+      const requestingUserId = req.user.claims.sub;
+      const users = await storage.getUsers({}, requestingUserId);
       const evaluations = await storage.getEvaluations();
       const activeReviews = evaluations.filter(e => e.status === 'in_progress');
       const completed = evaluations.filter(e => e.status === 'completed');
@@ -154,15 +155,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User management routes
-  app.get('/api/users', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req, res) => {
+  app.get('/api/users', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req: any, res) => {
     try {
       const { role, department, status } = req.query;
+      const requestingUserId = req.user.claims.sub;
       const filters = {
         role: role as string,
         department: department as string,
         status: status as string,
       };
-      const users = await storage.getUsers(filters);
+      const users = await storage.getUsers(filters, requestingUserId);
       res.json(users);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -170,10 +172,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/users', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req, res) => {
+  app.post('/api/users', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req: any, res) => {
     try {
       const userData = insertUserSchema.parse(req.body);
-      const user = await storage.createUser(userData);
+      const creatorId = req.user.claims.sub;
+      const user = await storage.createUser(userData, creatorId);
       res.status(201).json(user);
     } catch (error) {
       console.error("Error creating user:", error);
@@ -245,13 +248,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/users/:id', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req, res) => {
+  app.delete('/api/users/:id', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req: any, res) => {
     try {
       const { id } = req.params;
-      await storage.deleteUser(id);
+      const requestingUserId = req.user.claims.sub;
+      await storage.deleteUser(id, requestingUserId);
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting user:", error);
+      
+      // Handle authorization errors specifically
+      if (error instanceof Error && error.message?.includes('Forbidden')) {
+        return res.status(403).json({ message: error.message });
+      }
+      
       res.status(500).json({ message: "Failed to delete user" });
     }
   });
