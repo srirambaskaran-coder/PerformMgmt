@@ -297,6 +297,31 @@ export const insertAccessTokenSchema = createInsertSchema(accessTokens).omit({
   createdAt: true,
 });
 
+// Secure update schemas to prevent security vulnerabilities
+export const updateUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  passwordHash: true,
+}).extend({
+  roles: z.array(z.enum(['super_admin', 'admin', 'hr_manager', 'employee', 'manager'])).optional(),
+}).partial().strict();
+
+// Dedicated schema for password updates only
+export const passwordUpdateSchema = z.object({
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string()
+}).strict().refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+// Schema for role updates with authorization validation
+export const roleUpdateSchema = z.object({
+  role: z.enum(['super_admin', 'admin', 'hr_manager', 'employee', 'manager']).optional(),
+  roles: z.array(z.enum(['super_admin', 'admin', 'hr_manager', 'employee', 'manager'])).optional()
+}).strict();
+
 // Upsert user schema for Replit Auth
 export const upsertUserSchema = createInsertSchema(users).pick({
   id: true,
@@ -309,6 +334,7 @@ export const upsertUserSchema = createInsertSchema(users).pick({
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type SafeUser = Omit<User, 'passwordHash'>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Company = typeof companies.$inferSelect;
 export type InsertCompany = z.infer<typeof insertCompanySchema>;

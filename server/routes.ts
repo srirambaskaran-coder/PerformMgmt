@@ -11,6 +11,9 @@ import {
   insertEvaluationSchema,
   insertEmailTemplateSchema,
   insertEmailConfigSchema,
+  updateUserSchema,
+  passwordUpdateSchema,
+  type SafeUser,
 } from "@shared/schema";
 import { sendEmail, sendReviewInvitation, sendReviewReminder, sendReviewCompletion } from "./emailService";
 import { ObjectStorageService } from "./objectStorage";
@@ -28,7 +31,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      res.json(user);
+      // Sanitize user object to exclude passwordHash
+      const { passwordHash, ...safeUser } = user;
+      res.json(safeUser);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -176,15 +181,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/users/:id', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req, res) => {
+  app.put('/api/users/:id', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req: any, res) => {
     try {
       const { id } = req.params;
-      // Parse with the full schema to get password validation, then pass to storage
-      const userData = insertUserSchema.parse(req.body);
-      const user = await storage.updateUser(id, userData);
-      res.json(user);
+      const requestingUserId = req.user.claims.sub;
+      const { password, confirmPassword, ...otherFields } = req.body;
+      
+      // SECURITY: Detect if this is a password update vs a regular update
+      const isPasswordUpdate = password || confirmPassword;
+      
+      if (isPasswordUpdate) {
+        // SECURITY: Only super_admin can change passwords
+        const currentUser = await storage.getUser(requestingUserId);
+        if (!currentUser || currentUser.role !== 'super_admin') {
+          return res.status(403).json({ 
+            message: "Password changes can only be performed by Super Administrators" 
+          });
+        }
+        
+        // SECURITY: Validate password fields with dedicated schema
+        const passwordData = passwordUpdateSchema.parse({ password, confirmPassword });
+        
+        // SECURITY: Validate other fields with update schema (strict mode)
+        let otherData = {};
+        if (Object.keys(otherFields).length > 0) {
+          otherData = updateUserSchema.parse(otherFields);
+        }
+        
+        // Combine validated data
+        const userData = { ...otherData, ...passwordData };
+        const user = await storage.updateUser(id, userData, requestingUserId);
+        res.json(user);
+      } else {
+        // SECURITY: Regular update - validate with strict schema that excludes sensitive fields
+        if (Object.keys(req.body).length === 0) {
+          return res.status(400).json({ message: "No fields provided for update" });
+        }
+        
+        // SECURITY: Use strict validation schema that rejects unknown keys
+        const userData = updateUserSchema.parse(req.body);
+        
+        // SECURITY: Pass requesting user ID for role escalation protection
+        const user = await storage.updateUser(id, userData, requestingUserId);
+        res.json(user);
+      }
     } catch (error) {
       console.error("Error updating user:", error);
+      
+      // SECURITY: Provide specific error messages for validation failures
+      if (error instanceof Error && error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: (error as any).errors 
+        });
+      }
+      
+      // Handle authorization errors specifically
+      if (error instanceof Error && (error.message?.includes('Super Administrators') || error.message?.includes('super_admin'))) {
+        return res.status(403).json({ message: error.message });
+      }
+      
       res.status(500).json({ message: "Failed to update user" });
     }
   });

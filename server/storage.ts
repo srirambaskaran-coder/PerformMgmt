@@ -9,6 +9,7 @@ import {
   emailConfig,
   accessTokens,
   type User,
+  type SafeUser,
   type UpsertUser,
   type InsertUser,
   type Company,
@@ -32,6 +33,17 @@ import { db } from "./db";
 import { eq, and, desc, asc, like, inArray, or, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
+// Helper function to sanitize user objects by removing passwordHash
+function sanitizeUser(user: User): SafeUser {
+  const { passwordHash, ...sanitized } = user;
+  return sanitized;
+}
+
+// Helper function to sanitize array of users
+function sanitizeUsers(users: User[]): SafeUser[] {
+  return users.map(sanitizeUser);
+}
+
 export interface IStorage {
   // User operations - mandatory for Replit Auth
   getUser(id: string): Promise<User | undefined>;
@@ -52,12 +64,12 @@ export interface IStorage {
   deleteLocation(id: string): Promise<void>;
   
   // User management operations
-  getUsers(filters?: { role?: string; department?: string; status?: string }): Promise<User[]>;
-  getUserByEmail(email: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  updateUser(id: string, user: Partial<InsertUser>): Promise<User>;
+  getUsers(filters?: { role?: string; department?: string; status?: string }): Promise<SafeUser[]>;
+  getUserByEmail(email: string): Promise<User | undefined>; // Keep as User for internal auth
+  createUser(user: InsertUser): Promise<SafeUser>;
+  updateUser(id: string, user: Partial<InsertUser>, requestingUserId?: string): Promise<SafeUser>;
   deleteUser(id: string): Promise<void>;
-  getUsersByManager(managerId: string): Promise<User[]>;
+  getUsersByManager(managerId: string): Promise<SafeUser[]>;
   
   // Questionnaire template operations
   getQuestionnaireTemplates(): Promise<QuestionnaireTemplate[]>;
@@ -189,7 +201,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // User management operations
-  async getUsers(filters?: { role?: string; department?: string; status?: string }): Promise<User[]> {
+  async getUsers(filters?: { role?: string; department?: string; status?: string }): Promise<SafeUser[]> {
     const conditions = [];
     if (filters?.role) {
       // Support filtering by both single role and roles array
@@ -208,10 +220,12 @@ export class DatabaseStorage implements IStorage {
     }
     
     if (conditions.length > 0) {
-      return await db.select().from(users).where(and(...conditions)).orderBy(asc(users.firstName));
+      const filteredUsers = await db.select().from(users).where(and(...conditions)).orderBy(asc(users.firstName));
+      return sanitizeUsers(filteredUsers);
     }
     
-    return await db.select().from(users).orderBy(asc(users.firstName));
+    const userList = await db.select().from(users).orderBy(asc(users.firstName));
+    return sanitizeUsers(userList);
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
@@ -219,7 +233,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createUser(user: InsertUser): Promise<User> {
+  async createUser(user: InsertUser): Promise<SafeUser> {
     // Handle empty codes by converting to null to avoid unique constraint violations
     const userData: any = {
       ...user,
@@ -251,28 +265,63 @@ export class DatabaseStorage implements IStorage {
     }
     
     const [newUser] = await db.insert(users).values(userData).returning();
-    return newUser;
+    return sanitizeUser(newUser);
   }
 
-  async updateUser(id: string, user: Partial<InsertUser>): Promise<User> {
+  async updateUser(id: string, user: Partial<InsertUser>, requestingUserId?: string): Promise<SafeUser> {
+    // SECURITY: Explicitly strip dangerous fields that should never be directly updated
+    const {
+      passwordHash,
+      password,
+      confirmPassword,
+      ...sanitizedInput
+    } = user as any;
+    
     // Handle empty codes by converting to null to avoid unique constraint violations
     const userData: any = {
-      ...user,
-      code: user.code !== undefined ? (user.code && user.code.trim() !== '' ? user.code : null) : undefined,
+      ...sanitizedInput,
+      code: sanitizedInput.code !== undefined ? (sanitizedInput.code && sanitizedInput.code.trim() !== '' ? sanitizedInput.code : null) : undefined,
       updatedAt: new Date(),
     };
     
-    // Handle password hashing
-    if (user.password) {
+    // SECURITY: Only set passwordHash when password is explicitly provided
+    if (password && typeof password === 'string' && password.length > 0) {
       const saltRounds = 12;
-      userData.passwordHash = await bcrypt.hash(user.password, saltRounds);
+      userData.passwordHash = await bcrypt.hash(password, saltRounds);
     }
     
-    // Remove password fields from userData as they don't exist in the database
-    delete userData.password;
-    delete userData.confirmPassword;
+    // SECURITY: Enhanced role escalation protection - prevent unauthorized super_admin assignments
+    if (userData.role !== undefined || userData.roles !== undefined) {
+      // CRITICAL: requestingUserId is REQUIRED for any role changes
+      if (!requestingUserId) {
+        throw new Error('Unauthorized: Role changes require authenticated request');
+      }
+      
+      const requestingUser = await this.getUser(requestingUserId);
+      if (!requestingUser) {
+        throw new Error('Requesting user not found');
+      }
+      
+      // CRITICAL: Only super_admin can assign super_admin role to anyone
+      if (requestingUser.role !== 'super_admin') {
+        // Check direct role assignment
+        if (userData.role === 'super_admin') {
+          throw new Error('Insufficient privileges: Only Super Administrators can assign super_admin role');
+        }
+        
+        // Check roles array for super_admin
+        if (userData.roles && Array.isArray(userData.roles) && userData.roles.includes('super_admin')) {
+          throw new Error('Insufficient privileges: Only Super Administrators can assign super_admin role');
+        }
+        
+        // Prevent admins from escalating themselves to super_admin
+        if (requestingUser.id === id && (userData.role === 'super_admin' || (userData.roles && userData.roles.includes('super_admin')))) {
+          throw new Error('Forbidden: Users cannot escalate their own privileges to super_admin');
+        }
+      }
+    }
     
-    // Normalize role and roles fields for consistency
+    // Normalize role and roles fields for consistency (only for allowed roles)
     if (userData.roles !== undefined) {
       if (userData.roles && userData.roles.length > 0) {
         // Deduplicate roles and ensure at least one role
@@ -293,15 +342,16 @@ export class DatabaseStorage implements IStorage {
       .set(userData)
       .where(eq(users.id, id))
       .returning();
-    return updatedUser;
+    return sanitizeUser(updatedUser);
   }
 
   async deleteUser(id: string): Promise<void> {
     await db.delete(users).where(eq(users.id, id));
   }
 
-  async getUsersByManager(managerId: string): Promise<User[]> {
-    return await db.select().from(users).where(eq(users.reportingManagerId, managerId));
+  async getUsersByManager(managerId: string): Promise<SafeUser[]> {
+    const managerUsers = await db.select().from(users).where(eq(users.reportingManagerId, managerId));
+    return sanitizeUsers(managerUsers);
   }
 
   // Questionnaire template operations
