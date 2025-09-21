@@ -68,22 +68,18 @@ export function Sidebar() {
     >
       {/* Logo and Company Info */}
       <div className="p-6 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-            <Building className="h-6 w-6 text-primary-foreground" />
-          </div>
-          {!collapsed && (
-            <div>
-              <h2 className="font-semibold text-foreground">Performance Hub</h2>
-              <p className="text-sm text-muted-foreground">Employee Management</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+              <Building className="h-6 w-6 text-primary-foreground" />
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Sidebar Toggle */}
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-end">
+            {!collapsed && (
+              <div>
+                <h2 className="font-semibold text-foreground">Performance Hub</h2>
+                <p className="text-sm text-muted-foreground">Employee Management</p>
+              </div>
+            )}
+          </div>
           {!collapsed && (
             <Button
               variant="ghost"
