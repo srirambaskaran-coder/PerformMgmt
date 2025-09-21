@@ -51,6 +51,14 @@ export default function EmployeeManagement() {
     queryKey: ["/api/companies"],
   });
 
+  const { data: levels = [] } = useQuery<any[]>({
+    queryKey: ["/api/levels"],
+  });
+
+  const { data: grades = [] } = useQuery<any[]>({
+    queryKey: ["/api/grades"],
+  });
+
   const createUserMutation = useMutation({
     mutationFn: async (userData: InsertUser) => {
       await apiRequest("POST", "/api/users", userData);
@@ -133,6 +141,8 @@ export default function EmployeeManagement() {
       mobileNumber: "",
       locationId: "none",
       companyId: "none",
+      levelId: "none",
+      gradeId: "none",
       reportingManagerId: "none",
       role: "employee",
       roles: ["employee"],
@@ -148,6 +158,8 @@ export default function EmployeeManagement() {
       ...data,
       locationId: data.locationId === "none" ? null : data.locationId,
       companyId: data.companyId === "none" ? null : data.companyId,
+      levelId: data.levelId === "none" ? null : data.levelId,
+      gradeId: data.gradeId === "none" ? null : data.gradeId,
       reportingManagerId: data.reportingManagerId === "none" ? null : data.reportingManagerId,
     };
 
@@ -169,6 +181,8 @@ export default function EmployeeManagement() {
       mobileNumber: user.mobileNumber || "",
       locationId: user.locationId || "none",
       companyId: user.companyId || "none",
+      levelId: user.levelId || "none",
+      gradeId: user.gradeId || "none",
       reportingManagerId: user.reportingManagerId || "none",
       role: user.role || "employee",
       roles: (user as any).roles || [user.role] || ["employee"],
@@ -204,6 +218,8 @@ export default function EmployeeManagement() {
       mobileNumber: "",
       locationId: "none",
       companyId: "none",
+      levelId: "none",
+      gradeId: "none",
       reportingManagerId: "none",
       role: "employee",
       roles: ["employee"],
@@ -385,6 +401,59 @@ export default function EmployeeManagement() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
+                      name="levelId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Level</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value ?? "none"}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-level">
+                                <SelectValue placeholder="Select level" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">No Level</SelectItem>
+                              {levels.map((level: any) => (
+                                <SelectItem key={level.id} value={level.id}>
+                                  {level.description} ({level.code})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="gradeId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Grade</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value ?? "none"}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-grade">
+                                <SelectValue placeholder="Select grade" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">No Grade</SelectItem>
+                              {grades.map((grade: any) => (
+                                <SelectItem key={grade.id} value={grade.id}>
+                                  {grade.description} ({grade.code})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
                       name="reportingManagerId"
                       render={({ field }) => (
                         <FormItem>
@@ -449,7 +518,7 @@ export default function EmployeeManagement() {
                               <div key={role.value} className="flex items-center space-x-2">
                                 <Checkbox
                                   id={role.value}
-                                  checked={field.value?.includes(role.value)}
+                                  checked={field.value?.includes(role.value as "super_admin" | "admin" | "hr_manager" | "employee" | "manager")}
                                   onCheckedChange={(checked) => {
                                     const currentRoles = field.value || [];
                                     if (checked) {
