@@ -10,6 +10,9 @@ import {
   boolean,
   decimal,
   pgEnum,
+  foreignKey,
+  unique,
+  check,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -38,6 +41,12 @@ export const userRoleEnum = pgEnum('user_role', [
 // User status enum
 export const statusEnum = pgEnum('status', ['active', 'inactive']);
 
+// Questionnaire category enum
+export const categoryEnum = pgEnum('category', ['employee', 'manager']);
+
+// Publish type enum
+export const publishTypeEnum = pgEnum('publish_type', ['now', 'as_per_calendar']);
+
 // User storage table - mandatory for Replit Auth
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -56,6 +65,8 @@ export const users = pgTable("users", {
   reportingManagerId: varchar("reporting_manager_id"),
   locationId: varchar("location_id"),
   companyId: varchar("company_id"),
+  levelId: varchar("level_id"),
+  gradeId: varchar("grade_id"),
   role: userRoleEnum("role").default('employee'),
   roles: text("roles").array(),
   status: statusEnum("status").default('active'),
@@ -63,7 +74,11 @@ export const users = pgTable("users", {
   passwordHash: varchar("password_hash"),
   // Track which Administrator created this user (for user isolation)
   createdById: varchar("created_by_id"),
-});
+}, (table) => [
+  index("users_created_by_id_idx").on(table.createdById),
+  index("users_level_id_idx").on(table.levelId),
+  index("users_grade_id_idx").on(table.gradeId),
+])
 
 // Companies table
 export const companies = pgTable("companies", {
@@ -96,15 +111,23 @@ export const locations = pgTable("locations", {
 // Questionnaire templates table
 export const questionnaireTemplates = pgTable("questionnaire_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: varchar("name").notNull(),
-  description: text("description"),
-  targetRole: userRoleEnum("target_role").notNull(), // 'employee' or 'manager'
+  name: varchar("name").notNull(), // Keep existing column name
+  description: text("description"), // Keep existing column name  
+  targetRole: userRoleEnum("target_role").notNull(), // Keep existing column name
+  applicableCategory: categoryEnum("applicable_category"), // New field - optional for backward compatibility
+  applicableLevelId: varchar("applicable_level_id"), // Optional
+  applicableGradeId: varchar("applicable_grade_id"), // Optional
+  applicableLocationId: varchar("applicable_location_id"), // Optional
+  sendOnMail: boolean("send_on_mail").default(false),
   questions: jsonb("questions").notNull(), // Array of question objects
   year: integer("year"),
   status: statusEnum("status").default('active'),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+  createdById: varchar("created_by_id"), // New field - nullable for existing records
+}, (table) => [
+  index("questionnaire_templates_created_by_id_idx").on(table.createdById),
+]);
 
 // Performance review cycles table
 export const reviewCycles = pgTable("review_cycles", {
@@ -177,6 +200,115 @@ export const accessTokens = pgTable("access_tokens", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Level table - Administrator managed
+export const levels = pgTable("levels", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code").notNull(),
+  description: text("description").notNull(),
+  status: statusEnum("status").default('active'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdById: varchar("created_by_id").notNull(),
+}, (table) => [
+  unique().on(table.createdById, table.code),
+  index("levels_created_by_id_idx").on(table.createdById),
+]);
+
+// Grade table - Administrator managed  
+export const grades = pgTable("grades", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code").notNull(),
+  description: text("description").notNull(),
+  status: statusEnum("status").default('active'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdById: varchar("created_by_id").notNull(),
+}, (table) => [
+  unique().on(table.createdById, table.code),
+  index("grades_created_by_id_idx").on(table.createdById),
+]);
+
+// Appraisal Cycle table - Administrator managed
+export const appraisalCycles = pgTable("appraisal_cycles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code").notNull(),
+  description: text("description").notNull(),
+  fromDate: timestamp("from_date").notNull(),
+  toDate: timestamp("to_date").notNull(),
+  status: statusEnum("status").default('active'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdById: varchar("created_by_id").notNull(),
+}, (table) => [
+  unique().on(table.createdById, table.code),
+  check("appraisal_cycles_date_check", sql`${table.fromDate} <= ${table.toDate}`),
+  index("appraisal_cycles_created_by_id_idx").on(table.createdById),
+]);
+
+// Review Frequency table - Administrator managed
+export const reviewFrequencies = pgTable("review_frequencies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code").notNull(),
+  description: text("description").notNull(),
+  status: statusEnum("status").default('active'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdById: varchar("created_by_id").notNull(),
+}, (table) => [
+  unique().on(table.createdById, table.code),
+  index("review_frequencies_created_by_id_idx").on(table.createdById),
+]);
+
+// Frequency Calendar table - Administrator managed
+export const frequencyCalendars = pgTable("frequency_calendars", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code").notNull(),
+  description: text("description").notNull(),
+  appraisalCycleId: varchar("appraisal_cycle_id").notNull(),
+  reviewFrequencyId: varchar("review_frequency_id").notNull(),
+  status: statusEnum("status").default('active'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdById: varchar("created_by_id").notNull(),
+}, (table) => [
+  unique().on(table.createdById, table.code),
+  index("frequency_calendars_created_by_id_idx").on(table.createdById),
+]);
+
+// Frequency Calendar Details table - Administrator managed
+export const frequencyCalendarDetails = pgTable("frequency_calendar_details", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  frequencyCalendarId: varchar("frequency_calendar_id").notNull(),
+  displayName: varchar("display_name").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  status: statusEnum("status").default('active'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdById: varchar("created_by_id").notNull(),
+}, (table) => [
+  check("frequency_calendar_details_date_check", sql`${table.startDate} <= ${table.endDate}`),
+  index("frequency_calendar_details_created_by_id_idx").on(table.createdById),
+]);
+
+// Publish Questionnaire table - Administrator managed
+export const publishQuestionnaires = pgTable("publish_questionnaires", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code").notNull(),
+  displayName: varchar("display_name").notNull(),
+  templateId: varchar("template_id").notNull(),
+  frequencyCalendarId: varchar("frequency_calendar_id"),
+  status: statusEnum("status").default('active'),
+  publishType: publishTypeEnum("publish_type").default('now'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdById: varchar("created_by_id").notNull(),
+}, (table) => [
+  unique().on(table.createdById, table.code),
+  check("publish_questionnaires_calendar_check", sql`(${table.publishType} = 'now') OR (${table.publishType} = 'as_per_calendar' AND ${table.frequencyCalendarId} IS NOT NULL)`),
+  index("publish_questionnaires_created_by_id_idx").on(table.createdById),
+]);
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   reportingManager: one(users, {
@@ -208,6 +340,14 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   evaluationsAsManager: many(evaluations, {
     relationName: "managerEvaluations",
+  }),
+  level: one(levels, {
+    fields: [users.levelId],
+    references: [levels.id],
+  }),
+  grade: one(grades, {
+    fields: [users.gradeId],
+    references: [grades.id],
   }),
 }));
 
@@ -242,6 +382,105 @@ export const evaluationsRelations = relations(evaluations, ({ one }) => ({
     fields: [evaluations.reviewCycleId],
     references: [reviewCycles.id],
   }),
+}));
+
+// Relations for new entities
+export const levelsRelations = relations(levels, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [levels.createdById],
+    references: [users.id],
+  }),
+  users: many(users),
+  questionnaires: many(questionnaireTemplates),
+}));
+
+export const gradesRelations = relations(grades, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [grades.createdById],
+    references: [users.id],
+  }),
+  users: many(users),
+  questionnaires: many(questionnaireTemplates),
+}));
+
+export const appraisalCyclesRelations = relations(appraisalCycles, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [appraisalCycles.createdById],
+    references: [users.id],
+  }),
+  frequencyCalendars: many(frequencyCalendars),
+}));
+
+export const reviewFrequenciesRelations = relations(reviewFrequencies, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [reviewFrequencies.createdById],
+    references: [users.id],
+  }),
+  frequencyCalendars: many(frequencyCalendars),
+}));
+
+export const frequencyCalendarsRelations = relations(frequencyCalendars, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [frequencyCalendars.createdById],
+    references: [users.id],
+  }),
+  appraisalCycle: one(appraisalCycles, {
+    fields: [frequencyCalendars.appraisalCycleId],
+    references: [appraisalCycles.id],
+  }),
+  reviewFrequency: one(reviewFrequencies, {
+    fields: [frequencyCalendars.reviewFrequencyId],
+    references: [reviewFrequencies.id],
+  }),
+  details: many(frequencyCalendarDetails),
+  publishQuestionnaires: many(publishQuestionnaires),
+}));
+
+export const frequencyCalendarDetailsRelations = relations(frequencyCalendarDetails, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [frequencyCalendarDetails.createdById],
+    references: [users.id],
+  }),
+  frequencyCalendar: one(frequencyCalendars, {
+    fields: [frequencyCalendarDetails.frequencyCalendarId],
+    references: [frequencyCalendars.id],
+  }),
+}));
+
+export const publishQuestionnairesRelations = relations(publishQuestionnaires, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [publishQuestionnaires.createdById],
+    references: [users.id],
+  }),
+  template: one(questionnaireTemplates, {
+    fields: [publishQuestionnaires.templateId],
+    references: [questionnaireTemplates.id],
+  }),
+  frequencyCalendar: one(frequencyCalendars, {
+    fields: [publishQuestionnaires.frequencyCalendarId],
+    references: [frequencyCalendars.id],
+  }),
+}));
+
+export const questionnaireTemplatesRelations = relations(questionnaireTemplates, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [questionnaireTemplates.createdById],
+    references: [users.id],
+  }),
+  applicableLevel: one(levels, {
+    fields: [questionnaireTemplates.applicableLevelId],
+    references: [levels.id],
+  }),
+  applicableGrade: one(grades, {
+    fields: [questionnaireTemplates.applicableGradeId],
+    references: [grades.id],
+  }),
+  applicableLocation: one(locations, {
+    fields: [questionnaireTemplates.applicableLocationId],
+    references: [locations.id],
+  }),
+  publishQuestionnaires: many(publishQuestionnaires),
+  reviewCycles: many(reviewCycles),
 }));
 
 // Insert schemas
@@ -312,6 +551,56 @@ export const insertAccessTokenSchema = createInsertSchema(accessTokens).omit({
   createdAt: true,
 });
 
+// Insert schemas for new entities
+export const insertLevelSchema = createInsertSchema(levels).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  createdById: true,
+});
+
+export const insertGradeSchema = createInsertSchema(grades).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  createdById: true,
+});
+
+export const insertAppraisalCycleSchema = createInsertSchema(appraisalCycles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  createdById: true,
+});
+
+export const insertReviewFrequencySchema = createInsertSchema(reviewFrequencies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  createdById: true,
+});
+
+export const insertFrequencyCalendarSchema = createInsertSchema(frequencyCalendars).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  createdById: true,
+});
+
+export const insertFrequencyCalendarDetailsSchema = createInsertSchema(frequencyCalendarDetails).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  createdById: true,
+});
+
+export const insertPublishQuestionnaireSchema = createInsertSchema(publishQuestionnaires).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  createdById: true,
+});
+
 // Secure update schemas to prevent security vulnerabilities
 export const updateUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -368,3 +657,19 @@ export type EmailConfig = typeof emailConfig.$inferSelect;
 export type InsertEmailConfig = z.infer<typeof insertEmailConfigSchema>;
 export type AccessToken = typeof accessTokens.$inferSelect;
 export type InsertAccessToken = z.infer<typeof insertAccessTokenSchema>;
+
+// Types for new entities
+export type Level = typeof levels.$inferSelect;
+export type InsertLevel = z.infer<typeof insertLevelSchema>;
+export type Grade = typeof grades.$inferSelect;
+export type InsertGrade = z.infer<typeof insertGradeSchema>;
+export type AppraisalCycle = typeof appraisalCycles.$inferSelect;
+export type InsertAppraisalCycle = z.infer<typeof insertAppraisalCycleSchema>;
+export type ReviewFrequency = typeof reviewFrequencies.$inferSelect;
+export type InsertReviewFrequency = z.infer<typeof insertReviewFrequencySchema>;
+export type FrequencyCalendar = typeof frequencyCalendars.$inferSelect;
+export type InsertFrequencyCalendar = z.infer<typeof insertFrequencyCalendarSchema>;
+export type FrequencyCalendarDetails = typeof frequencyCalendarDetails.$inferSelect;
+export type InsertFrequencyCalendarDetails = z.infer<typeof insertFrequencyCalendarDetailsSchema>;
+export type PublishQuestionnaire = typeof publishQuestionnaires.$inferSelect;
+export type InsertPublishQuestionnaire = z.infer<typeof insertPublishQuestionnaireSchema>;
