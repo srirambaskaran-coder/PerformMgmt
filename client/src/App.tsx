@@ -16,6 +16,7 @@ import QuestionnaireTemplates from "@/pages/QuestionnaireTemplates";
 import PublishQuestionnaires from "@/pages/PublishQuestionnaires";
 import LevelManagement from "@/pages/LevelManagement";
 import GradeManagement from "@/pages/GradeManagement";
+import AppraisalCycleManagement from "@/pages/AppraisalCycleManagement";
 import PerformanceReviews from "@/pages/PerformanceReviews";
 import ReviewProgress from "@/pages/ReviewProgress";
 import Evaluations from "@/pages/Evaluations";
@@ -39,6 +40,7 @@ function Router() {
           <Route path="/publish-questionnaires" component={PublishQuestionnaires} />
           <Route path="/levels" component={LevelManagement} />
           <Route path="/grades" component={GradeManagement} />
+          <Route path="/appraisal-cycles" component={AppraisalCycleManagement} />
           <Route path="/performance-reviews" component={PerformanceReviews} />
           <Route path="/review-progress" component={ReviewProgress} />
           <Route path="/evaluations" component={Evaluations} />
