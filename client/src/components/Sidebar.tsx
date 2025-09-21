@@ -85,24 +85,9 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* User Profile */}
+      {/* Sidebar Toggle */}
       <div className="p-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center">
-            <span className="text-accent-foreground text-sm font-medium">
-              {(user as any)?.firstName?.[0]}{(user as any)?.lastName?.[0]}
-            </span>
-          </div>
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm truncate" data-testid="user-name">
-                {(user as any)?.firstName} {(user as any)?.lastName}
-              </p>
-              <p className="text-xs text-muted-foreground capitalize" data-testid="user-role">
-                {(user as any)?.role?.replace('_', ' ')}
-              </p>
-            </div>
-          )}
+        <div className="flex items-center justify-end">
           {!collapsed && (
             <Button
               variant="ghost"
