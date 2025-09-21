@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Plus, Search, Edit, Trash2, FileText, Minus } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Question {
   id: string;
@@ -36,6 +37,18 @@ export default function QuestionnaireTemplates() {
 
   const { data: templates = [], isLoading } = useQuery<QuestionnaireTemplate[]>({
     queryKey: ["/api/questionnaire-templates"],
+  });
+
+  const { data: locations = [] } = useQuery<any[]>({
+    queryKey: ["/api/locations"],
+  });
+
+  const { data: levels = [] } = useQuery<any[]>({
+    queryKey: ["/api/levels"],
+  });
+
+  const { data: grades = [] } = useQuery<any[]>({
+    queryKey: ["/api/grades"],
   });
 
   const createTemplateMutation = useMutation({
@@ -106,6 +119,10 @@ export default function QuestionnaireTemplates() {
       name: "",
       description: "",
       targetRole: "employee",
+      applicableLevelId: null,
+      applicableGradeId: null,
+      applicableLocationId: null,
+      sendOnMail: false,
       questions: [],
       year: new Date().getFullYear(),
       status: "active",
@@ -151,6 +168,10 @@ export default function QuestionnaireTemplates() {
       name: template.name,
       description: template.description || "",
       targetRole: template.targetRole,
+      applicableLevelId: template.applicableLevelId || null,
+      applicableGradeId: template.applicableGradeId || null,
+      applicableLocationId: template.applicableLocationId || null,
+      sendOnMail: template.sendOnMail || false,
       year: template.year || new Date().getFullYear(),
       status: template.status || "active",
     });
@@ -170,6 +191,10 @@ export default function QuestionnaireTemplates() {
       name: "",
       description: "",
       targetRole: "employee",
+      applicableLevelId: null,
+      applicableGradeId: null,
+      applicableLocationId: null,
+      sendOnMail: false,
       questions: [],
       year: new Date().getFullYear(),
       status: "active",
@@ -306,6 +331,113 @@ export default function QuestionnaireTemplates() {
                         </FormItem>
                       )}
                     />
+                  </div>
+
+                  {/* Enhanced Fields */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Applicability Settings</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="applicableLevelId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Applicable Level</FormLabel>
+                            <Select onValueChange={(v) => field.onChange(v || null)} value={field.value ?? ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-applicable-level">
+                                  <SelectValue placeholder="All Levels" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="">All Levels</SelectItem>
+                                {levels.map((level: any) => (
+                                  <SelectItem key={level.id} value={level.id}>
+                                    {level.description} ({level.code})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="applicableGradeId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Applicable Grade</FormLabel>
+                            <Select onValueChange={(v) => field.onChange(v || null)} value={field.value ?? ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-applicable-grade">
+                                  <SelectValue placeholder="All Grades" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="">All Grades</SelectItem>
+                                {grades.map((grade: any) => (
+                                  <SelectItem key={grade.id} value={grade.id}>
+                                    {grade.description} ({grade.code})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="applicableLocationId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Applicable Location</FormLabel>
+                            <Select onValueChange={(v) => field.onChange(v || null)} value={field.value ?? ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-applicable-location">
+                                  <SelectValue placeholder="All Locations" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="">All Locations</SelectItem>
+                                {locations.map((location: any) => (
+                                  <SelectItem key={location.id} value={location.id}>
+                                    {location.name} ({location.code})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="sendOnMail"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="checkbox-send-on-mail"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>
+                                Send on Mail
+                              </FormLabel>
+                              <p className="text-sm text-muted-foreground">
+                                Email this questionnaire to participants automatically
+                              </p>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
 
                   {/* Questions Section */}
