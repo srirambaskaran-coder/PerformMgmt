@@ -178,6 +178,13 @@ export interface IStorage {
   createFrequencyCalendarDetails(details: InsertFrequencyCalendarDetails, createdById: string): Promise<FrequencyCalendarDetails>;
   updateFrequencyCalendarDetails(id: string, details: Partial<InsertFrequencyCalendarDetails>, createdById: string): Promise<FrequencyCalendarDetails>;
   deleteFrequencyCalendarDetails(id: string, createdById: string): Promise<void>;
+
+  // Publish Questionnaire operations - Administrator isolated
+  getPublishQuestionnaires(createdById: string): Promise<PublishQuestionnaire[]>;
+  getPublishQuestionnaire(id: string, createdById: string): Promise<PublishQuestionnaire | undefined>;
+  createPublishQuestionnaire(questionnaire: InsertPublishQuestionnaire, createdById: string): Promise<PublishQuestionnaire>;
+  updatePublishQuestionnaire(id: string, questionnaire: Partial<InsertPublishQuestionnaire>, createdById: string): Promise<PublishQuestionnaire>;
+  deletePublishQuestionnaire(id: string, createdById: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1171,6 +1178,108 @@ export class DatabaseStorage implements IStorage {
     
     if (result.rowCount === 0) {
       throw new Error('Frequency Calendar Details not found or access denied');
+    }
+  }
+
+  // Publish Questionnaire operations - Administrator isolated
+  async getPublishQuestionnaires(createdById: string): Promise<PublishQuestionnaire[]> {
+    return await db
+      .select()
+      .from(publishQuestionnaires)
+      .where(eq(publishQuestionnaires.createdById, createdById))
+      .orderBy(desc(publishQuestionnaires.createdAt));
+  }
+
+  async getPublishQuestionnaire(id: string, createdById: string): Promise<PublishQuestionnaire | undefined> {
+    const [questionnaire] = await db
+      .select()
+      .from(publishQuestionnaires)
+      .where(
+        and(
+          eq(publishQuestionnaires.id, id),
+          eq(publishQuestionnaires.createdById, createdById)
+        )
+      );
+    return questionnaire;
+  }
+
+  async createPublishQuestionnaire(questionnaire: InsertPublishQuestionnaire, createdById: string): Promise<PublishQuestionnaire> {
+    // Verify template exists and belongs to the administrator
+    const template = await this.getQuestionnaireTemplate(questionnaire.templateId);
+    if (!template || template.createdById !== createdById) {
+      throw new Error('Questionnaire Template not found or access denied');
+    }
+
+    // If publishType is 'as_per_calendar', verify frequency calendar exists and belongs to administrator
+    if (questionnaire.publishType === 'as_per_calendar' && questionnaire.frequencyCalendarId) {
+      const calendar = await this.getFrequencyCalendar(questionnaire.frequencyCalendarId, createdById);
+      if (!calendar) {
+        throw new Error('Frequency Calendar not found or access denied');
+      }
+    }
+
+    const [newQuestionnaire] = await db.insert(publishQuestionnaires).values({
+      ...questionnaire,
+      createdById,
+    }).returning();
+    
+    if (!newQuestionnaire) {
+      throw new Error('Failed to create Publish Questionnaire');
+    }
+    return newQuestionnaire;
+  }
+
+  async updatePublishQuestionnaire(id: string, questionnaire: Partial<InsertPublishQuestionnaire>, createdById: string): Promise<PublishQuestionnaire> {
+    // Verify the publish questionnaire belongs to the administrator
+    const existing = await this.getPublishQuestionnaire(id, createdById);
+    if (!existing) {
+      throw new Error('Publish Questionnaire not found or access denied');
+    }
+
+    // If templateId is being updated, verify the new template belongs to the administrator
+    if (questionnaire.templateId) {
+      const template = await this.getQuestionnaireTemplate(questionnaire.templateId);
+      if (!template || template.createdById !== createdById) {
+        throw new Error('Questionnaire Template not found or access denied');
+      }
+    }
+
+    // If publishType is 'as_per_calendar', verify frequency calendar exists and belongs to administrator
+    if (questionnaire.publishType === 'as_per_calendar' && questionnaire.frequencyCalendarId) {
+      const calendar = await this.getFrequencyCalendar(questionnaire.frequencyCalendarId, createdById);
+      if (!calendar) {
+        throw new Error('Frequency Calendar not found or access denied');
+      }
+    }
+
+    const [updatedQuestionnaire] = await db
+      .update(publishQuestionnaires)
+      .set({ 
+        ...questionnaire, 
+        updatedAt: new Date() 
+      })
+      .where(eq(publishQuestionnaires.id, id))
+      .returning();
+    
+    if (!updatedQuestionnaire) {
+      throw new Error('Publish Questionnaire not found or access denied');
+    }
+    return updatedQuestionnaire;
+  }
+
+  async deletePublishQuestionnaire(id: string, createdById: string): Promise<void> {
+    // Verify the publish questionnaire belongs to the administrator
+    const existing = await this.getPublishQuestionnaire(id, createdById);
+    if (!existing) {
+      throw new Error('Publish Questionnaire not found or access denied');
+    }
+
+    const result = await db
+      .delete(publishQuestionnaires)
+      .where(eq(publishQuestionnaires.id, id));
+    
+    if (result.rowCount === 0) {
+      throw new Error('Publish Questionnaire not found or access denied');
     }
   }
 }

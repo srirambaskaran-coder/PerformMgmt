@@ -13,6 +13,7 @@ import CompanyManagement from "@/pages/CompanyManagement";
 import EmployeeManagement from "@/pages/EmployeeManagement";
 import LocationManagement from "@/pages/LocationManagement";
 import QuestionnaireTemplates from "@/pages/QuestionnaireTemplates";
+import PublishQuestionnaires from "@/pages/PublishQuestionnaires";
 import PerformanceReviews from "@/pages/PerformanceReviews";
 import ReviewProgress from "@/pages/ReviewProgress";
 import Evaluations from "@/pages/Evaluations";
@@ -33,6 +34,7 @@ function Router() {
           <Route path="/users" component={EmployeeManagement} />
           <Route path="/locations" component={LocationManagement} />
           <Route path="/questionnaires" component={QuestionnaireTemplates} />
+          <Route path="/publish-questionnaires" component={PublishQuestionnaires} />
           <Route path="/performance-reviews" component={PerformanceReviews} />
           <Route path="/review-progress" component={ReviewProgress} />
           <Route path="/evaluations" component={Evaluations} />

@@ -18,6 +18,7 @@ import {
   insertReviewFrequencySchema,
   insertFrequencyCalendarSchema,
   insertFrequencyCalendarDetailsSchema,
+  insertPublishQuestionnaireSchema,
   updateUserSchema,
   passwordUpdateSchema,
   type SafeUser,
@@ -1377,6 +1378,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting frequency calendar details:", error);
       res.status(500).json({ message: "Failed to delete frequency calendar details" });
+    }
+  });
+
+  // Publish Questionnaire management routes - Administrator isolated
+  app.get('/api/publish-questionnaires', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const createdById = req.user.claims.sub;
+      const questionnaires = await storage.getPublishQuestionnaires(createdById);
+      res.json(questionnaires);
+    } catch (error) {
+      console.error("Error fetching publish questionnaires:", error);
+      res.status(500).json({ message: "Failed to fetch publish questionnaires" });
+    }
+  });
+
+  app.get('/api/publish-questionnaires/:id', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const createdById = req.user.claims.sub;
+      const questionnaire = await storage.getPublishQuestionnaire(id, createdById);
+      if (!questionnaire) {
+        return res.status(404).json({ message: "Publish questionnaire not found" });
+      }
+      res.json(questionnaire);
+    } catch (error) {
+      console.error("Error fetching publish questionnaire:", error);
+      res.status(500).json({ message: "Failed to fetch publish questionnaire" });
+    }
+  });
+
+  app.post('/api/publish-questionnaires', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const questionnaireData = insertPublishQuestionnaireSchema.parse(req.body);
+      const createdById = req.user.claims.sub;
+      const questionnaire = await storage.createPublishQuestionnaire(questionnaireData, createdById);
+      res.status(201).json(questionnaire);
+    } catch (error) {
+      console.error("Error creating publish questionnaire:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid publish questionnaire data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create publish questionnaire" });
+    }
+  });
+
+  app.put('/api/publish-questionnaires/:id', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const createdById = req.user.claims.sub;
+      
+      // Check if publish questionnaire exists and belongs to the administrator
+      const existingQuestionnaire = await storage.getPublishQuestionnaire(id, createdById);
+      if (!existingQuestionnaire) {
+        return res.status(404).json({ message: "Publish questionnaire not found" });
+      }
+      
+      // Parse and sanitize the request body to prevent ownership changes
+      const { id: _id, createdById: _createdById, createdAt: _createdAt, ...safeQuestionnaireData } = insertPublishQuestionnaireSchema.partial().parse(req.body);
+      const questionnaire = await storage.updatePublishQuestionnaire(id, safeQuestionnaireData, createdById);
+      res.json(questionnaire);
+    } catch (error) {
+      console.error("Error updating publish questionnaire:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid publish questionnaire data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update publish questionnaire" });
+    }
+  });
+
+  app.delete('/api/publish-questionnaires/:id', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const createdById = req.user.claims.sub;
+      
+      // Check if publish questionnaire exists and belongs to the administrator
+      const existingQuestionnaire = await storage.getPublishQuestionnaire(id, createdById);
+      if (!existingQuestionnaire) {
+        return res.status(404).json({ message: "Publish questionnaire not found" });
+      }
+      
+      await storage.deletePublishQuestionnaire(id, createdById);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting publish questionnaire:", error);
+      res.status(500).json({ message: "Failed to delete publish questionnaire" });
     }
   });
 
