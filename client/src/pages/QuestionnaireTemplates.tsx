@@ -124,7 +124,6 @@ export default function QuestionnaireTemplates() {
       applicableLocationId: null,
       sendOnMail: false,
       questions: [],
-      year: new Date().getFullYear(),
       status: "active",
     },
   });
@@ -172,7 +171,6 @@ export default function QuestionnaireTemplates() {
       applicableGradeId: template.applicableGradeId || null,
       applicableLocationId: template.applicableLocationId || null,
       sendOnMail: template.sendOnMail || false,
-      year: template.year || new Date().getFullYear(),
       status: template.status || "active",
     });
     setQuestions((template.questions as Question[]) || []);
@@ -196,7 +194,6 @@ export default function QuestionnaireTemplates() {
       applicableLocationId: null,
       sendOnMail: false,
       questions: [],
-      year: new Date().getFullYear(),
       status: "active",
     });
   };
@@ -291,47 +288,27 @@ export default function QuestionnaireTemplates() {
                     )}
                   />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="year"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Year</FormLabel>
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <Input 
-                              type="number" 
-                              {...field} 
-                              onChange={(e) => field.onChange(parseInt(e.target.value))}
-                              data-testid="input-year" 
-                            />
+                            <SelectTrigger data-testid="select-status">
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-status">
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="inactive">Inactive</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                          <SelectContent>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   {/* Enhanced Fields */}
                   <div className="space-y-4">
@@ -620,7 +597,6 @@ export default function QuestionnaireTemplates() {
                   
                   <div className="space-y-2 text-sm text-muted-foreground">
                     {template.description && <p>{template.description}</p>}
-                    <p>Year: {template.year}</p>
                     <p>Questions: {Array.isArray(template.questions) ? template.questions.length : 0}</p>
                   </div>
                 </CardContent>
