@@ -12,6 +12,7 @@ import {
   insertEvaluationSchema,
   insertEmailTemplateSchema,
   insertEmailConfigSchema,
+  insertLevelSchema,
   updateUserSchema,
   passwordUpdateSchema,
   type SafeUser,
@@ -861,6 +862,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error saving email settings:", error);
       res.status(500).json({ message: "Failed to save email settings" });
+    }
+  });
+
+  // Level management routes - Administrator isolated
+  app.get('/api/levels', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const createdById = req.user.claims.sub;
+      const levels = await storage.getLevels(createdById);
+      res.json(levels);
+    } catch (error) {
+      console.error("Error fetching levels:", error);
+      res.status(500).json({ message: "Failed to fetch levels" });
+    }
+  });
+
+  app.get('/api/levels/:id', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const createdById = req.user.claims.sub;
+      const level = await storage.getLevel(id, createdById);
+      if (!level) {
+        return res.status(404).json({ message: "Level not found" });
+      }
+      res.json(level);
+    } catch (error) {
+      console.error("Error fetching level:", error);
+      res.status(500).json({ message: "Failed to fetch level" });
+    }
+  });
+
+  app.post('/api/levels', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const levelData = insertLevelSchema.parse(req.body);
+      const createdById = req.user.claims.sub;
+      const level = await storage.createLevel(levelData, createdById);
+      res.status(201).json(level);
+    } catch (error) {
+      console.error("Error creating level:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid level data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create level" });
+    }
+  });
+
+  app.put('/api/levels/:id', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const createdById = req.user.claims.sub;
+      
+      // Check if level exists and belongs to the administrator
+      const existingLevel = await storage.getLevel(id, createdById);
+      if (!existingLevel) {
+        return res.status(404).json({ message: "Level not found" });
+      }
+      
+      const levelData = insertLevelSchema.partial().parse(req.body);
+      const level = await storage.updateLevel(id, levelData, createdById);
+      res.json(level);
+    } catch (error) {
+      console.error("Error updating level:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid level data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update level" });
+    }
+  });
+
+  app.delete('/api/levels/:id', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const createdById = req.user.claims.sub;
+      
+      // Check if level exists and belongs to the administrator
+      const existingLevel = await storage.getLevel(id, createdById);
+      if (!existingLevel) {
+        return res.status(404).json({ message: "Level not found" });
+      }
+      
+      await storage.deleteLevel(id, createdById);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting level:", error);
+      res.status(500).json({ message: "Failed to delete level" });
     }
   });
 

@@ -8,6 +8,13 @@ import {
   emailTemplates,
   emailConfig,
   accessTokens,
+  levels,
+  grades,
+  appraisalCycles,
+  reviewFrequencies,
+  frequencyCalendars,
+  frequencyCalendarDetails,
+  publishQuestionnaires,
   type User,
   type SafeUser,
   type UpsertUser,
@@ -28,6 +35,20 @@ import {
   type InsertEmailConfig,
   type AccessToken,
   type InsertAccessToken,
+  type Level,
+  type InsertLevel,
+  type Grade,
+  type InsertGrade,
+  type AppraisalCycle,
+  type InsertAppraisalCycle,
+  type ReviewFrequency,
+  type InsertReviewFrequency,
+  type FrequencyCalendar,
+  type InsertFrequencyCalendar,
+  type FrequencyCalendarDetails,
+  type InsertFrequencyCalendarDetails,
+  type PublishQuestionnaire,
+  type InsertPublishQuestionnaire,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, like, inArray, or, sql } from "drizzle-orm";
@@ -115,6 +136,13 @@ export interface IStorage {
   markTokenAsUsed(token: string): Promise<void>;
   deactivateToken(token: string): Promise<void>;
   getActiveTokensByUser(userId: string): Promise<AccessToken[]>;
+  
+  // Level operations - Administrator isolated
+  getLevels(createdById: string): Promise<Level[]>;
+  getLevel(id: string, createdById: string): Promise<Level | undefined>;
+  createLevel(level: InsertLevel, createdById: string): Promise<Level>;
+  updateLevel(id: string, level: Partial<InsertLevel>, createdById: string): Promise<Level>;
+  deleteLevel(id: string, createdById: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -671,6 +699,72 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date() 
       })
       .where(eq(users.id, userId));
+  }
+
+  // Level operations - Administrator isolated
+  async getLevels(createdById: string): Promise<Level[]> {
+    return await db.select().from(levels).where(
+      and(
+        eq(levels.createdById, createdById),
+        eq(levels.status, 'active')
+      )
+    ).orderBy(asc(levels.code));
+  }
+
+  async getLevel(id: string, createdById: string): Promise<Level | undefined> {
+    const [level] = await db.select().from(levels).where(
+      and(
+        eq(levels.id, id),
+        eq(levels.createdById, createdById)
+      )
+    );
+    return level;
+  }
+
+  async createLevel(level: InsertLevel, createdById: string): Promise<Level> {
+    const [newLevel] = await db.insert(levels).values({
+      ...level,
+      createdById,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+    return newLevel;
+  }
+
+  async updateLevel(id: string, level: Partial<InsertLevel>, createdById: string): Promise<Level> {
+    const [updatedLevel] = await db
+      .update(levels)
+      .set({ 
+        ...level, 
+        updatedAt: new Date() 
+      })
+      .where(
+        and(
+          eq(levels.id, id),
+          eq(levels.createdById, createdById)
+        )
+      )
+      .returning();
+    
+    if (!updatedLevel) {
+      throw new Error('Level not found or access denied');
+    }
+    return updatedLevel;
+  }
+
+  async deleteLevel(id: string, createdById: string): Promise<void> {
+    const result = await db
+      .delete(levels)
+      .where(
+        and(
+          eq(levels.id, id),
+          eq(levels.createdById, createdById)
+        )
+      );
+    
+    if (result.rowCount === 0) {
+      throw new Error('Level not found or access denied');
+    }
   }
 }
 
