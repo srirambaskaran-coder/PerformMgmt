@@ -135,17 +135,26 @@ export default function QuestionnaireTemplates() {
       type: "text",
       required: true,
     };
-    setQuestions([...questions, newQuestion]);
+    const newQuestions = [...questions, newQuestion];
+    setQuestions(newQuestions);
+    // Sync form field with local state
+    form.setValue("questions", newQuestions);
   };
 
   const removeQuestion = (id: string) => {
-    setQuestions(questions.filter(q => q.id !== id));
+    const newQuestions = questions.filter(q => q.id !== id);
+    setQuestions(newQuestions);
+    // Sync form field with local state
+    form.setValue("questions", newQuestions);
   };
 
   const updateQuestion = (id: string, field: keyof Question, value: any) => {
-    setQuestions(questions.map(q => 
+    const newQuestions = questions.map(q => 
       q.id === id ? { ...q, [field]: value } : q
-    ));
+    );
+    setQuestions(newQuestions);
+    // Sync form field with local state
+    form.setValue("questions", newQuestions);
   };
 
   const onSubmit = (data: InsertQuestionnaireTemplate) => {
@@ -163,6 +172,7 @@ export default function QuestionnaireTemplates() {
 
   const handleEdit = (template: QuestionnaireTemplate) => {
     setEditingTemplate(template);
+    const templateQuestions = (template.questions as Question[]) || [];
     form.reset({
       name: template.name,
       description: template.description || "",
@@ -172,8 +182,9 @@ export default function QuestionnaireTemplates() {
       applicableLocationId: template.applicableLocationId || null,
       sendOnMail: template.sendOnMail || false,
       status: template.status || "active",
+      questions: templateQuestions, // Include questions in form reset
     });
-    setQuestions((template.questions as Question[]) || []);
+    setQuestions(templateQuestions);
   };
 
   const handleDelete = (id: string) => {
@@ -217,7 +228,8 @@ export default function QuestionnaireTemplates() {
             <p className="text-muted-foreground">Manage performance review questionnaire templates</p>
           </div>
           <Dialog open={isCreateModalOpen || !!editingTemplate} onOpenChange={(open) => {
-            if (!open) {
+            // Only close dialog if user explicitly wants to close it, not during form interactions
+            if (!open && !updateTemplateMutation.isPending && !createTemplateMutation.isPending) {
               setIsCreateModalOpen(false);
               resetForm();
             }
@@ -281,7 +293,7 @@ export default function QuestionnaireTemplates() {
                       <FormItem>
                         <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <Textarea {...field} placeholder="Template description..." data-testid="input-description" />
+                          <Textarea {...field} value={field.value || ""} placeholder="Template description..." data-testid="input-description" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -294,7 +306,7 @@ export default function QuestionnaireTemplates() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
                             <SelectTrigger data-testid="select-status">
                               <SelectValue placeholder="Select status" />
@@ -398,7 +410,7 @@ export default function QuestionnaireTemplates() {
                           <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                             <FormControl>
                               <Checkbox
-                                checked={field.value}
+                                checked={field.value || false}
                                 onCheckedChange={field.onChange}
                                 data-testid="checkbox-send-on-mail"
                               />
