@@ -164,6 +164,13 @@ export interface IStorage {
   createReviewFrequency(frequency: InsertReviewFrequency, createdById: string): Promise<ReviewFrequency>;
   updateReviewFrequency(id: string, frequency: Partial<InsertReviewFrequency>, createdById: string): Promise<ReviewFrequency>;
   deleteReviewFrequency(id: string, createdById: string): Promise<void>;
+  
+  // Frequency Calendar operations - Administrator isolated
+  getFrequencyCalendars(createdById: string): Promise<FrequencyCalendar[]>;
+  getFrequencyCalendar(id: string, createdById: string): Promise<FrequencyCalendar | undefined>;
+  createFrequencyCalendar(calendar: InsertFrequencyCalendar, createdById: string): Promise<FrequencyCalendar>;
+  updateFrequencyCalendar(id: string, calendar: Partial<InsertFrequencyCalendar>, createdById: string): Promise<FrequencyCalendar>;
+  deleteFrequencyCalendar(id: string, createdById: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -983,6 +990,72 @@ export class DatabaseStorage implements IStorage {
     
     if (result.rowCount === 0) {
       throw new Error('Review Frequency not found or access denied');
+    }
+  }
+
+  // Frequency Calendar operations - Administrator isolated
+  async getFrequencyCalendars(createdById: string): Promise<FrequencyCalendar[]> {
+    return await db.select().from(frequencyCalendars).where(
+      and(
+        eq(frequencyCalendars.createdById, createdById),
+        eq(frequencyCalendars.status, 'active')
+      )
+    ).orderBy(asc(frequencyCalendars.code));
+  }
+
+  async getFrequencyCalendar(id: string, createdById: string): Promise<FrequencyCalendar | undefined> {
+    const [calendar] = await db.select().from(frequencyCalendars).where(
+      and(
+        eq(frequencyCalendars.id, id),
+        eq(frequencyCalendars.createdById, createdById)
+      )
+    );
+    return calendar;
+  }
+
+  async createFrequencyCalendar(calendar: InsertFrequencyCalendar, createdById: string): Promise<FrequencyCalendar> {
+    const [newCalendar] = await db.insert(frequencyCalendars).values({
+      ...calendar,
+      createdById,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+    return newCalendar;
+  }
+
+  async updateFrequencyCalendar(id: string, calendar: Partial<InsertFrequencyCalendar>, createdById: string): Promise<FrequencyCalendar> {
+    const [updatedCalendar] = await db
+      .update(frequencyCalendars)
+      .set({ 
+        ...calendar, 
+        updatedAt: new Date() 
+      })
+      .where(
+        and(
+          eq(frequencyCalendars.id, id),
+          eq(frequencyCalendars.createdById, createdById)
+        )
+      )
+      .returning();
+    
+    if (!updatedCalendar) {
+      throw new Error('Frequency Calendar not found or access denied');
+    }
+    return updatedCalendar;
+  }
+
+  async deleteFrequencyCalendar(id: string, createdById: string): Promise<void> {
+    const result = await db
+      .delete(frequencyCalendars)
+      .where(
+        and(
+          eq(frequencyCalendars.id, id),
+          eq(frequencyCalendars.createdById, createdById)
+        )
+      );
+    
+    if (result.rowCount === 0) {
+      throw new Error('Frequency Calendar not found or access denied');
     }
   }
 }

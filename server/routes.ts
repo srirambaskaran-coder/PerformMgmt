@@ -16,6 +16,7 @@ import {
   insertGradeSchema,
   insertAppraisalCycleSchema,
   insertReviewFrequencySchema,
+  insertFrequencyCalendarSchema,
   updateUserSchema,
   passwordUpdateSchema,
   type SafeUser,
@@ -1205,6 +1206,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting review frequency:", error);
       res.status(500).json({ message: "Failed to delete review frequency" });
+    }
+  });
+
+  // Frequency Calendar management routes - Administrator isolated
+  app.get('/api/frequency-calendars', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const createdById = req.user.claims.sub;
+      const calendars = await storage.getFrequencyCalendars(createdById);
+      res.json(calendars);
+    } catch (error) {
+      console.error("Error fetching frequency calendars:", error);
+      res.status(500).json({ message: "Failed to fetch frequency calendars" });
+    }
+  });
+
+  app.get('/api/frequency-calendars/:id', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const createdById = req.user.claims.sub;
+      const calendar = await storage.getFrequencyCalendar(id, createdById);
+      if (!calendar) {
+        return res.status(404).json({ message: "Frequency calendar not found" });
+      }
+      res.json(calendar);
+    } catch (error) {
+      console.error("Error fetching frequency calendar:", error);
+      res.status(500).json({ message: "Failed to fetch frequency calendar" });
+    }
+  });
+
+  app.post('/api/frequency-calendars', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const calendarData = insertFrequencyCalendarSchema.parse(req.body);
+      const createdById = req.user.claims.sub;
+      const calendar = await storage.createFrequencyCalendar(calendarData, createdById);
+      res.status(201).json(calendar);
+    } catch (error) {
+      console.error("Error creating frequency calendar:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid frequency calendar data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create frequency calendar" });
+    }
+  });
+
+  app.put('/api/frequency-calendars/:id', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const createdById = req.user.claims.sub;
+      
+      // Check if frequency calendar exists and belongs to the administrator
+      const existingCalendar = await storage.getFrequencyCalendar(id, createdById);
+      if (!existingCalendar) {
+        return res.status(404).json({ message: "Frequency calendar not found" });
+      }
+      
+      // Parse and sanitize the request body to prevent ownership changes
+      const { id: _id, createdById: _createdById, createdAt: _createdAt, ...safeCalendarData } = insertFrequencyCalendarSchema.partial().parse(req.body);
+      const calendar = await storage.updateFrequencyCalendar(id, safeCalendarData, createdById);
+      res.json(calendar);
+    } catch (error) {
+      console.error("Error updating frequency calendar:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid frequency calendar data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update frequency calendar" });
+    }
+  });
+
+  app.delete('/api/frequency-calendars/:id', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const createdById = req.user.claims.sub;
+      
+      // Check if frequency calendar exists and belongs to the administrator
+      const existingCalendar = await storage.getFrequencyCalendar(id, createdById);
+      if (!existingCalendar) {
+        return res.status(404).json({ message: "Frequency calendar not found" });
+      }
+      
+      await storage.deleteFrequencyCalendar(id, createdById);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting frequency calendar:", error);
+      res.status(500).json({ message: "Failed to delete frequency calendar" });
     }
   });
 
