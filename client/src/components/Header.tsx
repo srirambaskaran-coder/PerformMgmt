@@ -60,7 +60,10 @@ export function Header() {
               <Button variant="ghost" className="relative h-8 w-8 rounded-full" data-testid="user-profile-button">
                 <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center">
                   <span className="text-accent-foreground text-sm font-medium">
-                    {(user as any)?.firstName?.[0]}{(user as any)?.lastName?.[0]}
+                    {(user as any)?.firstName && (user as any)?.lastName 
+                      ? `${(user as any).firstName[0]?.toUpperCase()}${(user as any).lastName[0]?.toUpperCase()}`
+                      : <User className="h-4 w-4" />
+                    }
                   </span>
                 </div>
               </Button>
@@ -69,13 +72,16 @@ export function Header() {
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none" data-testid="user-name-display">
-                    {(user as any)?.firstName} {(user as any)?.lastName}
+                    {(user as any)?.firstName && (user as any)?.lastName 
+                      ? `${(user as any).firstName} ${(user as any).lastName}`
+                      : 'Loading...'
+                    }
                   </p>
-                  <p className="text-xs leading-none text-muted-foreground capitalize" data-testid="user-email-display">
-                    {(user as any)?.email}
+                  <p className="text-xs leading-none text-muted-foreground" data-testid="user-email-display">
+                    {(user as any)?.email || 'Loading...'}
                   </p>
                   <p className="text-xs leading-none text-muted-foreground capitalize" data-testid="user-role-display">
-                    {(user as any)?.role?.replace('_', ' ')}
+                    {(user as any)?.role?.replace('_', ' ') || 'Loading...'}
                   </p>
                 </div>
               </DropdownMenuLabel>

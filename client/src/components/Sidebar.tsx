@@ -12,7 +12,6 @@ import {
   FileText,
   Calendar,
   Settings,
-  LogOut,
   Menu,
   MapPin,
   Layers,
@@ -53,9 +52,6 @@ export function Sidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
 
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
-  };
 
   const filteredNavItems = navItems.filter((item) => {
     if (!item.roles) return true;
@@ -127,21 +123,6 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Sidebar Footer */}
-      <div className="p-4 border-t border-border">
-        <Button
-          variant="ghost"
-          onClick={handleLogout}
-          className={cn(
-            "w-full justify-start gap-3 text-destructive hover:text-destructive",
-            collapsed && "justify-center px-2"
-          )}
-          data-testid="logout-button"
-        >
-          <LogOut className="h-5 w-5 flex-shrink-0" />
-          {!collapsed && <span>Sign Out</span>}
-        </Button>
-      </div>
 
       {/* Collapse toggle for collapsed state */}
       {collapsed && (
