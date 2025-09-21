@@ -171,6 +171,13 @@ export interface IStorage {
   createFrequencyCalendar(calendar: InsertFrequencyCalendar, createdById: string): Promise<FrequencyCalendar>;
   updateFrequencyCalendar(id: string, calendar: Partial<InsertFrequencyCalendar>, createdById: string): Promise<FrequencyCalendar>;
   deleteFrequencyCalendar(id: string, createdById: string): Promise<void>;
+  
+  // Frequency Calendar Details operations - Administrator isolated through parent calendar
+  getFrequencyCalendarDetails(createdById: string): Promise<FrequencyCalendarDetails[]>;
+  getFrequencyCalendarDetail(id: string, createdById: string): Promise<FrequencyCalendarDetails | undefined>;
+  createFrequencyCalendarDetails(details: InsertFrequencyCalendarDetails, createdById: string): Promise<FrequencyCalendarDetails>;
+  updateFrequencyCalendarDetails(id: string, details: Partial<InsertFrequencyCalendarDetails>, createdById: string): Promise<FrequencyCalendarDetails>;
+  deleteFrequencyCalendarDetails(id: string, createdById: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1056,6 +1063,114 @@ export class DatabaseStorage implements IStorage {
     
     if (result.rowCount === 0) {
       throw new Error('Frequency Calendar not found or access denied');
+    }
+  }
+
+  // Frequency Calendar Details operations - Administrator isolated through parent calendar
+  async getFrequencyCalendarDetails(createdById: string): Promise<FrequencyCalendarDetails[]> {
+    return await db
+      .select({
+        id: frequencyCalendarDetails.id,
+        frequencyCalendarId: frequencyCalendarDetails.frequencyCalendarId,
+        name: frequencyCalendarDetails.name,
+        startDate: frequencyCalendarDetails.startDate,
+        endDate: frequencyCalendarDetails.endDate,
+        status: frequencyCalendarDetails.status,
+        createdAt: frequencyCalendarDetails.createdAt,
+        updatedAt: frequencyCalendarDetails.updatedAt,
+      })
+      .from(frequencyCalendarDetails)
+      .innerJoin(frequencyCalendars, eq(frequencyCalendarDetails.frequencyCalendarId, frequencyCalendars.id))
+      .where(
+        and(
+          eq(frequencyCalendars.createdById, createdById),
+          eq(frequencyCalendarDetails.status, 'active')
+        )
+      )
+      .orderBy(asc(frequencyCalendarDetails.startDate));
+  }
+
+  async getFrequencyCalendarDetail(id: string, createdById: string): Promise<FrequencyCalendarDetails | undefined> {
+    const [detail] = await db
+      .select({
+        id: frequencyCalendarDetails.id,
+        frequencyCalendarId: frequencyCalendarDetails.frequencyCalendarId,
+        name: frequencyCalendarDetails.name,
+        startDate: frequencyCalendarDetails.startDate,
+        endDate: frequencyCalendarDetails.endDate,
+        status: frequencyCalendarDetails.status,
+        createdAt: frequencyCalendarDetails.createdAt,
+        updatedAt: frequencyCalendarDetails.updatedAt,
+      })
+      .from(frequencyCalendarDetails)
+      .innerJoin(frequencyCalendars, eq(frequencyCalendarDetails.frequencyCalendarId, frequencyCalendars.id))
+      .where(
+        and(
+          eq(frequencyCalendarDetails.id, id),
+          eq(frequencyCalendars.createdById, createdById)
+        )
+      );
+    return detail;
+  }
+
+  async createFrequencyCalendarDetails(details: InsertFrequencyCalendarDetails, createdById: string): Promise<FrequencyCalendarDetails> {
+    // Verify the frequency calendar belongs to the administrator
+    const parentCalendar = await this.getFrequencyCalendar(details.frequencyCalendarId, createdById);
+    if (!parentCalendar) {
+      throw new Error('Frequency Calendar not found or access denied');
+    }
+
+    const [newDetails] = await db.insert(frequencyCalendarDetails).values({
+      ...details,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+    return newDetails;
+  }
+
+  async updateFrequencyCalendarDetails(id: string, details: Partial<InsertFrequencyCalendarDetails>, createdById: string): Promise<FrequencyCalendarDetails> {
+    // Verify the frequency calendar detail belongs to the administrator through parent calendar
+    const existingDetail = await this.getFrequencyCalendarDetail(id, createdById);
+    if (!existingDetail) {
+      throw new Error('Frequency Calendar Details not found or access denied');
+    }
+
+    // If frequencyCalendarId is being updated, verify the new parent calendar belongs to the administrator
+    if (details.frequencyCalendarId) {
+      const parentCalendar = await this.getFrequencyCalendar(details.frequencyCalendarId, createdById);
+      if (!parentCalendar) {
+        throw new Error('Target Frequency Calendar not found or access denied');
+      }
+    }
+
+    const [updatedDetails] = await db
+      .update(frequencyCalendarDetails)
+      .set({ 
+        ...details, 
+        updatedAt: new Date() 
+      })
+      .where(eq(frequencyCalendarDetails.id, id))
+      .returning();
+    
+    if (!updatedDetails) {
+      throw new Error('Frequency Calendar Details not found or access denied');
+    }
+    return updatedDetails;
+  }
+
+  async deleteFrequencyCalendarDetails(id: string, createdById: string): Promise<void> {
+    // Verify the frequency calendar detail belongs to the administrator through parent calendar
+    const existingDetail = await this.getFrequencyCalendarDetail(id, createdById);
+    if (!existingDetail) {
+      throw new Error('Frequency Calendar Details not found or access denied');
+    }
+
+    const result = await db
+      .delete(frequencyCalendarDetails)
+      .where(eq(frequencyCalendarDetails.id, id));
+    
+    if (result.rowCount === 0) {
+      throw new Error('Frequency Calendar Details not found or access denied');
     }
   }
 }
