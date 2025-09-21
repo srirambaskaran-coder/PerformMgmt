@@ -571,6 +571,9 @@ export const insertAppraisalCycleSchema = createInsertSchema(appraisalCycles).om
   createdAt: true,
   updatedAt: true,
   createdById: true,
+}).extend({
+  fromDate: z.preprocess((val) => new Date(val as string), z.date()),
+  toDate: z.preprocess((val) => new Date(val as string), z.date()),
 });
 
 export const insertReviewFrequencySchema = createInsertSchema(reviewFrequencies).omit({

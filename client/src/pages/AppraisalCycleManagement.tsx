@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { insertAppraisalCycleSchema, type AppraisalCycle, type InsertAppraisalCycle } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -99,9 +100,18 @@ export default function AppraisalCycleManagement() {
     },
   });
 
+  // Enhanced schema with date range validation
+  const enhancedSchema = insertAppraisalCycleSchema.refine(
+    (data) => data.toDate >= data.fromDate,
+    {
+      path: ['toDate'],
+      message: 'To date must be on or after from date'
+    }
+  );
+
   // Form handling
   const form = useForm<InsertAppraisalCycle>({
-    resolver: zodResolver(insertAppraisalCycleSchema),
+    resolver: zodResolver(enhancedSchema),
     defaultValues: {
       code: "",
       fromDate: new Date(),
@@ -162,7 +172,17 @@ export default function AppraisalCycleManagement() {
   };
 
   const formatDateForInput = (date: Date | null) => {
-    return date ? new Date(date).toISOString().split('T')[0] : '';
+    if (!date) return '';
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const parseLocalDate = (value: string) => {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
   };
 
   return (
@@ -246,7 +266,7 @@ export default function AppraisalCycleManagement() {
                               {...field} 
                               type="date"
                               value={field.value ? formatDateForInput(field.value) : ''}
-                              onChange={(e) => field.onChange(new Date(e.target.value))}
+                              onChange={(e) => field.onChange(parseLocalDate(e.target.value))}
                               data-testid="input-from-date"
                             />
                           </FormControl>
@@ -265,7 +285,7 @@ export default function AppraisalCycleManagement() {
                               {...field} 
                               type="date"
                               value={field.value ? formatDateForInput(field.value) : ''}
-                              onChange={(e) => field.onChange(new Date(e.target.value))}
+                              onChange={(e) => field.onChange(parseLocalDate(e.target.value))}
                               data-testid="input-to-date"
                             />
                           </FormControl>
