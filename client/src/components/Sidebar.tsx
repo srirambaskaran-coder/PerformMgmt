@@ -15,6 +15,11 @@ import {
   LogOut,
   Menu,
   MapPin,
+  Layers,
+  Award,
+  Clock,
+  Repeat,
+  CalendarDays,
 } from "lucide-react";
 
 interface NavItem {
@@ -29,6 +34,12 @@ const navItems: NavItem[] = [
   { href: "/companies", label: "Company Management", icon: Building, roles: ["super_admin"] },
   { href: "/users", label: "User Management", icon: Users, roles: ["super_admin", "admin"] },
   { href: "/locations", label: "Location Management", icon: MapPin, roles: ["admin"] },
+  { href: "/levels", label: "Level Management", icon: Layers, roles: ["admin"] },
+  { href: "/grades", label: "Grade Management", icon: Award, roles: ["admin"] },
+  { href: "/appraisal-cycles", label: "Appraisal Cycles", icon: Clock, roles: ["admin"] },
+  { href: "/review-frequencies", label: "Review Frequencies", icon: Repeat, roles: ["admin"] },
+  { href: "/frequency-calendars", label: "Frequency Calendars", icon: Calendar, roles: ["admin"] },
+  { href: "/frequency-calendar-details", label: "Calendar Details", icon: CalendarDays, roles: ["admin"] },
   { href: "/performance-reviews", label: "Performance Reviews", icon: ClipboardList, roles: ["hr_manager"] },
   { href: "/review-progress", label: "Review Progress", icon: ChartBar, roles: ["hr_manager"] },
   { href: "/questionnaires", label: "Questionnaires", icon: FileText },
