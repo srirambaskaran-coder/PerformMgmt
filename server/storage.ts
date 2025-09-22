@@ -514,24 +514,17 @@ export class DatabaseStorage implements IStorage {
     // SECURITY: Company isolation - HR Managers only see templates from their company
     if (requestingUserId) {
       const requestingUser = await this.getUser(requestingUserId);
-      console.log('[DEBUG] getQuestionnaireTemplates - requestingUser:', {
-        id: requestingUser?.id,
-        role: requestingUser?.role,
-        companyId: requestingUser?.companyId
-      });
       
       if (requestingUser && requestingUser.role === 'hr_manager') {
         // HR Managers can only see templates created by users (admins/hr_managers) in their company
         // DEFENSIVE: If HR Manager has no companyId, they can only see templates they created themselves
         if (!requestingUser.companyId) {
-          console.log('[DEBUG] HR Manager has no companyId, returning only their own templates');
           const templates = await db
             .select()
             .from(questionnaireTemplates)
             .where(eq(questionnaireTemplates.createdById, requestingUser.id))
             .orderBy(desc(questionnaireTemplates.createdAt));
           
-          console.log('[DEBUG] getQuestionnaireTemplates - HR Manager personal templates found:', templates.length);
           return templates;
         }
         
@@ -563,17 +556,12 @@ export class DatabaseStorage implements IStorage {
           )
           .orderBy(desc(questionnaireTemplates.createdAt));
         
-        console.log('[DEBUG] getQuestionnaireTemplates - HR Manager templates found:', templates.length);
-        console.log('[DEBUG] getQuestionnaireTemplates - Templates:', templates.map(t => ({ id: t.id, name: t.name, createdById: t.createdById })));
-        
         return templates;
       }
       // Admins and super admins can see all templates (no additional filter)
     }
     
-    const allTemplates = await db.select().from(questionnaireTemplates).orderBy(desc(questionnaireTemplates.createdAt));
-    console.log('[DEBUG] getQuestionnaireTemplates - All templates (non-HR Manager):', allTemplates.length);
-    return allTemplates;
+    return await db.select().from(questionnaireTemplates).orderBy(desc(questionnaireTemplates.createdAt));
   }
 
   async getQuestionnaireTemplate(id: string, requestingUserId?: string): Promise<QuestionnaireTemplate | undefined> {
@@ -595,19 +583,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createQuestionnaireTemplate(template: InsertQuestionnaireTemplate): Promise<QuestionnaireTemplate> {
-    console.log('[DEBUG] createQuestionnaireTemplate - creating template:', {
-      name: template.name,
-      createdById: template.createdById
-    });
-    
     const [newTemplate] = await db.insert(questionnaireTemplates).values(template).returning();
-    
-    console.log('[DEBUG] createQuestionnaireTemplate - created template:', {
-      id: newTemplate.id,
-      name: newTemplate.name,
-      createdById: newTemplate.createdById
-    });
-    
     return newTemplate;
   }
 
