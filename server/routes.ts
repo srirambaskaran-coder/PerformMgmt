@@ -275,9 +275,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Questionnaire template routes
-  app.get('/api/questionnaire-templates', isAuthenticated, async (req, res) => {
+  app.get('/api/questionnaire-templates', isAuthenticated, async (req: any, res) => {
     try {
-      const templates = await storage.getQuestionnaireTemplates();
+      const requestingUserId = req.user.claims.sub;
+      const templates = await storage.getQuestionnaireTemplates(requestingUserId);
       res.json(templates);
     } catch (error) {
       console.error("Error fetching questionnaire templates:", error);
@@ -285,9 +286,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/questionnaire-templates', isAuthenticated, requireRoles(['super_admin', 'admin', 'hr_manager']), async (req, res) => {
+  app.post('/api/questionnaire-templates', isAuthenticated, requireRoles(['super_admin', 'admin', 'hr_manager']), async (req: any, res) => {
     try {
+      const requestingUserId = req.user.claims.sub;
       const templateData = insertQuestionnaireTemplateSchema.parse(req.body);
+      
+      // Automatically set the createdById field to the requesting user
+      templateData.createdById = requestingUserId;
+      
       const template = await storage.createQuestionnaireTemplate(templateData);
       res.status(201).json(template);
     } catch (error) {
@@ -296,10 +302,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/questionnaire-templates/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/questionnaire-templates/:id', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const template = await storage.getQuestionnaireTemplate(id);
+      const requestingUserId = req.user.claims.sub;
+      const template = await storage.getQuestionnaireTemplate(id, requestingUserId);
       if (!template) {
         return res.status(404).json({ message: "Questionnaire template not found" });
       }
@@ -310,39 +317,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/questionnaire-templates/:id', isAuthenticated, requireRoles(['super_admin', 'admin', 'hr_manager']), async (req, res) => {
+  app.put('/api/questionnaire-templates/:id', isAuthenticated, requireRoles(['super_admin', 'admin', 'hr_manager']), async (req: any, res) => {
     try {
       const { id } = req.params;
-      
-      // Check if template exists
-      const existingTemplate = await storage.getQuestionnaireTemplate(id);
-      if (!existingTemplate) {
-        return res.status(404).json({ message: "Questionnaire template not found" });
-      }
+      const requestingUserId = req.user.claims.sub;
       
       const templateData = insertQuestionnaireTemplateSchema.partial().parse(req.body);
-      const template = await storage.updateQuestionnaireTemplate(id, templateData);
+      const template = await storage.updateQuestionnaireTemplate(id, templateData, requestingUserId);
       res.json(template);
     } catch (error) {
       console.error("Error updating questionnaire template:", error);
+      
+      // Handle authorization errors specifically
+      if (error instanceof Error && error.message?.includes('Forbidden')) {
+        return res.status(403).json({ message: error.message });
+      }
+      
       res.status(500).json({ message: "Failed to update questionnaire template" });
     }
   });
 
-  app.delete('/api/questionnaire-templates/:id', isAuthenticated, requireRoles(['super_admin', 'admin', 'hr_manager']), async (req, res) => {
+  app.delete('/api/questionnaire-templates/:id', isAuthenticated, requireRoles(['super_admin', 'admin', 'hr_manager']), async (req: any, res) => {
     try {
       const { id } = req.params;
+      const requestingUserId = req.user.claims.sub;
       
-      // Check if template exists
-      const existingTemplate = await storage.getQuestionnaireTemplate(id);
-      if (!existingTemplate) {
-        return res.status(404).json({ message: "Questionnaire template not found" });
-      }
-      
-      await storage.deleteQuestionnaireTemplate(id);
+      await storage.deleteQuestionnaireTemplate(id, requestingUserId);
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting questionnaire template:", error);
+      
+      // Handle authorization errors specifically
+      if (error instanceof Error && error.message?.includes('Forbidden')) {
+        return res.status(403).json({ message: error.message });
+      }
+      
       res.status(500).json({ message: "Failed to delete questionnaire template" });
     }
   });

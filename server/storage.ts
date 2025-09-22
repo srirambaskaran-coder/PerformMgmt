@@ -93,11 +93,11 @@ export interface IStorage {
   getUsersByManager(managerId: string): Promise<SafeUser[]>;
   
   // Questionnaire template operations
-  getQuestionnaireTemplates(): Promise<QuestionnaireTemplate[]>;
-  getQuestionnaireTemplate(id: string): Promise<QuestionnaireTemplate | undefined>;
+  getQuestionnaireTemplates(requestingUserId?: string): Promise<QuestionnaireTemplate[]>;
+  getQuestionnaireTemplate(id: string, requestingUserId?: string): Promise<QuestionnaireTemplate | undefined>;
   createQuestionnaireTemplate(template: InsertQuestionnaireTemplate): Promise<QuestionnaireTemplate>;
-  updateQuestionnaireTemplate(id: string, template: Partial<InsertQuestionnaireTemplate>): Promise<QuestionnaireTemplate>;
-  deleteQuestionnaireTemplate(id: string): Promise<void>;
+  updateQuestionnaireTemplate(id: string, template: Partial<InsertQuestionnaireTemplate>, requestingUserId?: string): Promise<QuestionnaireTemplate>;
+  deleteQuestionnaireTemplate(id: string, requestingUserId?: string): Promise<void>;
   getQuestionnaireTemplatesByYear(year: number): Promise<QuestionnaireTemplate[]>;
   
   // Review cycle operations
@@ -510,12 +510,58 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Questionnaire template operations
-  async getQuestionnaireTemplates(): Promise<QuestionnaireTemplate[]> {
+  async getQuestionnaireTemplates(requestingUserId?: string): Promise<QuestionnaireTemplate[]> {
+    // SECURITY: Company isolation - HR Managers only see templates from their company
+    if (requestingUserId) {
+      const requestingUser = await this.getUser(requestingUserId);
+      if (requestingUser && requestingUser.role === 'hr_manager') {
+        // HR Managers can only see templates created by admins in their company
+        const templates = await db
+          .select({
+            id: questionnaireTemplates.id,
+            name: questionnaireTemplates.name,
+            description: questionnaireTemplates.description,
+            targetRole: questionnaireTemplates.targetRole,
+            applicableCategory: questionnaireTemplates.applicableCategory,
+            applicableLevelId: questionnaireTemplates.applicableLevelId,
+            applicableGradeId: questionnaireTemplates.applicableGradeId,
+            applicableLocationId: questionnaireTemplates.applicableLocationId,
+            sendOnMail: questionnaireTemplates.sendOnMail,
+            questions: questionnaireTemplates.questions,
+            year: questionnaireTemplates.year,
+            status: questionnaireTemplates.status,
+            createdAt: questionnaireTemplates.createdAt,
+            updatedAt: questionnaireTemplates.updatedAt,
+            createdById: questionnaireTemplates.createdById,
+          })
+          .from(questionnaireTemplates)
+          .leftJoin(users, eq(questionnaireTemplates.createdById, users.id))
+          .where(eq(users.companyId, requestingUser.companyId))
+          .orderBy(desc(questionnaireTemplates.createdAt));
+        
+        return templates;
+      }
+      // Admins and super admins can see all templates (no additional filter)
+    }
+    
     return await db.select().from(questionnaireTemplates).orderBy(desc(questionnaireTemplates.createdAt));
   }
 
-  async getQuestionnaireTemplate(id: string): Promise<QuestionnaireTemplate | undefined> {
+  async getQuestionnaireTemplate(id: string, requestingUserId?: string): Promise<QuestionnaireTemplate | undefined> {
     const [template] = await db.select().from(questionnaireTemplates).where(eq(questionnaireTemplates.id, id));
+    
+    // SECURITY: Company isolation - HR Managers only see templates from their company
+    if (template && requestingUserId) {
+      const requestingUser = await this.getUser(requestingUserId);
+      if (requestingUser && requestingUser.role === 'hr_manager') {
+        // Check if template was created by someone in the same company
+        const creator = await this.getUser(template.createdById!);
+        if (!creator || creator.companyId !== requestingUser.companyId) {
+          return undefined; // Template not accessible to this HR Manager
+        }
+      }
+    }
+    
     return template;
   }
 
@@ -524,7 +570,15 @@ export class DatabaseStorage implements IStorage {
     return newTemplate;
   }
 
-  async updateQuestionnaireTemplate(id: string, template: Partial<InsertQuestionnaireTemplate>): Promise<QuestionnaireTemplate> {
+  async updateQuestionnaireTemplate(id: string, template: Partial<InsertQuestionnaireTemplate>, requestingUserId?: string): Promise<QuestionnaireTemplate> {
+    // SECURITY: Company isolation - HR Managers only update templates from their company
+    if (requestingUserId) {
+      const existingTemplate = await this.getQuestionnaireTemplate(id, requestingUserId);
+      if (!existingTemplate) {
+        throw new Error('Forbidden: Questionnaire template not found or not accessible');
+      }
+    }
+    
     const [updatedTemplate] = await db
       .update(questionnaireTemplates)
       .set({ ...template, updatedAt: new Date() })
@@ -533,7 +587,15 @@ export class DatabaseStorage implements IStorage {
     return updatedTemplate;
   }
 
-  async deleteQuestionnaireTemplate(id: string): Promise<void> {
+  async deleteQuestionnaireTemplate(id: string, requestingUserId?: string): Promise<void> {
+    // SECURITY: Company isolation - HR Managers only delete templates from their company
+    if (requestingUserId) {
+      const existingTemplate = await this.getQuestionnaireTemplate(id, requestingUserId);
+      if (!existingTemplate) {
+        throw new Error('Forbidden: Questionnaire template not found or not accessible');
+      }
+    }
+    
     await db.delete(questionnaireTemplates).where(eq(questionnaireTemplates.id, id));
   }
 
