@@ -710,3 +710,49 @@ export type FrequencyCalendarDetails = typeof frequencyCalendarDetails.$inferSel
 export type InsertFrequencyCalendarDetails = z.infer<typeof insertFrequencyCalendarDetailsSchema>;
 export type PublishQuestionnaire = typeof publishQuestionnaires.$inferSelect;
 export type InsertPublishQuestionnaire = z.infer<typeof insertPublishQuestionnaireSchema>;
+
+// Appraisal Groups table
+export const appraisalGroups = pgTable("appraisal_groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  createdById: varchar("created_by_id").notNull(), // HR Manager who created the group
+  companyId: varchar("company_id"), // For multi-tenant isolation
+  status: statusEnum("status").default('active'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("appraisal_groups_created_by_id_idx").on(table.createdById),
+  index("appraisal_groups_company_id_idx").on(table.companyId),
+]);
+
+// Appraisal Group Members table (many-to-many relationship)
+export const appraisalGroupMembers = pgTable("appraisal_group_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appraisalGroupId: varchar("appraisal_group_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  addedById: varchar("added_by_id").notNull(), // HR Manager who added this member
+  addedAt: timestamp("added_at").defaultNow(),
+}, (table) => [
+  index("appraisal_group_members_group_id_idx").on(table.appraisalGroupId),
+  index("appraisal_group_members_user_id_idx").on(table.userId),
+  unique("appraisal_group_members_unique").on(table.appraisalGroupId, table.userId), // Prevent duplicate members
+]);
+
+// Insert schemas
+export const insertAppraisalGroupSchema = createInsertSchema(appraisalGroups).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAppraisalGroupMemberSchema = createInsertSchema(appraisalGroupMembers).omit({
+  id: true,
+  addedAt: true,
+});
+
+// Export types
+export type AppraisalGroup = typeof appraisalGroups.$inferSelect;
+export type InsertAppraisalGroup = z.infer<typeof insertAppraisalGroupSchema>;
+export type AppraisalGroupMember = typeof appraisalGroupMembers.$inferSelect;
+export type InsertAppraisalGroupMember = z.infer<typeof insertAppraisalGroupMemberSchema>;

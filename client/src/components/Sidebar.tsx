@@ -43,6 +43,7 @@ const navItems: NavItem[] = [
   { href: "/frequency-calendar-details", label: "Calendar Details", icon: CalendarDays, roles: ["admin"] },
   { href: "/performance-reviews", label: "Performance Reviews", icon: ClipboardList, roles: ["hr_manager"] },
   { href: "/review-progress", label: "Review Progress", icon: ChartBar, roles: ["hr_manager"] },
+  { href: "/appraisal-groups", label: "Appraisal Groups", icon: Users, roles: ["hr_manager"] },
   { href: "/questionnaires", label: "Questionnaires", icon: FileText },
   { href: "/evaluations", label: "My Evaluations", icon: ClipboardList, roles: ["employee", "manager"] },
   { href: "/meetings", label: "Meetings", icon: Calendar },
