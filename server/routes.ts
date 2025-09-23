@@ -20,6 +20,8 @@ import {
   insertFrequencyCalendarSchema,
   insertFrequencyCalendarDetailsSchema,
   insertPublishQuestionnaireSchema,
+  insertAppraisalGroupSchema,
+  insertAppraisalGroupMemberSchema,
   updateUserSchema,
   passwordUpdateSchema,
   type SafeUser,
@@ -1599,6 +1601,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting publish questionnaire:", error);
       res.status(500).json({ message: "Failed to delete publish questionnaire" });
+    }
+  });
+
+  // Appraisal Groups routes - HR Manager access
+  app.get('/api/appraisal-groups', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      const groups = await storage.getAppraisalGroupsWithMembers(requestingUserId);
+      res.json(groups);
+    } catch (error) {
+      console.error("Error fetching appraisal groups:", error);
+      res.status(500).json({ message: "Failed to fetch appraisal groups" });
+    }
+  });
+
+  app.get('/api/appraisal-groups/:id', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      const { id } = req.params;
+      const group = await storage.getAppraisalGroup(id, requestingUserId);
+      if (!group) {
+        return res.status(404).json({ message: "Appraisal group not found" });
+      }
+      res.json(group);
+    } catch (error) {
+      console.error("Error fetching appraisal group:", error);
+      res.status(500).json({ message: "Failed to fetch appraisal group" });
+    }
+  });
+
+  app.post('/api/appraisal-groups', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      const validatedData = insertAppraisalGroupSchema.parse(req.body);
+      const group = await storage.createAppraisalGroup(validatedData, requestingUserId);
+      res.status(201).json(group);
+    } catch (error) {
+      console.error("Error creating appraisal group:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create appraisal group" });
+    }
+  });
+
+  app.put('/api/appraisal-groups/:id', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      const { id } = req.params;
+      const validatedData = insertAppraisalGroupSchema.partial().parse(req.body);
+      const group = await storage.updateAppraisalGroup(id, validatedData, requestingUserId);
+      res.json(group);
+    } catch (error) {
+      console.error("Error updating appraisal group:", error);
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ message: "Appraisal group not found" });
+      }
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update appraisal group" });
+    }
+  });
+
+  app.delete('/api/appraisal-groups/:id', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      const { id } = req.params;
+      await storage.deleteAppraisalGroup(id, requestingUserId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting appraisal group:", error);
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ message: "Appraisal group not found" });
+      }
+      res.status(500).json({ message: "Failed to delete appraisal group" });
+    }
+  });
+
+  // Appraisal Group Members routes
+  app.get('/api/appraisal-groups/:groupId/members', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      const { groupId } = req.params;
+      const members = await storage.getAppraisalGroupMembers(groupId, requestingUserId);
+      res.json(members);
+    } catch (error) {
+      console.error("Error fetching group members:", error);
+      res.status(500).json({ message: "Failed to fetch group members" });
+    }
+  });
+
+  app.post('/api/appraisal-groups/:groupId/members', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      const { groupId } = req.params;
+      const { userId } = req.body;
+      
+      const memberData = {
+        appraisalGroupId: groupId,
+        userId: userId,
+      };
+      
+      const validatedData = insertAppraisalGroupMemberSchema.parse(memberData);
+      const member = await storage.addAppraisalGroupMember(validatedData, requestingUserId);
+      res.status(201).json(member);
+    } catch (error) {
+      console.error("Error adding group member:", error);
+      if (error.message.includes('already a member')) {
+        return res.status(409).json({ message: "User is already a member of this group" });
+      }
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ message: "Group or user not found" });
+      }
+      res.status(500).json({ message: "Failed to add group member" });
+    }
+  });
+
+  app.delete('/api/appraisal-groups/:groupId/members/:userId', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      const { groupId, userId } = req.params;
+      await storage.removeAppraisalGroupMember(groupId, userId, requestingUserId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing group member:", error);
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ message: "Group member not found" });
+      }
+      res.status(500).json({ message: "Failed to remove group member" });
     }
   });
 

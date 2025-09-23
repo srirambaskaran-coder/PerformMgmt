@@ -16,6 +16,8 @@ import {
   frequencyCalendars,
   frequencyCalendarDetails,
   publishQuestionnaires,
+  appraisalGroups,
+  appraisalGroupMembers,
   type User,
   type SafeUser,
   type UpsertUser,
@@ -52,6 +54,10 @@ import {
   type InsertFrequencyCalendarDetails,
   type PublishQuestionnaire,
   type InsertPublishQuestionnaire,
+  type AppraisalGroup,
+  type InsertAppraisalGroup,
+  type AppraisalGroupMember,
+  type InsertAppraisalGroupMember,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, like, inArray, or, sql, isNotNull } from "drizzle-orm";
@@ -188,6 +194,19 @@ export interface IStorage {
   createPublishQuestionnaire(questionnaire: InsertPublishQuestionnaire, createdById: string): Promise<PublishQuestionnaire>;
   updatePublishQuestionnaire(id: string, questionnaire: Partial<InsertPublishQuestionnaire>, createdById: string): Promise<PublishQuestionnaire>;
   deletePublishQuestionnaire(id: string, createdById: string): Promise<void>;
+  
+  // Appraisal Group operations - HR Manager isolated
+  getAppraisalGroups(createdById: string): Promise<AppraisalGroup[]>;
+  getAppraisalGroup(id: string, createdById: string): Promise<AppraisalGroup | undefined>;
+  createAppraisalGroup(group: InsertAppraisalGroup, createdById: string): Promise<AppraisalGroup>;
+  updateAppraisalGroup(id: string, group: Partial<InsertAppraisalGroup>, createdById: string): Promise<AppraisalGroup>;
+  deleteAppraisalGroup(id: string, createdById: string): Promise<void>;
+  
+  // Appraisal Group Member operations 
+  getAppraisalGroupMembers(groupId: string, createdById: string): Promise<AppraisalGroupMember[]>;
+  addAppraisalGroupMember(member: InsertAppraisalGroupMember, createdById: string): Promise<AppraisalGroupMember>;
+  removeAppraisalGroupMember(groupId: string, userId: string, createdById: string): Promise<void>;
+  getAppraisalGroupsWithMembers(createdById: string): Promise<(AppraisalGroup & { members: SafeUser[] })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1467,6 +1486,189 @@ export class DatabaseStorage implements IStorage {
     if (result.rowCount === 0) {
       throw new Error('Publish Questionnaire not found or access denied');
     }
+  }
+
+  // Appraisal Group operations - HR Manager isolated
+  async getAppraisalGroups(createdById: string): Promise<AppraisalGroup[]> {
+    const results = await db.select()
+      .from(appraisalGroups)
+      .where(and(
+        eq(appraisalGroups.createdById, createdById),
+        eq(appraisalGroups.status, 'active')
+      ))
+      .orderBy(desc(appraisalGroups.createdAt));
+    
+    return results;
+  }
+
+  async getAppraisalGroup(id: string, createdById: string): Promise<AppraisalGroup | undefined> {
+    const [result] = await db.select()
+      .from(appraisalGroups)
+      .where(and(
+        eq(appraisalGroups.id, id),
+        eq(appraisalGroups.createdById, createdById),
+        eq(appraisalGroups.status, 'active')
+      ));
+    
+    return result;
+  }
+
+  async createAppraisalGroup(group: InsertAppraisalGroup, createdById: string): Promise<AppraisalGroup> {
+    const [newGroup] = await db.insert(appraisalGroups).values({
+      ...group,
+      createdById,
+    }).returning();
+    
+    if (!newGroup) {
+      throw new Error('Failed to create Appraisal Group');
+    }
+    return newGroup;
+  }
+
+  async updateAppraisalGroup(id: string, group: Partial<InsertAppraisalGroup>, createdById: string): Promise<AppraisalGroup> {
+    // Verify the group belongs to the HR Manager
+    const existing = await this.getAppraisalGroup(id, createdById);
+    if (!existing) {
+      throw new Error('Appraisal Group not found or access denied');
+    }
+
+    const [updatedGroup] = await db
+      .update(appraisalGroups)
+      .set({ 
+        ...group, 
+        updatedAt: new Date() 
+      })
+      .where(eq(appraisalGroups.id, id))
+      .returning();
+    
+    if (!updatedGroup) {
+      throw new Error('Appraisal Group not found or access denied');
+    }
+    return updatedGroup;
+  }
+
+  async deleteAppraisalGroup(id: string, createdById: string): Promise<void> {
+    // Verify the group belongs to the HR Manager
+    const existing = await this.getAppraisalGroup(id, createdById);
+    if (!existing) {
+      throw new Error('Appraisal Group not found or access denied');
+    }
+
+    // Delete all group members first
+    await db
+      .delete(appraisalGroupMembers)
+      .where(eq(appraisalGroupMembers.appraisalGroupId, id));
+
+    // Delete the group
+    const result = await db
+      .delete(appraisalGroups)
+      .where(eq(appraisalGroups.id, id));
+    
+    if (result.rowCount === 0) {
+      throw new Error('Appraisal Group not found or access denied');
+    }
+  }
+
+  // Appraisal Group Member operations
+  async getAppraisalGroupMembers(groupId: string, createdById: string): Promise<AppraisalGroupMember[]> {
+    // Verify the group belongs to the HR Manager
+    const group = await this.getAppraisalGroup(groupId, createdById);
+    if (!group) {
+      throw new Error('Appraisal Group not found or access denied');
+    }
+
+    const results = await db.select()
+      .from(appraisalGroupMembers)
+      .where(eq(appraisalGroupMembers.appraisalGroupId, groupId))
+      .orderBy(desc(appraisalGroupMembers.addedAt));
+    
+    return results;
+  }
+
+  async addAppraisalGroupMember(member: InsertAppraisalGroupMember, createdById: string): Promise<AppraisalGroupMember> {
+    // Verify the group belongs to the HR Manager
+    const group = await this.getAppraisalGroup(member.appraisalGroupId, createdById);
+    if (!group) {
+      throw new Error('Appraisal Group not found or access denied');
+    }
+
+    // Verify the user exists and is active
+    const user = await this.getUser(member.userId);
+    if (!user || user.status !== 'active') {
+      throw new Error('User not found or inactive');
+    }
+
+    // Check if user is already in the group
+    const [existing] = await db.select()
+      .from(appraisalGroupMembers)
+      .where(and(
+        eq(appraisalGroupMembers.appraisalGroupId, member.appraisalGroupId),
+        eq(appraisalGroupMembers.userId, member.userId)
+      ));
+    
+    if (existing) {
+      throw new Error('User is already a member of this group');
+    }
+
+    const [newMember] = await db.insert(appraisalGroupMembers).values({
+      ...member,
+      addedById: createdById,
+    }).returning();
+    
+    if (!newMember) {
+      throw new Error('Failed to add group member');
+    }
+    return newMember;
+  }
+
+  async removeAppraisalGroupMember(groupId: string, userId: string, createdById: string): Promise<void> {
+    // Verify the group belongs to the HR Manager
+    const group = await this.getAppraisalGroup(groupId, createdById);
+    if (!group) {
+      throw new Error('Appraisal Group not found or access denied');
+    }
+
+    const result = await db
+      .delete(appraisalGroupMembers)
+      .where(and(
+        eq(appraisalGroupMembers.appraisalGroupId, groupId),
+        eq(appraisalGroupMembers.userId, userId)
+      ));
+    
+    if (result.rowCount === 0) {
+      throw new Error('Group member not found');
+    }
+  }
+
+  async getAppraisalGroupsWithMembers(createdById: string): Promise<(AppraisalGroup & { members: SafeUser[] })[]> {
+    const groups = await this.getAppraisalGroups(createdById);
+    
+    const groupsWithMembers = await Promise.all(
+      groups.map(async (group) => {
+        const memberRecords = await db
+          .select({
+            user: users,
+          })
+          .from(appraisalGroupMembers)
+          .leftJoin(users, eq(appraisalGroupMembers.userId, users.id))
+          .where(and(
+            eq(appraisalGroupMembers.appraisalGroupId, group.id),
+            eq(users.status, 'active')
+          ))
+          .orderBy(asc(users.firstName), asc(users.lastName));
+
+        const members = memberRecords
+          .filter(record => record.user !== null)
+          .map(record => sanitizeUser(record.user!));
+
+        return {
+          ...group,
+          members,
+        };
+      })
+    );
+    
+    return groupsWithMembers;
   }
 }
 
