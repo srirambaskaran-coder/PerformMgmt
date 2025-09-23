@@ -1707,6 +1707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const memberData = {
         appraisalGroupId: groupId,
         userId: userId,
+        addedById: requestingUserId,
       };
       
       const validatedData = insertAppraisalGroupMemberSchema.parse(memberData);
