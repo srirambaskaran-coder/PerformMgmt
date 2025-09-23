@@ -1844,6 +1844,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/initiated-appraisals - Get all initiated appraisals for HR manager
+  app.get('/api/initiated-appraisals', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      const appraisals = await storage.getInitiatedAppraisals(requestingUserId);
+      res.json(appraisals);
+    } catch (error) {
+      console.error('Error fetching initiated appraisals:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Development endpoints for user seeding and testing
   // Development endpoints - only available in development environment
   if (process.env.NODE_ENV === 'development') {

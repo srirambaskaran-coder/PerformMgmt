@@ -220,6 +220,7 @@ export interface IStorage {
   createInitiatedAppraisal(appraisal: any, createdById: string): Promise<InitiatedAppraisal>;
   createInitiatedAppraisalDetailTiming(timing: InsertInitiatedAppraisalDetailTiming): Promise<InitiatedAppraisalDetailTiming>;
   getInitiatedAppraisalDetailTimings(appraisalId: string): Promise<InitiatedAppraisalDetailTiming[]>;
+  getInitiatedAppraisals(createdById: string): Promise<InitiatedAppraisal[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1770,6 +1771,24 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(initiatedAppraisalDetailTimings).where(
       eq(initiatedAppraisalDetailTimings.initiatedAppraisalId, appraisalId)
     ).orderBy(asc(initiatedAppraisalDetailTimings.createdAt));
+  }
+
+  async getInitiatedAppraisals(createdById: string): Promise<InitiatedAppraisal[]> {
+    return await db
+      .select({
+        initiatedAppraisal: initiatedAppraisals,
+        appraisalGroup: appraisalGroups,
+      })
+      .from(initiatedAppraisals)
+      .leftJoin(appraisalGroups, eq(initiatedAppraisals.appraisalGroupId, appraisalGroups.id))
+      .where(eq(initiatedAppraisals.createdById, createdById))
+      .orderBy(desc(initiatedAppraisals.createdAt))
+      .then(results => 
+        results.map(result => ({
+          ...result.initiatedAppraisal,
+          appraisalGroup: result.appraisalGroup,
+        }))
+      );
   }
 }
 
