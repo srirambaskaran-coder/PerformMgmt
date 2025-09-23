@@ -54,7 +54,6 @@ export default function AppraisalGroups() {
     grade: "",
     reportingManager: "",
   });
-  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<AppraisalGroupWithMembers | null>(null);
   const [isEmployeeSelectOpen, setIsEmployeeSelectOpen] = useState(false);
@@ -162,7 +161,14 @@ export default function AppraisalGroups() {
       setIsEmployeeSelectOpen(false);
       setSelectedEmployees([]);
       setSelectedGroupForEmployees(null);
-      setEmployeeSearchQuery("");
+      setEmployeeFilters({
+        nameOrCode: "",
+        location: "",
+        department: "",
+        level: "",
+        grade: "",
+        reportingManager: "",
+      });
       toast({
         title: "Success",
         description: "Employees added to group successfully",
@@ -266,51 +272,6 @@ export default function AppraisalGroups() {
     (group.description || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Filter active employees (assuming all users are active unless explicitly marked inactive)
-  const activeEmployees = allUsers.filter(user => !user.isDeleted && user.role !== 'super_admin');
-
-  // Filter active employees based on structured filters
-  const filteredActiveEmployees = activeEmployees.filter(user => {
-    // Name or Code filter
-    if (employeeFilters.nameOrCode) {
-      const nameOrCodeQuery = employeeFilters.nameOrCode.toLowerCase();
-      const matchesName = ((user.firstName ?? '') + ' ' + (user.lastName ?? '')).toLowerCase().includes(nameOrCodeQuery);
-      const matchesCode = (user.code ?? '').toLowerCase().includes(nameOrCodeQuery);
-      if (!matchesName && !matchesCode) return false;
-    }
-
-    // Location filter
-    if (employeeFilters.location) {
-      const locationQuery = employeeFilters.location.toLowerCase();
-      if (!(user.location ?? '').toLowerCase().includes(locationQuery)) return false;
-    }
-
-    // Department filter
-    if (employeeFilters.department) {
-      const departmentQuery = employeeFilters.department.toLowerCase();
-      if (!(user.department ?? '').toLowerCase().includes(departmentQuery)) return false;
-    }
-
-    // Level filter
-    if (employeeFilters.level) {
-      const levelQuery = employeeFilters.level.toLowerCase();
-      if (!(user.level ?? '').toLowerCase().includes(levelQuery)) return false;
-    }
-
-    // Grade filter
-    if (employeeFilters.grade) {
-      const gradeQuery = employeeFilters.grade.toLowerCase();
-      if (!(user.grade ?? '').toLowerCase().includes(gradeQuery)) return false;
-    }
-
-    // Reporting Manager filter
-    if (employeeFilters.reportingManager) {
-      const reportingManagerQuery = employeeFilters.reportingManager.toLowerCase();
-      if (!(user.reportingManager ?? '').toLowerCase().includes(reportingManagerQuery)) return false;
-    }
-
-    return true;
-  });
 
   // Helper function to get groups for an employee
   const getEmployeeGroups = (employeeId: string) => {
@@ -325,12 +286,46 @@ export default function AppraisalGroups() {
   const availableEmployees = allUsers.filter(user => {
     if (existingMemberIds.includes(user.id)) return false;
     
-    const query = employeeSearchQuery.toLowerCase();
-    return (user.firstName ?? '').toLowerCase().includes(query) ||
-           (user.lastName ?? '').toLowerCase().includes(query) ||
-           (user.email ?? '').toLowerCase().includes(query) ||
-           (user.code ?? '').toLowerCase().includes(query) ||
-           (user.department ?? '').toLowerCase().includes(query);
+    // Apply structured filters
+    // Name or Code filter
+    if (employeeFilters.nameOrCode) {
+      const nameOrCodeQuery = employeeFilters.nameOrCode.toLowerCase();
+      const matchesName = ((user.firstName ?? '') + ' ' + (user.lastName ?? '')).toLowerCase().includes(nameOrCodeQuery);
+      const matchesCode = (user.code ?? '').toLowerCase().includes(nameOrCodeQuery);
+      if (!matchesName && !matchesCode) return false;
+    }
+
+    // Location filter
+    if (employeeFilters.location) {
+      const locationQuery = employeeFilters.location.toLowerCase();
+      if (!(user.locationId ?? '').toLowerCase().includes(locationQuery)) return false;
+    }
+
+    // Department filter
+    if (employeeFilters.department) {
+      const departmentQuery = employeeFilters.department.toLowerCase();
+      if (!(user.department ?? '').toLowerCase().includes(departmentQuery)) return false;
+    }
+
+    // Level filter
+    if (employeeFilters.level) {
+      const levelQuery = employeeFilters.level.toLowerCase();
+      if (!(user.levelId ?? '').toLowerCase().includes(levelQuery)) return false;
+    }
+
+    // Grade filter
+    if (employeeFilters.grade) {
+      const gradeQuery = employeeFilters.grade.toLowerCase();
+      if (!(user.gradeId ?? '').toLowerCase().includes(gradeQuery)) return false;
+    }
+
+    // Reporting Manager filter
+    if (employeeFilters.reportingManager) {
+      const reportingManagerQuery = employeeFilters.reportingManager.toLowerCase();
+      if (!(user.reportingManagerId ?? '').toLowerCase().includes(reportingManagerQuery)) return false;
+    }
+
+    return true;
   });
 
   return (
@@ -435,205 +430,6 @@ export default function AppraisalGroups() {
           </CardContent>
         </Card>
 
-        {/* Active Employees Section */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Users className="h-5 w-5 mr-2" />
-              All Active Employees ({activeEmployees.length})
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              View and organize employees for performance evaluations
-            </p>
-          </CardHeader>
-          <CardContent>
-            {/* Employee Filters */}
-            <div className="space-y-4 mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Employee Name/Code</label>
-                  <Input
-                    placeholder="Enter name or code..."
-                    value={employeeFilters.nameOrCode}
-                    onChange={(e) => setEmployeeFilters({ ...employeeFilters, nameOrCode: e.target.value })}
-                    data-testid="filter-name-code"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Location</label>
-                  <Input
-                    placeholder="Enter location..."
-                    value={employeeFilters.location}
-                    onChange={(e) => setEmployeeFilters({ ...employeeFilters, location: e.target.value })}
-                    data-testid="filter-location"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Department</label>
-                  <Input
-                    placeholder="Enter department..."
-                    value={employeeFilters.department}
-                    onChange={(e) => setEmployeeFilters({ ...employeeFilters, department: e.target.value })}
-                    data-testid="filter-department"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Level</label>
-                  <Input
-                    placeholder="Enter level..."
-                    value={employeeFilters.level}
-                    onChange={(e) => setEmployeeFilters({ ...employeeFilters, level: e.target.value })}
-                    data-testid="filter-level"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Grade</label>
-                  <Input
-                    placeholder="Enter grade..."
-                    value={employeeFilters.grade}
-                    onChange={(e) => setEmployeeFilters({ ...employeeFilters, grade: e.target.value })}
-                    data-testid="filter-grade"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Reporting Manager</label>
-                  <Input
-                    placeholder="Enter manager name..."
-                    value={employeeFilters.reportingManager}
-                    onChange={(e) => setEmployeeFilters({ ...employeeFilters, reportingManager: e.target.value })}
-                    data-testid="filter-reporting-manager"
-                  />
-                </div>
-              </div>
-              
-              {/* Search Button and Clear Filters */}
-              <div className="flex gap-3">
-                <Button 
-                  onClick={() => {
-                    // The filtering is already reactive, so this button can be used for explicit search
-                  }}
-                  className="flex items-center gap-2"
-                  data-testid="search-employees-btn"
-                >
-                  <Search className="h-4 w-4" />
-                  Search Employees
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => setEmployeeFilters({
-                    nameOrCode: "",
-                    location: "",
-                    department: "",
-                    level: "",
-                    grade: "",
-                    reportingManager: "",
-                  })}
-                  data-testid="clear-filters-btn"
-                >
-                  Clear Filters
-                </Button>
-              </div>
-            </div>
-
-            {isLoadingUsers ? (
-              <div className="text-center py-8">
-                <div className="text-muted-foreground">Loading employees...</div>
-              </div>
-            ) : filteredActiveEmployees.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-muted-foreground mb-2">
-                  {Object.values(employeeFilters).some(filter => filter.trim()) ? "No employees found" : "No active employees"}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {Object.values(employeeFilters).some(filter => filter.trim()) 
-                    ? "Try adjusting your filter criteria or clear all filters."
-                    : "No active employees are currently available."
-                  }
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredActiveEmployees.map((employee) => (
-                  <Card key={employee.id} className="p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-sm mb-1" data-testid={`employee-name-${employee.id}`}>
-                          {employee.firstName} {employee.lastName}
-                        </h4>
-                        <p className="text-xs text-muted-foreground mb-2 truncate" data-testid={`employee-email-${employee.id}`}>
-                          {employee.email}
-                        </p>
-                        <div className="space-y-1">
-                          {employee.code && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-muted-foreground">Code:</span>
-                              <span className="text-xs" data-testid={`employee-code-${employee.id}`}>
-                                {employee.code}
-                              </span>
-                            </div>
-                          )}
-                          {employee.department && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-muted-foreground">Dept:</span>
-                              <span className="text-xs" data-testid={`employee-dept-${employee.id}`}>
-                                {employee.department}
-                              </span>
-                            </div>
-                          )}
-                          {employee.location && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-muted-foreground">Location:</span>
-                              <span className="text-xs" data-testid={`employee-location-${employee.id}`}>
-                                {employee.location}
-                              </span>
-                            </div>
-                          )}
-                          {employee.level && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-muted-foreground">Level:</span>
-                              <span className="text-xs" data-testid={`employee-level-${employee.id}`}>
-                                {employee.level}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <Badge 
-                        variant={employee.role === 'hr_manager' ? 'default' : 'secondary'} 
-                        className="text-xs"
-                        data-testid={`employee-role-${employee.id}`}
-                      >
-                        {employee.role?.replace('_', ' ')}
-                      </Badge>
-                    </div>
-                    
-                    {/* Show group memberships if any */}
-                    {getEmployeeGroups(employee.id).length > 0 && (
-                      <div className="mt-3 pt-3 border-t">
-                        <div className="flex items-center gap-1 mb-1">
-                          <span className="text-xs text-muted-foreground">Groups:</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {getEmployeeGroups(employee.id).map((group) => (
-                            <Badge key={group.id} variant="outline" className="text-xs">
-                              {group.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </Card>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Groups List */}
         <Card>
@@ -778,16 +574,97 @@ export default function AppraisalGroups() {
             </DialogHeader>
             
             <div className="space-y-4">
-              {/* Employee Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search employees by name, email, code, or department..."
-                  value={employeeSearchQuery}
-                  onChange={(e) => setEmployeeSearchQuery(e.target.value)}
-                  className="pl-10"
-                  data-testid="search-employees"
-                />
+              {/* Employee Filters */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Employee Name/Code</label>
+                    <Input
+                      placeholder="Enter name or code..."
+                      value={employeeFilters.nameOrCode}
+                      onChange={(e) => setEmployeeFilters({ ...employeeFilters, nameOrCode: e.target.value })}
+                      data-testid="dialog-filter-name-code"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Location</label>
+                    <Input
+                      placeholder="Enter location..."
+                      value={employeeFilters.location}
+                      onChange={(e) => setEmployeeFilters({ ...employeeFilters, location: e.target.value })}
+                      data-testid="dialog-filter-location"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Department</label>
+                    <Input
+                      placeholder="Enter department..."
+                      value={employeeFilters.department}
+                      onChange={(e) => setEmployeeFilters({ ...employeeFilters, department: e.target.value })}
+                      data-testid="dialog-filter-department"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Level</label>
+                    <Input
+                      placeholder="Enter level..."
+                      value={employeeFilters.level}
+                      onChange={(e) => setEmployeeFilters({ ...employeeFilters, level: e.target.value })}
+                      data-testid="dialog-filter-level"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Grade</label>
+                    <Input
+                      placeholder="Enter grade..."
+                      value={employeeFilters.grade}
+                      onChange={(e) => setEmployeeFilters({ ...employeeFilters, grade: e.target.value })}
+                      data-testid="dialog-filter-grade"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Reporting Manager</label>
+                    <Input
+                      placeholder="Enter manager name..."
+                      value={employeeFilters.reportingManager}
+                      onChange={(e) => setEmployeeFilters({ ...employeeFilters, reportingManager: e.target.value })}
+                      data-testid="dialog-filter-reporting-manager"
+                    />
+                  </div>
+                </div>
+                
+                {/* Search Button and Clear Filters */}
+                <div className="flex gap-3">
+                  <Button 
+                    onClick={() => {
+                      // The filtering is already reactive, so this button can be used for explicit search
+                    }}
+                    className="flex items-center gap-2"
+                    data-testid="dialog-search-employees-btn"
+                  >
+                    <Search className="h-4 w-4" />
+                    Search Employees
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => setEmployeeFilters({
+                      nameOrCode: "",
+                      location: "",
+                      department: "",
+                      level: "",
+                      grade: "",
+                      reportingManager: "",
+                    })}
+                    data-testid="dialog-clear-filters-btn"
+                  >
+                    Clear Filters
+                  </Button>
+                </div>
               </div>
               
               {/* Employee List */}
@@ -847,8 +724,8 @@ export default function AppraisalGroups() {
               
               {availableEmployees.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
-                  {employeeSearchQuery 
-                    ? "No employees found matching your search."
+                  {Object.values(employeeFilters).some(filter => filter.trim()) 
+                    ? "No employees found matching your filter criteria."
                     : "All employees are already in this group."
                   }
                 </div>
@@ -866,7 +743,14 @@ export default function AppraisalGroups() {
                     setIsEmployeeSelectOpen(false);
                     setSelectedEmployees([]);
                     setSelectedGroupForEmployees(null);
-                    setEmployeeSearchQuery("");
+                    setEmployeeFilters({
+                      nameOrCode: "",
+                      location: "",
+                      department: "",
+                      level: "",
+                      grade: "",
+                      reportingManager: "",
+                    });
                   }}
                   data-testid="cancel-employee-selection"
                 >
