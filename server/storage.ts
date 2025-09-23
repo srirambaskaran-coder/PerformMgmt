@@ -18,6 +18,7 @@ import {
   publishQuestionnaires,
   appraisalGroups,
   appraisalGroupMembers,
+  initiatedAppraisals,
   type User,
   type SafeUser,
   type UpsertUser,
@@ -207,6 +208,9 @@ export interface IStorage {
   addAppraisalGroupMember(member: InsertAppraisalGroupMember, createdById: string): Promise<AppraisalGroupMember>;
   removeAppraisalGroupMember(groupId: string, userId: string, createdById: string): Promise<void>;
   getAppraisalGroupsWithMembers(createdById: string): Promise<(AppraisalGroup & { members: SafeUser[] })[]>;
+  
+  // Initiated Appraisal operations - HR Manager isolated
+  createInitiatedAppraisal(appraisal: any, createdById: string): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1669,6 +1673,46 @@ export class DatabaseStorage implements IStorage {
     );
     
     return groupsWithMembers;
+  }
+
+  async createInitiatedAppraisal(appraisalData: any, createdById: string): Promise<any> {
+    // Verify the appraisal group exists and belongs to the HR manager
+    const group = await this.getAppraisalGroup(appraisalData.appraisalGroupId, createdById);
+    if (!group) {
+      throw new Error('Appraisal group not found or access denied');
+    }
+
+    // Additional validations
+    if (appraisalData.questionnaireTemplateId) {
+      const template = await this.getQuestionnaireTemplate(appraisalData.questionnaireTemplateId, createdById);
+      if (!template) {
+        throw new Error('Questionnaire template not found or access denied');
+      }
+    }
+
+    // Insert the initiated appraisal
+    const [newAppraisal] = await db.insert(initiatedAppraisals).values({
+      appraisalGroupId: appraisalData.appraisalGroupId,
+      appraisalType: appraisalData.appraisalType,
+      questionnaireTemplateId: appraisalData.questionnaireTemplateId,
+      documentUrl: appraisalData.documentUrl,
+      frequencyCalendarId: appraisalData.frequencyCalendarId,
+      daysToInitiate: appraisalData.daysToInitiate,
+      daysToClose: appraisalData.daysToClose,
+      numberOfReminders: appraisalData.numberOfReminders,
+      excludeTenureLessThanYear: appraisalData.excludeTenureLessThanYear,
+      excludedEmployeeIds: appraisalData.excludedEmployeeIds,
+      status: 'draft',
+      makePublic: appraisalData.makePublic,
+      publishType: appraisalData.publishType,
+      createdById: createdById,
+    }).returning();
+
+    if (!newAppraisal) {
+      throw new Error('Failed to create initiated appraisal');
+    }
+    
+    return newAppraisal;
   }
 }
 

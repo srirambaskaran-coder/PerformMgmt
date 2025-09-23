@@ -1350,7 +1350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Frequency Calendar management routes - Administrator isolated
-  app.get('/api/frequency-calendars', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+  app.get('/api/frequency-calendars', isAuthenticated, requireRoles(['admin', 'hr_manager']), async (req: any, res) => {
     try {
       const createdById = req.user.claims.sub;
       const calendars = await storage.getFrequencyCalendars(createdById);
@@ -1737,6 +1737,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Group member not found" });
       }
       res.status(500).json({ message: "Failed to remove group member" });
+    }
+  });
+
+  // Initiate Appraisal endpoint - HR Manager can initiate appraisals for groups
+  app.post('/api/initiate-appraisal', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      
+      // Handle form data if file upload is present
+      let parsedData: any;
+      let documentUrl: string | undefined;
+
+      if (req.headers['content-type']?.includes('multipart/form-data')) {
+        // Handle file upload (this would need multer middleware setup)
+        // For now, we'll handle JSON data in the 'data' field
+        parsedData = JSON.parse(req.body.data);
+        // File handling would be implemented here with proper upload logic
+        if (req.file) {
+          // Upload file to object storage and get URL
+          documentUrl = `/uploads/${req.file.filename}`;
+        }
+      } else {
+        // Handle regular JSON data
+        parsedData = req.body;
+      }
+
+      // Validate the appraisal initiation data
+      const validatedData = {
+        appraisalGroupId: parsedData.appraisalGroupId,
+        appraisalType: parsedData.appraisalType,
+        questionnaireTemplateId: parsedData.questionnaireTemplateId || null,
+        documentUrl: documentUrl || parsedData.documentUrl || null,
+        frequencyCalendarId: parsedData.frequencyCalendarId || null,
+        daysToInitiate: parsedData.daysToInitiate || 0,
+        daysToClose: parsedData.daysToClose || 30,
+        numberOfReminders: parsedData.numberOfReminders || 3,
+        excludeTenureLessThanYear: parsedData.excludeTenureLessThanYear || false,
+        excludedEmployeeIds: parsedData.excludedEmployeeIds || [],
+        makePublic: parsedData.makePublic || false,
+        publishType: parsedData.publishType || 'now',
+        createdById: requestingUserId,
+      };
+
+      // Basic validation
+      if (!validatedData.appraisalGroupId) {
+        return res.status(400).json({ message: "Appraisal group ID is required" });
+      }
+
+      if (!validatedData.appraisalType) {
+        return res.status(400).json({ message: "Appraisal type is required" });
+      }
+
+      // Type-specific validation
+      if (validatedData.appraisalType === 'questionnaire_based' && !validatedData.questionnaireTemplateId) {
+        return res.status(400).json({ message: "Questionnaire template is required for questionnaire-based appraisals" });
+      }
+
+      if ((validatedData.appraisalType === 'kpi_based' || validatedData.appraisalType === 'mbo_based') && !validatedData.documentUrl) {
+        return res.status(400).json({ message: "Document is required for KPI/MBO-based appraisals" });
+      }
+
+      // Create the initiated appraisal
+      const initiatedAppraisal = await storage.createInitiatedAppraisal(validatedData, requestingUserId);
+      
+      res.status(201).json({
+        message: "Appraisal initiated successfully",
+        appraisal: initiatedAppraisal
+      });
+      
+    } catch (error) {
+      console.error("Error initiating appraisal:", error);
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ message: "Appraisal group not found" });
+      }
+      if (error.message?.includes('access')) {
+        return res.status(403).json({ message: "Access denied to this appraisal group" });
+      }
+      res.status(500).json({ message: "Failed to initiate appraisal" });
     }
   });
 
