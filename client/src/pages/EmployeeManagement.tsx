@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { insertUserSchema, type User, type InsertUser } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -134,8 +135,44 @@ export default function EmployeeManagement() {
     },
   });
 
+  // Create a schema that handles empty passwords properly for updates
+  const flexibleUserSchema = z.object({
+    firstName: z.string().min(1, "First name is required"),
+    lastName: z.string().min(1, "Last name is required"),
+    email: z.string().email("Invalid email address"),
+    code: z.string().min(1, "Employee code is required"),
+    designation: z.string().optional(),
+    mobileNumber: z.string().optional(),
+    locationId: z.string().nullable().optional(),
+    companyId: z.string().nullable().optional(),
+    levelId: z.string().nullable().optional(),
+    gradeId: z.string().nullable().optional(),
+    reportingManagerId: z.string().nullable().optional(),
+    department: z.string().nullable().optional(),
+    role: z.enum(['super_admin', 'admin', 'hr_manager', 'employee', 'manager']),
+    roles: z.array(z.enum(['super_admin', 'admin', 'hr_manager', 'employee', 'manager'])).optional().default(['employee']),
+    status: z.enum(['active', 'inactive']).default('active'),
+    password: z.union([
+      z.string().min(8, "Password must be at least 8 characters"),
+      z.literal("").transform(() => undefined)
+    ]).optional(),
+    confirmPassword: z.union([
+      z.string(),
+      z.literal("").transform(() => undefined)
+    ]).optional(),
+  }).refine((data) => {
+    // If either password field is provided, both must be provided and match
+    if (data.password || data.confirmPassword) {
+      return data.password && data.confirmPassword && data.password === data.confirmPassword;
+    }
+    return true;
+  }, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
   const form = useForm<InsertUser>({
-    resolver: zodResolver(insertUserSchema),
+    resolver: zodResolver(flexibleUserSchema),
     defaultValues: {
       firstName: "",
       lastName: "",
@@ -165,10 +202,20 @@ export default function EmployeeManagement() {
       levelId: data.levelId === "none" ? null : data.levelId,
       gradeId: data.gradeId === "none" ? null : data.gradeId,
       reportingManagerId: data.reportingManagerId === "none" ? null : data.reportingManagerId,
+      department: data.department === "none" ? null : data.department,
     };
 
     if (editingUser) {
-      updateUserMutation.mutate({ id: editingUser.id, userData: processedData });
+      // For updates, only include password fields if they're actually filled in
+      const updateData = { ...processedData };
+      
+      // Remove password fields if they're empty (to avoid triggering password update logic)
+      if (!data.password && !data.confirmPassword) {
+        delete updateData.password;
+        delete updateData.confirmPassword;
+      }
+      
+      updateUserMutation.mutate({ id: editingUser.id, userData: updateData });
     } else {
       createUserMutation.mutate(processedData);
     }
