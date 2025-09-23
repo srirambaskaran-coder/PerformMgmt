@@ -23,6 +23,7 @@ import FrequencyCalendarManagement from "@/pages/FrequencyCalendarManagement";
 import FrequencyCalendarDetailsManagement from "@/pages/FrequencyCalendarDetailsManagement";
 import PerformanceReviews from "@/pages/PerformanceReviews";
 import ReviewProgress from "@/pages/ReviewProgress";
+import AppraisalGroups from "@/pages/AppraisalGroups";
 import Evaluations from "@/pages/Evaluations";
 import Meetings from "@/pages/Meetings";
 import Settings from "@/pages/Settings";
@@ -52,6 +53,7 @@ function Router() {
           <Route path="/frequency-calendar-details" component={FrequencyCalendarDetailsManagement} />
           <Route path="/performance-reviews" component={PerformanceReviews} />
           <Route path="/review-progress" component={ReviewProgress} />
+          <Route path="/appraisal-groups" component={AppraisalGroups} />
           <Route path="/evaluations" component={Evaluations} />
           <Route path="/meetings" component={Meetings} />
           <Route path="/settings" component={Settings} />

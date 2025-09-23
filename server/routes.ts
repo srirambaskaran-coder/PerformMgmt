@@ -1634,8 +1634,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/appraisal-groups', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
     try {
       const requestingUserId = req.user.claims.sub;
-      const validatedData = insertAppraisalGroupSchema.parse(req.body);
-      const group = await storage.createAppraisalGroup(validatedData, requestingUserId);
+      // Validate request body and add createdById from session
+      const validatedData = insertAppraisalGroupSchema.omit({ createdById: true }).parse(req.body);
+      const groupData = {
+        ...validatedData,
+        createdById: requestingUserId,
+      };
+      const group = await storage.createAppraisalGroup(groupData, requestingUserId);
       res.status(201).json(group);
     } catch (error) {
       console.error("Error creating appraisal group:", error);
