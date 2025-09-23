@@ -37,11 +37,11 @@ interface CreateGroupFormData {
 
 export default function AppraisalGroups() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<AppraisalGroupWithMembers | null>(null);
   const [isEmployeeSelectOpen, setIsEmployeeSelectOpen] = useState(false);
   const [selectedGroupForEmployees, setSelectedGroupForEmployees] = useState<string | null>(null);
-  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
 
   const { toast } = useToast();
@@ -58,7 +58,7 @@ export default function AppraisalGroups() {
   });
 
   // Fetch all users for employee selection
-  const { data: allUsers = [] } = useQuery<SafeUser[]>({
+  const { data: allUsers = [], isLoading: isLoadingUsers } = useQuery<SafeUser[]>({
     queryKey: ['/api/users'],
   });
 
@@ -249,17 +249,41 @@ export default function AppraisalGroups() {
     (group.description || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Filter active employees (assuming all users are active unless explicitly marked inactive)
+  const activeEmployees = allUsers.filter(user => !user.isDeleted && user.role !== 'super_admin');
+
+  // Filter active employees based on search query
+  const filteredActiveEmployees = activeEmployees.filter(user => {
+    const query = employeeSearchQuery.toLowerCase();
+    return (user.firstName ?? '').toLowerCase().includes(query) ||
+           (user.lastName ?? '').toLowerCase().includes(query) ||
+           (user.email ?? '').toLowerCase().includes(query) ||
+           (user.code ?? '').toLowerCase().includes(query) ||
+           (user.department ?? '').toLowerCase().includes(query) ||
+           (user.location ?? '').toLowerCase().includes(query) ||
+           (user.level ?? '').toLowerCase().includes(query);
+  });
+
+  // Helper function to get groups for an employee
+  const getEmployeeGroups = (employeeId: string) => {
+    return groups.filter(group => 
+      group.members.some(member => member.id === employeeId)
+    );
+  };
+
   // Filter available employees (not already in the selected group)
   const selectedGroup = selectedGroupForEmployees ? groups.find(g => g.id === selectedGroupForEmployees) : null;
   const existingMemberIds = selectedGroup ? selectedGroup.members.map(m => m.id) : [];
-  const availableEmployees = allUsers.filter(user =>
-    !existingMemberIds.includes(user.id) &&
-    (user.firstName?.toLowerCase().includes(employeeSearchQuery.toLowerCase()) ||
-     user.lastName?.toLowerCase().includes(employeeSearchQuery.toLowerCase()) ||
-     user.email?.toLowerCase().includes(employeeSearchQuery.toLowerCase()) ||
-     user.code?.toLowerCase().includes(employeeSearchQuery.toLowerCase()) ||
-     user.department?.toLowerCase().includes(employeeSearchQuery.toLowerCase()))
-  );
+  const availableEmployees = allUsers.filter(user => {
+    if (existingMemberIds.includes(user.id)) return false;
+    
+    const query = employeeSearchQuery.toLowerCase();
+    return (user.firstName ?? '').toLowerCase().includes(query) ||
+           (user.lastName ?? '').toLowerCase().includes(query) ||
+           (user.email ?? '').toLowerCase().includes(query) ||
+           (user.code ?? '').toLowerCase().includes(query) ||
+           (user.department ?? '').toLowerCase().includes(query);
+  });
 
   return (
     <RoleGuard allowedRoles={['hr_manager']}>
@@ -360,6 +384,124 @@ export default function AppraisalGroups() {
                 data-testid="search-groups"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Active Employees Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Users className="h-5 w-5 mr-2" />
+              All Active Employees ({activeEmployees.length})
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              View and organize employees for performance evaluations
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search employees by name, email, code, department..."
+                value={employeeSearchQuery}
+                onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                className="pl-10"
+                data-testid="search-employees"
+              />
+            </div>
+
+            {isLoadingUsers ? (
+              <div className="text-center py-8">
+                <div className="text-muted-foreground">Loading employees...</div>
+              </div>
+            ) : filteredActiveEmployees.length === 0 ? (
+              <div className="text-center py-8">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                  {employeeSearchQuery ? "No employees found" : "No active employees"}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {employeeSearchQuery 
+                    ? "Try adjusting your search criteria."
+                    : "No active employees are currently available."
+                  }
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredActiveEmployees.map((employee) => (
+                  <Card key={employee.id} className="p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-sm mb-1" data-testid={`employee-name-${employee.id}`}>
+                          {employee.firstName} {employee.lastName}
+                        </h4>
+                        <p className="text-xs text-muted-foreground mb-2 truncate" data-testid={`employee-email-${employee.id}`}>
+                          {employee.email}
+                        </p>
+                        <div className="space-y-1">
+                          {employee.code && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-muted-foreground">Code:</span>
+                              <span className="text-xs" data-testid={`employee-code-${employee.id}`}>
+                                {employee.code}
+                              </span>
+                            </div>
+                          )}
+                          {employee.department && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-muted-foreground">Dept:</span>
+                              <span className="text-xs" data-testid={`employee-dept-${employee.id}`}>
+                                {employee.department}
+                              </span>
+                            </div>
+                          )}
+                          {employee.location && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-muted-foreground">Location:</span>
+                              <span className="text-xs" data-testid={`employee-location-${employee.id}`}>
+                                {employee.location}
+                              </span>
+                            </div>
+                          )}
+                          {employee.level && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-muted-foreground">Level:</span>
+                              <span className="text-xs" data-testid={`employee-level-${employee.id}`}>
+                                {employee.level}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <Badge 
+                        variant={employee.role === 'hr_manager' ? 'default' : 'secondary'} 
+                        className="text-xs"
+                        data-testid={`employee-role-${employee.id}`}
+                      >
+                        {employee.role?.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                    
+                    {/* Show group memberships if any */}
+                    {getEmployeeGroups(employee.id).length > 0 && (
+                      <div className="mt-3 pt-3 border-t">
+                        <div className="flex items-center gap-1 mb-1">
+                          <span className="text-xs text-muted-foreground">Groups:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {getEmployeeGroups(employee.id).map((group) => (
+                            <Badge key={group.id} variant="outline" className="text-xs">
+                              {group.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

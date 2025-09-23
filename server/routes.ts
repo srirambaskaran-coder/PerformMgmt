@@ -166,7 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User management routes
-  app.get('/api/users', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req: any, res) => {
+  app.get('/api/users', isAuthenticated, requireRoles(['super_admin', 'admin', 'hr_manager']), async (req: any, res) => {
     try {
       const { role, department, status } = req.query;
       const requestingUserId = req.user.claims.sub;
