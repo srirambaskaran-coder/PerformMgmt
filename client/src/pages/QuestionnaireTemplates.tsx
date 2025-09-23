@@ -15,7 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Plus, Search, Edit, Trash2, FileText, Minus } from "lucide-react";
+import { Copy, Edit, FileText, Minus, Plus, Search, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface Question {
@@ -113,6 +113,34 @@ export default function QuestionnaireTemplates() {
     },
   });
 
+  const copyTemplateMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      return await apiRequest("POST", `/api/questionnaire-templates/${templateId}/copy`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/questionnaire-templates"] });
+      toast({
+        title: "Success",
+        description: "Template copied successfully",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You don't have permission to copy this template",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to copy template",
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
   const form = useForm<InsertQuestionnaireTemplate>({
     resolver: zodResolver(insertQuestionnaireTemplateSchema),
     defaultValues: {
@@ -191,6 +219,10 @@ export default function QuestionnaireTemplates() {
     if (confirm("Are you sure you want to delete this questionnaire template?")) {
       deleteTemplateMutation.mutate(id);
     }
+  };
+
+  const handleCopy = (id: string) => {
+    copyTemplateMutation.mutate(id);
   };
 
   const resetForm = () => {
@@ -606,8 +638,19 @@ export default function QuestionnaireTemplates() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => handleCopy(template.id)}
+                        disabled={copyTemplateMutation.isPending}
+                        data-testid={`copy-template-${template.id}`}
+                        title="Copy Template"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleEdit(template)}
                         data-testid={`edit-template-${template.id}`}
+                        title="Edit Template"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -616,6 +659,7 @@ export default function QuestionnaireTemplates() {
                         size="sm"
                         onClick={() => handleDelete(template.id)}
                         data-testid={`delete-template-${template.id}`}
+                        title="Delete Template"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

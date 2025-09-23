@@ -604,7 +604,7 @@ export class DatabaseStorage implements IStorage {
       applicableGradeId: originalTemplate.applicableGradeId,
       applicableLocationId: originalTemplate.applicableLocationId,
       sendOnMail: originalTemplate.sendOnMail,
-      questions: originalTemplate.questions,
+      questions: originalTemplate.questions as any,
       year: originalTemplate.year,
       status: originalTemplate.status,
       createdById: requestingUserId, // Set the requesting user as the creator of the copy
