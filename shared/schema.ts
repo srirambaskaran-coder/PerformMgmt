@@ -364,6 +364,22 @@ export const initiatedAppraisals = pgTable("initiated_appraisals", {
   check("initiated_appraisals_template_check", sql`(${table.appraisalType} NOT IN ('questionnaire_based', 'mbo_based')) OR (${table.questionnaireTemplateId} IS NOT NULL OR ${table.documentUrl} IS NOT NULL)`),
 ]);
 
+// Initiated Appraisal Detail Timings - Per frequency calendar detail timing configurations
+export const initiatedAppraisalDetailTimings = pgTable("initiated_appraisal_detail_timings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  initiatedAppraisalId: varchar("initiated_appraisal_id").notNull(),
+  frequencyCalendarDetailId: varchar("frequency_calendar_detail_id").notNull(),
+  daysToInitiate: integer("days_to_initiate").notNull().default(0),
+  daysToClose: integer("days_to_close").notNull().default(30),
+  numberOfReminders: integer("number_of_reminders").notNull().default(3),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("initiated_appraisal_detail_timings_appraisal_id_idx").on(table.initiatedAppraisalId),
+  index("initiated_appraisal_detail_timings_detail_id_idx").on(table.frequencyCalendarDetailId),
+  unique().on(table.initiatedAppraisalId, table.frequencyCalendarDetailId), // One timing config per detail per appraisal
+]);
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   reportingManager: one(users, {
@@ -798,6 +814,12 @@ export const insertInitiatedAppraisalSchema = createInsertSchema(initiatedApprai
   updatedAt: true,
 });
 
+export const insertInitiatedAppraisalDetailTimingSchema = createInsertSchema(initiatedAppraisalDetailTimings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Export types
 export type AppraisalGroup = typeof appraisalGroups.$inferSelect;
 export type InsertAppraisalGroup = z.infer<typeof insertAppraisalGroupSchema>;
@@ -805,3 +827,5 @@ export type AppraisalGroupMember = typeof appraisalGroupMembers.$inferSelect;
 export type InsertAppraisalGroupMember = z.infer<typeof insertAppraisalGroupMemberSchema>;
 export type InitiatedAppraisal = typeof initiatedAppraisals.$inferSelect;
 export type InsertInitiatedAppraisal = z.infer<typeof insertInitiatedAppraisalSchema>;
+export type InitiatedAppraisalDetailTiming = typeof initiatedAppraisalDetailTimings.$inferSelect;
+export type InsertInitiatedAppraisalDetailTiming = z.infer<typeof insertInitiatedAppraisalDetailTimingSchema>;

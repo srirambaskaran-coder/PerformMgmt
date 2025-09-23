@@ -1795,6 +1795,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         questionnaireTemplateId: parsedData.questionnaireTemplateId || null,
         documentUrl: documentUrl || parsedData.documentUrl || null,
         frequencyCalendarId: parsedData.frequencyCalendarId || null,
+        calendarDetailTimings: parsedData.calendarDetailTimings || [], // Add calendar detail timings
         daysToInitiate: parsedData.daysToInitiate || 0,
         daysToClose: parsedData.daysToClose || 30,
         numberOfReminders: parsedData.numberOfReminders || 3,

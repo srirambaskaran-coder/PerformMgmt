@@ -19,6 +19,7 @@ import {
   appraisalGroups,
   appraisalGroupMembers,
   initiatedAppraisals,
+  initiatedAppraisalDetailTimings,
   type User,
   type SafeUser,
   type UpsertUser,
@@ -59,6 +60,10 @@ import {
   type InsertAppraisalGroup,
   type AppraisalGroupMember,
   type InsertAppraisalGroupMember,
+  type InitiatedAppraisal,
+  type InsertInitiatedAppraisal,
+  type InitiatedAppraisalDetailTiming,
+  type InsertInitiatedAppraisalDetailTiming,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, like, inArray, or, sql, isNotNull } from "drizzle-orm";
@@ -212,7 +217,9 @@ export interface IStorage {
   getAppraisalGroupsWithMembers(createdById: string): Promise<(AppraisalGroup & { members: SafeUser[] })[]>;
   
   // Initiated Appraisal operations - HR Manager isolated
-  createInitiatedAppraisal(appraisal: any, createdById: string): Promise<any>;
+  createInitiatedAppraisal(appraisal: any, createdById: string): Promise<InitiatedAppraisal>;
+  createInitiatedAppraisalDetailTiming(timing: InsertInitiatedAppraisalDetailTiming): Promise<InitiatedAppraisalDetailTiming>;
+  getInitiatedAppraisalDetailTimings(appraisalId: string): Promise<InitiatedAppraisalDetailTiming[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1731,7 +1738,38 @@ export class DatabaseStorage implements IStorage {
       throw new Error('Failed to create initiated appraisal');
     }
     
+    // If calendar detail timings are provided, save them
+    if (appraisalData.calendarDetailTimings && Array.isArray(appraisalData.calendarDetailTimings)) {
+      const timingPromises = appraisalData.calendarDetailTimings.map((timing: any) => 
+        this.createInitiatedAppraisalDetailTiming({
+          initiatedAppraisalId: newAppraisal.id,
+          frequencyCalendarDetailId: timing.detailId,
+          daysToInitiate: timing.daysToInitiate || 0,
+          daysToClose: timing.daysToClose || 30,
+          numberOfReminders: timing.numberOfReminders || 3,
+        })
+      );
+      
+      try {
+        await Promise.all(timingPromises);
+      } catch (error) {
+        console.error('Error saving calendar detail timings:', error);
+        // Continue execution but log the error
+      }
+    }
+    
     return newAppraisal;
+  }
+
+  async createInitiatedAppraisalDetailTiming(timing: InsertInitiatedAppraisalDetailTiming): Promise<InitiatedAppraisalDetailTiming> {
+    const [newTiming] = await db.insert(initiatedAppraisalDetailTimings).values(timing).returning();
+    return newTiming;
+  }
+
+  async getInitiatedAppraisalDetailTimings(appraisalId: string): Promise<InitiatedAppraisalDetailTiming[]> {
+    return await db.select().from(initiatedAppraisalDetailTimings).where(
+      eq(initiatedAppraisalDetailTimings.initiatedAppraisalId, appraisalId)
+    ).orderBy(asc(initiatedAppraisalDetailTimings.createdAt));
   }
 }
 
