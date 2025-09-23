@@ -19,6 +19,7 @@ import {
   Clock,
   Repeat,
   CalendarDays,
+  Building2,
 } from "lucide-react";
 
 interface NavItem {
@@ -32,6 +33,7 @@ const navItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: ChartPie },
   { href: "/companies", label: "Company Management", icon: Building, roles: ["super_admin"] },
   { href: "/locations", label: "Location Management", icon: MapPin, roles: ["admin"] },
+  { href: "/departments", label: "Department Management", icon: Building2, roles: ["admin"] },
   { href: "/levels", label: "Level Management", icon: Layers, roles: ["admin"] },
   { href: "/grades", label: "Grade Management", icon: Award, roles: ["admin"] },
   { href: "/users", label: "User Management", icon: Users, roles: ["super_admin", "admin"] },
