@@ -47,6 +47,22 @@ export const categoryEnum = pgEnum('category', ['employee', 'manager']);
 // Publish type enum
 export const publishTypeEnum = pgEnum('publish_type', ['now', 'as_per_calendar']);
 
+// Appraisal type enum
+export const appraisalTypeEnum = pgEnum('appraisal_type', [
+  'questionnaire_based',
+  'kpi_based', 
+  'mbo_based',
+  'okr_based'
+]);
+
+// Appraisal cycle status enum
+export const appraisalCycleStatusEnum = pgEnum('appraisal_cycle_status', [
+  'draft',
+  'active', 
+  'closed',
+  'cancelled'
+]);
+
 // User storage table - mandatory for Replit Auth
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -321,6 +337,31 @@ export const publishQuestionnaires = pgTable("publish_questionnaires", {
   unique().on(table.createdById, table.code),
   check("publish_questionnaires_calendar_check", sql`(${table.publishType} = 'now') OR (${table.publishType} = 'as_per_calendar' AND ${table.frequencyCalendarId} IS NOT NULL)`),
   index("publish_questionnaires_created_by_id_idx").on(table.createdById),
+]);
+
+// Initiated Appraisal table - HR Manager initiated appraisals
+export const initiatedAppraisals = pgTable("initiated_appraisals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appraisalGroupId: varchar("appraisal_group_id").notNull(),
+  appraisalType: appraisalTypeEnum("appraisal_type").notNull(),
+  questionnaireTemplateId: varchar("questionnaire_template_id"), // For questionnaire_based
+  documentUrl: varchar("document_url"), // For uploaded documents (MBO/KPI)
+  frequencyCalendarId: varchar("frequency_calendar_id"),
+  daysToInitiate: integer("days_to_initiate").default(0), // Days after calendar period end
+  daysToClose: integer("days_to_close").default(30), // Days after calendar period end  
+  numberOfReminders: integer("number_of_reminders").default(3), // 1-10 reminders
+  excludeTenureLessThanYear: boolean("exclude_tenure_less_than_year").default(false),
+  excludedEmployeeIds: text("excluded_employee_ids").array().default(sql`ARRAY[]::text[]`), // Specific excluded employees
+  status: appraisalCycleStatusEnum("status").default('draft'),
+  makePublic: boolean("make_public").default(false),
+  publishType: publishTypeEnum("publish_type").default('now'),
+  createdById: varchar("created_by_id").notNull(), // HR Manager who created
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("initiated_appraisals_group_id_idx").on(table.appraisalGroupId),
+  index("initiated_appraisals_created_by_id_idx").on(table.createdById),
+  check("initiated_appraisals_template_check", sql`(${table.appraisalType} NOT IN ('questionnaire_based', 'mbo_based')) OR (${table.questionnaireTemplateId} IS NOT NULL OR ${table.documentUrl} IS NOT NULL)`),
 ]);
 
 // Relations
@@ -751,8 +792,16 @@ export const insertAppraisalGroupMemberSchema = createInsertSchema(appraisalGrou
   addedAt: true,
 });
 
+export const insertInitiatedAppraisalSchema = createInsertSchema(initiatedAppraisals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Export types
 export type AppraisalGroup = typeof appraisalGroups.$inferSelect;
 export type InsertAppraisalGroup = z.infer<typeof insertAppraisalGroupSchema>;
 export type AppraisalGroupMember = typeof appraisalGroupMembers.$inferSelect;
 export type InsertAppraisalGroupMember = z.infer<typeof insertAppraisalGroupMemberSchema>;
+export type InitiatedAppraisal = typeof initiatedAppraisals.$inferSelect;
+export type InsertInitiatedAppraisal = z.infer<typeof insertInitiatedAppraisalSchema>;
