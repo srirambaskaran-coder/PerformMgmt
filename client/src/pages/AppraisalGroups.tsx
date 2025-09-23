@@ -46,7 +46,17 @@ interface EmployeeFilters {
 
 export default function AppraisalGroups() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [employeeFilters, setEmployeeFilters] = useState<EmployeeFilters>({
+  // Draft filters that user is typing (not yet applied)
+  const [draftFilters, setDraftFilters] = useState<EmployeeFilters>({
+    nameOrCode: "",
+    location: "",
+    department: "",
+    level: "",
+    grade: "",
+    reportingManager: "",
+  });
+  // Applied filters that actually control the results
+  const [appliedFilters, setAppliedFilters] = useState<EmployeeFilters>({
     nameOrCode: "",
     location: "",
     department: "",
@@ -161,7 +171,15 @@ export default function AppraisalGroups() {
       setIsEmployeeSelectOpen(false);
       setSelectedEmployees([]);
       setSelectedGroupForEmployees(null);
-      setEmployeeFilters({
+      setDraftFilters({
+        nameOrCode: "",
+        location: "",
+        department: "",
+        level: "",
+        grade: "",
+        reportingManager: "",
+      });
+      setAppliedFilters({
         nameOrCode: "",
         location: "",
         department: "",
@@ -288,40 +306,40 @@ export default function AppraisalGroups() {
     
     // Apply structured filters
     // Name or Code filter
-    if (employeeFilters.nameOrCode) {
-      const nameOrCodeQuery = employeeFilters.nameOrCode.toLowerCase();
+    if (appliedFilters.nameOrCode) {
+      const nameOrCodeQuery = appliedFilters.nameOrCode.toLowerCase();
       const matchesName = ((user.firstName ?? '') + ' ' + (user.lastName ?? '')).toLowerCase().includes(nameOrCodeQuery);
       const matchesCode = (user.code ?? '').toLowerCase().includes(nameOrCodeQuery);
       if (!matchesName && !matchesCode) return false;
     }
 
     // Location filter
-    if (employeeFilters.location) {
-      const locationQuery = employeeFilters.location.toLowerCase();
+    if (appliedFilters.location) {
+      const locationQuery = appliedFilters.location.toLowerCase();
       if (!(user.locationId ?? '').toLowerCase().includes(locationQuery)) return false;
     }
 
     // Department filter
-    if (employeeFilters.department) {
-      const departmentQuery = employeeFilters.department.toLowerCase();
+    if (appliedFilters.department) {
+      const departmentQuery = appliedFilters.department.toLowerCase();
       if (!(user.department ?? '').toLowerCase().includes(departmentQuery)) return false;
     }
 
     // Level filter
-    if (employeeFilters.level) {
-      const levelQuery = employeeFilters.level.toLowerCase();
+    if (appliedFilters.level) {
+      const levelQuery = appliedFilters.level.toLowerCase();
       if (!(user.levelId ?? '').toLowerCase().includes(levelQuery)) return false;
     }
 
     // Grade filter
-    if (employeeFilters.grade) {
-      const gradeQuery = employeeFilters.grade.toLowerCase();
+    if (appliedFilters.grade) {
+      const gradeQuery = appliedFilters.grade.toLowerCase();
       if (!(user.gradeId ?? '').toLowerCase().includes(gradeQuery)) return false;
     }
 
     // Reporting Manager filter
-    if (employeeFilters.reportingManager) {
-      const reportingManagerQuery = employeeFilters.reportingManager.toLowerCase();
+    if (appliedFilters.reportingManager) {
+      const reportingManagerQuery = appliedFilters.reportingManager.toLowerCase();
       if (!(user.reportingManagerId ?? '').toLowerCase().includes(reportingManagerQuery)) return false;
     }
 
@@ -581,8 +599,8 @@ export default function AppraisalGroups() {
                     <label className="block text-sm font-medium mb-2">Employee Name/Code</label>
                     <Input
                       placeholder="Enter name or code..."
-                      value={employeeFilters.nameOrCode}
-                      onChange={(e) => setEmployeeFilters({ ...employeeFilters, nameOrCode: e.target.value })}
+                      value={draftFilters.nameOrCode}
+                      onChange={(e) => setDraftFilters({ ...draftFilters, nameOrCode: e.target.value })}
                       data-testid="dialog-filter-name-code"
                     />
                   </div>
@@ -591,8 +609,8 @@ export default function AppraisalGroups() {
                     <label className="block text-sm font-medium mb-2">Location</label>
                     <Input
                       placeholder="Enter location..."
-                      value={employeeFilters.location}
-                      onChange={(e) => setEmployeeFilters({ ...employeeFilters, location: e.target.value })}
+                      value={draftFilters.location}
+                      onChange={(e) => setDraftFilters({ ...draftFilters, location: e.target.value })}
                       data-testid="dialog-filter-location"
                     />
                   </div>
@@ -601,8 +619,8 @@ export default function AppraisalGroups() {
                     <label className="block text-sm font-medium mb-2">Department</label>
                     <Input
                       placeholder="Enter department..."
-                      value={employeeFilters.department}
-                      onChange={(e) => setEmployeeFilters({ ...employeeFilters, department: e.target.value })}
+                      value={draftFilters.department}
+                      onChange={(e) => setDraftFilters({ ...draftFilters, department: e.target.value })}
                       data-testid="dialog-filter-department"
                     />
                   </div>
@@ -611,8 +629,8 @@ export default function AppraisalGroups() {
                     <label className="block text-sm font-medium mb-2">Level</label>
                     <Input
                       placeholder="Enter level..."
-                      value={employeeFilters.level}
-                      onChange={(e) => setEmployeeFilters({ ...employeeFilters, level: e.target.value })}
+                      value={draftFilters.level}
+                      onChange={(e) => setDraftFilters({ ...draftFilters, level: e.target.value })}
                       data-testid="dialog-filter-level"
                     />
                   </div>
@@ -621,8 +639,8 @@ export default function AppraisalGroups() {
                     <label className="block text-sm font-medium mb-2">Grade</label>
                     <Input
                       placeholder="Enter grade..."
-                      value={employeeFilters.grade}
-                      onChange={(e) => setEmployeeFilters({ ...employeeFilters, grade: e.target.value })}
+                      value={draftFilters.grade}
+                      onChange={(e) => setDraftFilters({ ...draftFilters, grade: e.target.value })}
                       data-testid="dialog-filter-grade"
                     />
                   </div>
@@ -631,8 +649,8 @@ export default function AppraisalGroups() {
                     <label className="block text-sm font-medium mb-2">Reporting Manager</label>
                     <Input
                       placeholder="Enter manager name..."
-                      value={employeeFilters.reportingManager}
-                      onChange={(e) => setEmployeeFilters({ ...employeeFilters, reportingManager: e.target.value })}
+                      value={draftFilters.reportingManager}
+                      onChange={(e) => setDraftFilters({ ...draftFilters, reportingManager: e.target.value })}
                       data-testid="dialog-filter-reporting-manager"
                     />
                   </div>
@@ -642,7 +660,8 @@ export default function AppraisalGroups() {
                 <div className="flex gap-3">
                   <Button 
                     onClick={() => {
-                      // The filtering is already reactive, so this button can be used for explicit search
+                      // Apply the draft filters to the applied filters to trigger search
+                      setAppliedFilters({ ...draftFilters });
                     }}
                     className="flex items-center gap-2"
                     data-testid="dialog-search-employees-btn"
@@ -652,14 +671,19 @@ export default function AppraisalGroups() {
                   </Button>
                   <Button 
                     variant="outline"
-                    onClick={() => setEmployeeFilters({
-                      nameOrCode: "",
-                      location: "",
-                      department: "",
-                      level: "",
-                      grade: "",
-                      reportingManager: "",
-                    })}
+                    onClick={() => {
+                      // Clear both draft and applied filters
+                      const emptyFilters = {
+                        nameOrCode: "",
+                        location: "",
+                        department: "",
+                        level: "",
+                        grade: "",
+                        reportingManager: "",
+                      };
+                      setDraftFilters(emptyFilters);
+                      setAppliedFilters(emptyFilters);
+                    }}
                     data-testid="dialog-clear-filters-btn"
                   >
                     Clear Filters
@@ -724,7 +748,7 @@ export default function AppraisalGroups() {
               
               {availableEmployees.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
-                  {Object.values(employeeFilters).some(filter => filter.trim()) 
+                  {Object.values(appliedFilters).some(filter => filter.trim()) 
                     ? "No employees found matching your filter criteria."
                     : "All employees are already in this group."
                   }
@@ -743,7 +767,15 @@ export default function AppraisalGroups() {
                     setIsEmployeeSelectOpen(false);
                     setSelectedEmployees([]);
                     setSelectedGroupForEmployees(null);
-                    setEmployeeFilters({
+                    setDraftFilters({
+                      nameOrCode: "",
+                      location: "",
+                      department: "",
+                      level: "",
+                      grade: "",
+                      reportingManager: "",
+                    });
+                    setAppliedFilters({
                       nameOrCode: "",
                       location: "",
                       department: "",
