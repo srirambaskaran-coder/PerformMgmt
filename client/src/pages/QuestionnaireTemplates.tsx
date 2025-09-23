@@ -15,14 +15,127 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Copy, Edit, FileText, Minus, Plus, Search, Trash2 } from "lucide-react";
+import { Copy, Edit, FileText, GripVertical, Minus, Plus, Search, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface Question {
   id: string;
   text: string;
   type: 'text' | 'rating' | 'textarea';
   required: boolean;
+}
+
+interface SortableQuestionProps {
+  question: Question;
+  index: number;
+  updateQuestion: (id: string, field: keyof Question, value: any) => void;
+  removeQuestion: (id: string) => void;
+}
+
+function SortableQuestion({ question, index, updateQuestion, removeQuestion }: SortableQuestionProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: question.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.8 : 1,
+  };
+
+  return (
+    <Card 
+      ref={setNodeRef} 
+      style={style} 
+      className={`p-4 ${isDragging ? 'shadow-lg ring-2 ring-primary/20' : ''}`}
+    >
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <div 
+              {...attributes} 
+              {...listeners} 
+              className="cursor-grab hover:cursor-grabbing p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+              data-testid={`drag-handle-${question.id}`}
+            >
+              <GripVertical className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <h4 className="font-medium">Question {index + 1}</h4>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => removeQuestion(question.id)}
+            data-testid={`remove-question-${question.id}`}
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="col-span-2">
+            <Input
+              placeholder="Enter question text..."
+              value={question.text}
+              onChange={(e) => updateQuestion(question.id, 'text', e.target.value)}
+              data-testid={`input-question-text-${question.id}`}
+            />
+          </div>
+          <Select
+            value={question.type}
+            onValueChange={(value) => updateQuestion(question.id, 'type', value)}
+          >
+            <SelectTrigger data-testid={`select-question-type-${question.id}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="text">Text</SelectItem>
+              <SelectItem value="textarea">Long Text</SelectItem>
+              <SelectItem value="rating">Rating (1-5)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center space-x-2 mt-3">
+          <Checkbox
+            id={`required-${question.id}`}
+            checked={question.required}
+            onCheckedChange={(checked) => updateQuestion(question.id, 'required', checked)}
+            data-testid={`checkbox-question-required-${question.id}`}
+          />
+          <label 
+            htmlFor={`required-${question.id}`}
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            Required
+          </label>
+        </div>
+      </div>
+    </Card>
+  );
 }
 
 export default function QuestionnaireTemplates() {
@@ -155,6 +268,31 @@ export default function QuestionnaireTemplates() {
       status: "active",
     },
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = questions.findIndex((q) => q.id === active.id);
+      const newIndex = questions.findIndex((q) => q.id === over.id);
+
+      const newQuestions = arrayMove(questions, oldIndex, newIndex);
+      setQuestions(newQuestions);
+      // Sync form field with local state
+      form.setValue("questions", newQuestions);
+    }
+  };
 
   const addQuestion = () => {
     const newQuestion: Question = {
@@ -465,68 +603,33 @@ export default function QuestionnaireTemplates() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-medium">Questions</h3>
-                      <Button type="button" onClick={addQuestion} variant="outline" size="sm">
+                      <Button type="button" onClick={addQuestion} variant="outline" size="sm" data-testid="add-question">
                         <Plus className="h-4 w-4 mr-2" />
                         Add Question
                       </Button>
                     </div>
 
-                    {questions.map((question, index) => (
-                      <Card key={question.id} className="p-4">
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-medium">Question {index + 1}</h4>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeQuestion(question.id)}
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <div className="grid grid-cols-3 gap-4">
-                            <div className="col-span-2">
-                              <Input
-                                placeholder="Enter question text..."
-                                value={question.text}
-                                onChange={(e) => updateQuestion(question.id, 'text', e.target.value)}
-                                data-testid={`input-question-text-${question.id}`}
+                    {questions.length > 0 ? (
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <SortableContext items={questions.map(q => q.id)} strategy={verticalListSortingStrategy}>
+                          <div className="space-y-3">
+                            {questions.map((question, index) => (
+                              <SortableQuestion
+                                key={question.id}
+                                question={question}
+                                index={index}
+                                updateQuestion={updateQuestion}
+                                removeQuestion={removeQuestion}
                               />
-                            </div>
-                            <Select
-                              value={question.type}
-                              onValueChange={(value) => updateQuestion(question.id, 'type', value)}
-                            >
-                              <SelectTrigger data-testid={`select-question-type-${question.id}`}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="text">Text</SelectItem>
-                                <SelectItem value="textarea">Long Text</SelectItem>
-                                <SelectItem value="rating">Rating (1-5)</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            ))}
                           </div>
-                          <div className="flex items-center space-x-2 mt-3">
-                            <Checkbox
-                              id={`required-${question.id}`}
-                              checked={question.required}
-                              onCheckedChange={(checked) => updateQuestion(question.id, 'required', checked)}
-                              data-testid={`checkbox-question-required-${question.id}`}
-                            />
-                            <label 
-                              htmlFor={`required-${question.id}`}
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              Required
-                            </label>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-
-                    {questions.length === 0 && (
+                        </SortableContext>
+                      </DndContext>
+                    ) : (
                       <div className="text-center py-8 border-2 border-dashed border-muted rounded-lg">
                         <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                         <p className="text-muted-foreground">No questions added yet</p>
