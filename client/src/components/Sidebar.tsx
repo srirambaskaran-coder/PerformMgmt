@@ -21,6 +21,7 @@ import {
   CalendarDays,
   Building2,
   Play,
+  Search,
 } from "lucide-react";
 
 interface NavItem {
@@ -46,6 +47,7 @@ const navItems: NavItem[] = [
   { href: "/review-progress", label: "Review Progress", icon: ChartBar, roles: ["hr_manager"] },
   { href: "/appraisal-groups", label: "Appraisal Groups", icon: Users, roles: ["hr_manager"] },
   { href: "/initiate-appraisal", label: "Initiate Appraisal", icon: Play, roles: ["hr_manager"] },
+  { href: "/review-appraisal", label: "Review Appraisal", icon: Search, roles: ["hr_manager"] },
   { href: "/questionnaires", label: "Questionnaires", icon: FileText },
   { href: "/evaluations", label: "My Evaluations", icon: ClipboardList, roles: ["employee", "manager"] },
   { href: "/meetings", label: "Meetings", icon: Calendar },
