@@ -528,12 +528,10 @@ export default function InitiateAppraisal() {
                             <FormLabel>Questionnaire Templates*</FormLabel>
                             <FormControl>
                               <MultiSelect
-                                options={questionnaireTemplates
-                                  .filter(template => template.targetRole === 'employee')
-                                  .map(template => ({
-                                    value: template.id,
-                                    label: template.name
-                                  }))}
+                                options={questionnaireTemplates.map(template => ({
+                                  value: template.id,
+                                  label: template.name
+                                }))}
                                 value={field.value || []}
                                 onChange={field.onChange}
                                 placeholder="Select questionnaire templates..."

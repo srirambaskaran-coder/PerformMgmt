@@ -389,7 +389,7 @@ export default function Evaluations() {
   };
 
   return (
-    <RoleGuard allowedRoles={["employee", "manager"]}>
+    <RoleGuard allowedRoles={["employee"]}>
       <div className="space-y-6" data-testid="evaluations">
         <div className="flex items-center justify-between">
           <div>
