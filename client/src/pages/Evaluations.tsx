@@ -31,6 +31,15 @@ interface EvaluationWithDetails extends Evaluation {
   employee?: UserType;
   manager?: UserType;
   reviewCycle?: ReviewCycle;
+  questionnaires?: QuestionnaireTemplate[];
+}
+
+interface QuestionnaireTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  questions: Question[];
+  targetRole: string;
 }
 
 interface Question {
@@ -38,19 +47,38 @@ interface Question {
   text: string;
   type: 'text' | 'rating' | 'textarea';
   required: boolean;
+  category?: string;
+  weight?: number;
+}
+
+interface QuestionResponse {
+  questionId: string;
+  response: string;
+  rating?: number;
+  remarks?: string;
 }
 
 export default function Evaluations() {
   const [selectedEvaluation, setSelectedEvaluation] = useState<EvaluationWithDetails | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [responses, setResponses] = useState<Record<string, any>>({});
+  const [responses, setResponses] = useState<Record<string, QuestionResponse>>({});
+  const [averageRating, setAverageRating] = useState<number>(0);
 
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: evaluations = [], isLoading } = useQuery<EvaluationWithDetails[]>({
-    queryKey: ["/api/evaluations", { employeeId: user?.id }],
+    queryKey: ["/api/evaluations", { employeeId: user?.id, includeQuestionnaires: true }],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        employeeId: user?.id || '',
+        includeQuestionnaires: 'true'
+      });
+      const response = await fetch(`/api/evaluations?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch evaluations');
+      return response.json();
+    },
   });
 
   const submitEvaluationMutation = useMutation({
@@ -120,80 +148,169 @@ export default function Evaluations() {
     return "destructive";
   };
 
-  // Sample questions for demonstration
-  const sampleQuestions: Question[] = [
-    { id: "1", text: "What went well during this cycle?", type: "textarea", required: true },
-    { id: "2", text: "Projects/tasks you worked on", type: "textarea", required: true },
-    { id: "3", text: "Challenges faced and how you addressed them", type: "textarea", required: true },
-    { id: "4", text: "Areas for improvement", type: "textarea", required: true },
-    { id: "5", text: "Skills learned or enhanced", type: "textarea", required: true },
-    { id: "6", text: "Support/resources needed", type: "textarea", required: true },
-    { id: "7", text: "Overall performance rating (1–5)", type: "rating", required: true },
-  ];
+  // Calculate average rating from responses
+  const calculateAverageRating = (responseData: Record<string, QuestionResponse>) => {
+    const ratings = Object.values(responseData)
+      .filter(response => response.rating !== undefined)
+      .map(response => response.rating!);
+    
+    if (ratings.length === 0) return 0;
+    
+    const average = ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+    // Round to nearest 0.5
+    return Math.round(average * 2) / 2;
+  };
+
+  // Get all questions from questionnaires
+  const getAllQuestions = (questionnaires: QuestionnaireTemplate[]): Question[] => {
+    return questionnaires.flatMap((questionnaire, qIndex) => 
+      questionnaire.questions.map((question, index) => ({
+        ...question,
+        id: `${questionnaire.id}_${question.id || index}`,
+        questionnaireName: questionnaire.name
+      }))
+    );
+  };
 
   const renderQuestion = (question: Question) => {
+    const questionKey = question.id;
+    const currentResponse = responses[questionKey] || { questionId: questionKey, response: '', rating: undefined, remarks: '' };
+
+    const updateResponse = (field: string, value: any) => {
+      setResponses(prev => {
+        const updated = {
+          ...prev,
+          [questionKey]: {
+            ...currentResponse,
+            [field]: value
+          }
+        };
+        
+        // Recalculate average when ratings change
+        if (field === 'rating') {
+          const newAverage = calculateAverageRating(updated);
+          setAverageRating(newAverage);
+        }
+        
+        return updated;
+      });
+    };
+
     switch (question.type) {
       case 'textarea':
         return (
-          <FormField
-            key={question.id}
-            control={form.control}
-            name={question.id}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{question.text}</FormLabel>
-                <FormControl>
-                  <Textarea {...field} placeholder="Enter your response..." />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <Card key={question.id} className="p-4">
+            <div className="space-y-4">
+              <div>
+                <FormLabel className="text-base font-semibold">{question.text}</FormLabel>
+                {question.required && <span className="text-red-500 ml-1">*</span>}
+                {question.questionnaireName && (
+                  <p className="text-sm text-muted-foreground mt-1">From: {question.questionnaireName}</p>
+                )}
+              </div>
+              <Textarea
+                value={currentResponse.response}
+                onChange={(e) => updateResponse('response', e.target.value)}
+                placeholder="Enter your detailed response..."
+                className="min-h-[100px]"
+                data-testid={`question-response-${question.id}`}
+              />
+              <div>
+                <FormLabel className="text-sm">Self Remarks (Optional)</FormLabel>
+                <Textarea
+                  value={currentResponse.remarks || ''}
+                  onChange={(e) => updateResponse('remarks', e.target.value)}
+                  placeholder="Add any additional comments or context..."
+                  className="min-h-[60px] mt-1"
+                  data-testid={`question-remarks-${question.id}`}
+                />
+              </div>
+            </div>
+          </Card>
         );
       case 'rating':
         return (
-          <FormField
-            key={question.id}
-            control={form.control}
-            name={question.id}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{question.text}</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value?.toString()}>
-                  <FormControl>
-                    <SelectTrigger>
+          <Card key={question.id} className="p-4">
+            <div className="space-y-4">
+              <div>
+                <FormLabel className="text-base font-semibold">{question.text}</FormLabel>
+                {question.required && <span className="text-red-500 ml-1">*</span>}
+                {question.questionnaireName && (
+                  <p className="text-sm text-muted-foreground mt-1">From: {question.questionnaireName}</p>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <FormLabel className="text-sm">Rating</FormLabel>
+                  <Select
+                    value={currentResponse.rating?.toString() || ''}
+                    onValueChange={(value) => updateResponse('rating', parseInt(value))}
+                  >
+                    <SelectTrigger data-testid={`question-rating-${question.id}`}>
                       <SelectValue placeholder="Select rating" />
                     </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="1">1 - Below Expectations</SelectItem>
-                    <SelectItem value="2">2 - Meets Some Expectations</SelectItem>
-                    <SelectItem value="3">3 - Meets Expectations</SelectItem>
-                    <SelectItem value="4">4 - Exceeds Expectations</SelectItem>
-                    <SelectItem value="5">5 - Outstanding</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                    <SelectContent>
+                      <SelectItem value="1">1 - Below Expectations</SelectItem>
+                      <SelectItem value="2">2 - Meets Some Expectations</SelectItem>
+                      <SelectItem value="3">3 - Meets Expectations</SelectItem>
+                      <SelectItem value="4">4 - Exceeds Expectations</SelectItem>
+                      <SelectItem value="5">5 - Outstanding</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <FormLabel className="text-sm">Self Assessment</FormLabel>
+                  <Textarea
+                    value={currentResponse.response}
+                    onChange={(e) => updateResponse('response', e.target.value)}
+                    placeholder="Explain your rating..."
+                    className="min-h-[80px]"
+                    data-testid={`question-response-${question.id}`}
+                  />
+                </div>
+              </div>
+              <div>
+                <FormLabel className="text-sm">Additional Remarks (Optional)</FormLabel>
+                <Textarea
+                  value={currentResponse.remarks || ''}
+                  onChange={(e) => updateResponse('remarks', e.target.value)}
+                  placeholder="Add any additional comments..."
+                  className="min-h-[60px] mt-1"
+                  data-testid={`question-remarks-${question.id}`}
+                />
+              </div>
+            </div>
+          </Card>
         );
       default:
         return (
-          <FormField
-            key={question.id}
-            control={form.control}
-            name={question.id}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{question.text}</FormLabel>
-                <FormControl>
-                  <Input {...field} placeholder="Enter your response..." />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <Card key={question.id} className="p-4">
+            <div className="space-y-4">
+              <div>
+                <FormLabel className="text-base font-semibold">{question.text}</FormLabel>
+                {question.required && <span className="text-red-500 ml-1">*</span>}
+                {question.questionnaireName && (
+                  <p className="text-sm text-muted-foreground mt-1">From: {question.questionnaireName}</p>
+                )}
+              </div>
+              <Input
+                value={currentResponse.response}
+                onChange={(e) => updateResponse('response', e.target.value)}
+                placeholder="Enter your response..."
+                data-testid={`question-response-${question.id}`}
+              />
+              <div>
+                <FormLabel className="text-sm">Self Remarks (Optional)</FormLabel>
+                <Textarea
+                  value={currentResponse.remarks || ''}
+                  onChange={(e) => updateResponse('remarks', e.target.value)}
+                  placeholder="Add any additional comments..."
+                  className="min-h-[60px] mt-1"
+                  data-testid={`question-remarks-${question.id}`}
+                />
+              </div>
+            </div>
+          </Card>
         );
     }
   };
@@ -349,10 +466,50 @@ export default function Evaluations() {
                   </CardContent>
                 </Card>
 
+                {/* Average Rating Display */}
+                {averageRating > 0 && (
+                  <Card className="bg-accent/10">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <Star className="h-6 w-6 text-yellow-500" />
+                        <div>
+                          <p className="font-semibold">Current Average Rating</p>
+                          <p className="text-2xl font-bold text-primary">{averageRating.toFixed(1)}/5.0</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Questionnaires */}
+                {selectedEvaluation.questionnaires && selectedEvaluation.questionnaires.length > 0 ? (
+                  <div className="space-y-6">
+                    {selectedEvaluation.questionnaires.map((questionnaire, index) => (
+                      <Card key={questionnaire.id} className="border-l-4 border-l-primary">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg">{questionnaire.name}</CardTitle>
+                          {questionnaire.description && (
+                            <CardDescription>{questionnaire.description}</CardDescription>
+                          )}
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {getAllQuestions([questionnaire]).map(renderQuestion)}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <Card>
+                    <CardContent className="text-center py-8">
+                      <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No questionnaires assigned to this evaluation</p>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Questions Form */}
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    {sampleQuestions.map(renderQuestion)}
                     
                     <div className="flex gap-3 pt-4 border-t">
                       <Button

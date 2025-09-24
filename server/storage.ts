@@ -741,6 +741,61 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(evaluations).orderBy(desc(evaluations.createdAt));
   }
 
+  async getEvaluationsWithQuestionnaires(filters?: { employeeId?: string; managerId?: string; reviewCycleId?: string; status?: string }): Promise<any[]> {
+    const conditions = [];
+    if (filters?.employeeId) conditions.push(eq(evaluations.employeeId, filters.employeeId));
+    if (filters?.managerId) conditions.push(eq(evaluations.managerId, filters.managerId));
+    if (filters?.reviewCycleId) conditions.push(eq(evaluations.reviewCycleId, filters.reviewCycleId));
+    if (filters?.status) conditions.push(eq(evaluations.status, filters.status));
+    
+    const evaluationResults = conditions.length > 0 
+      ? await db.select().from(evaluations).where(and(...conditions)).orderBy(desc(evaluations.createdAt))
+      : await db.select().from(evaluations).orderBy(desc(evaluations.createdAt));
+
+    // Fetch related data for each evaluation
+    const evaluationsWithData = await Promise.all(
+      evaluationResults.map(async (evaluation) => {
+        let questionnaires = [];
+        
+        // Get questionnaire templates if evaluation is linked to an initiated appraisal
+        if (evaluation.initiatedAppraisalId) {
+          const initiatedAppraisal = await db
+            .select()
+            .from(initiatedAppraisals)
+            .where(eq(initiatedAppraisals.id, evaluation.initiatedAppraisalId))
+            .limit(1);
+
+          if (initiatedAppraisal.length > 0 && initiatedAppraisal[0].questionnaireTemplateIds) {
+            const templateIds = initiatedAppraisal[0].questionnaireTemplateIds;
+            
+            if (templateIds && templateIds.length > 0) {
+              questionnaires = await db
+                .select()
+                .from(questionnaireTemplates)
+                .where(inArray(questionnaireTemplates.id, templateIds))
+                .orderBy(asc(questionnaireTemplates.name));
+            }
+          }
+        }
+
+        // Get employee and manager details
+        const [employee, manager] = await Promise.all([
+          evaluation.employeeId ? this.getUser(evaluation.employeeId) : null,
+          evaluation.managerId ? this.getUser(evaluation.managerId) : null,
+        ]);
+
+        return {
+          ...evaluation,
+          employee,
+          manager,
+          questionnaires,
+        };
+      })
+    );
+
+    return evaluationsWithData;
+  }
+
   async getEvaluation(id: string): Promise<Evaluation | undefined> {
     const [evaluation] = await db.select().from(evaluations).where(eq(evaluations.id, id));
     return evaluation;

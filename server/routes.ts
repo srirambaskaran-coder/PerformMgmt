@@ -483,7 +483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const { employeeId, managerId, reviewCycleId, status } = req.query;
+      const { employeeId, managerId, reviewCycleId, status, includeQuestionnaires } = req.query;
       let filters = {
         employeeId: employeeId as string,
         managerId: managerId as string,
@@ -499,8 +499,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Managers can see evaluations they manage or their own
         if (!filters.employeeId && !filters.managerId) {
           // If no specific filter, show evaluations where they are the manager or employee
-          const userManagedEvaluations = await storage.getEvaluations({ managerId: currentUser.id });
-          const userOwnEvaluations = await storage.getEvaluations({ employeeId: currentUser.id });
+          const getEvaluationsMethod = includeQuestionnaires === 'true' 
+            ? storage.getEvaluationsWithQuestionnaires 
+            : storage.getEvaluations;
+          
+          const userManagedEvaluations = await getEvaluationsMethod({ managerId: currentUser.id });
+          const userOwnEvaluations = await getEvaluationsMethod({ employeeId: currentUser.id });
           const combinedEvaluations = [...userManagedEvaluations, ...userOwnEvaluations];
           // Remove duplicates by id
           const uniqueEvaluations = combinedEvaluations.filter((evaluation, index, self) => 
@@ -515,7 +519,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // super_admin, admin, hr_manager can access all evaluations (no additional filtering)
 
-      const evaluations = await storage.getEvaluations(filters);
+      // Use enhanced method if questionnaires are requested
+      const evaluations = includeQuestionnaires === 'true' 
+        ? await storage.getEvaluationsWithQuestionnaires(filters)
+        : await storage.getEvaluations(filters);
+        
       res.json(evaluations);
     } catch (error) {
       console.error("Error fetching evaluations:", error);
