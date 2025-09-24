@@ -728,8 +728,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Evaluation not found" });
       }
 
+      // Convert date strings to Date objects before validation
+      const requestBody = { ...req.body };
+      if (requestBody.selfEvaluationSubmittedAt && typeof requestBody.selfEvaluationSubmittedAt === 'string') {
+        requestBody.selfEvaluationSubmittedAt = new Date(requestBody.selfEvaluationSubmittedAt);
+      }
+      if (requestBody.managerEvaluationSubmittedAt && typeof requestBody.managerEvaluationSubmittedAt === 'string') {
+        requestBody.managerEvaluationSubmittedAt = new Date(requestBody.managerEvaluationSubmittedAt);
+      }
+      if (requestBody.finalizedAt && typeof requestBody.finalizedAt === 'string') {
+        requestBody.finalizedAt = new Date(requestBody.finalizedAt);
+      }
+      if (requestBody.meetingScheduledAt && typeof requestBody.meetingScheduledAt === 'string') {
+        requestBody.meetingScheduledAt = new Date(requestBody.meetingScheduledAt);
+      }
+      if (requestBody.meetingCompletedAt && typeof requestBody.meetingCompletedAt === 'string') {
+        requestBody.meetingCompletedAt = new Date(requestBody.meetingCompletedAt);
+      }
+
       // Apply role-based access control for updates
-      const evaluationData = insertEvaluationSchema.partial().parse(req.body);
+      const evaluationData = insertEvaluationSchema.partial().parse(requestBody);
       
       if (currentUser.role === 'employee') {
         // Employees can only update their own evaluations and only self-evaluation data
