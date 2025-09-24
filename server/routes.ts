@@ -917,6 +917,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get evaluations requiring manager review (submitted by employees) - MUST come before /:id route
+  app.get('/api/evaluations/manager-submissions', isAuthenticated, requireRoles(['manager']), async (req: any, res) => {
+    try {
+      const managerId = req.user.claims.sub;
+      
+      // Get all evaluations where:
+      // 1. Manager is the current user
+      // 2. Employee has submitted their evaluation
+      // 3. Manager hasn't submitted their review yet
+      const evaluations = await storage.getEvaluations({ managerId });
+      const submissionsForReview = evaluations.filter(evaluation => 
+        evaluation.selfEvaluationSubmittedAt && !evaluation.managerEvaluationSubmittedAt
+      );
+
+      // Get questionnaire data for each evaluation
+      const evaluationsWithQuestionnaires = await Promise.all(
+        submissionsForReview.map(async (evaluation) => {
+          // Get employee details
+          const employee = await storage.getUser(evaluation.employeeId);
+          // Get questionnaire template details if available
+          let questionnaireTemplate = null;
+          if (evaluation.reviewCycleId && !evaluation.reviewCycleId.startsWith('initiated-appraisal-')) {
+            const reviewCycle = await storage.getReviewCycle(evaluation.reviewCycleId);
+            if (reviewCycle?.questionnaireTemplateId) {
+              questionnaireTemplate = await storage.getQuestionnaireTemplate(reviewCycle.questionnaireTemplateId);
+            }
+          }
+          
+          return {
+            ...evaluation,
+            employee: employee ? {
+              id: employee.id,
+              firstName: employee.firstName,
+              lastName: employee.lastName,
+              email: employee.email,
+              department: employee.department,
+              designation: employee.designation
+            } : null,
+            questionnaireTemplate
+          };
+        })
+      );
+
+      res.json(evaluationsWithQuestionnaires);
+    } catch (error) {
+      console.error("Error fetching manager submissions:", error);
+      res.status(500).json({ message: "Failed to fetch submissions for review" });
+    }
+  });
+
   // Get evaluation by ID with role-based access
   app.get('/api/evaluations/:id', isAuthenticated, async (req: any, res) => {
     try {
@@ -2581,6 +2631,250 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid request data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to send reminder" });
+    }
+  });
+
+  // Manager Workflow API Routes (moved above to avoid route conflicts)
+
+  // Submit manager review with remarks and final rating
+  app.put('/api/evaluations/:id/manager-review', isAuthenticated, requireRoles(['manager']), async (req: any, res) => {
+    try {
+      const evaluationId = req.params.id;
+      const managerId = req.user.claims.sub;
+      
+      const { managerRemarks, finalRating, managerEvaluationData } = req.body;
+      
+      // Validate the evaluation belongs to this manager
+      const evaluation = await storage.getEvaluation(evaluationId);
+      if (!evaluation) {
+        return res.status(404).json({ message: "Evaluation not found" });
+      }
+      if (evaluation.managerId !== managerId) {
+        return res.status(403).json({ message: "Access denied: You can only review evaluations for your direct reports" });
+      }
+      if (!evaluation.selfEvaluationSubmittedAt) {
+        return res.status(400).json({ message: "Cannot review: Employee hasn't submitted their evaluation yet" });
+      }
+      
+      // Prepare manager evaluation data with remarks
+      const completeManagerEvaluationData = {
+        ...managerEvaluationData,
+        managerRemarks: managerRemarks
+      };
+      
+      // Update evaluation with manager review
+      const updatedEvaluation = await storage.updateEvaluation(evaluationId, {
+        managerEvaluationData: completeManagerEvaluationData,
+        overallRating: finalRating,
+        managerEvaluationSubmittedAt: new Date(),
+        status: 'reviewed'
+      });
+      
+      res.json({
+        message: "Manager review submitted successfully",
+        evaluation: updatedEvaluation
+      });
+    } catch (error) {
+      console.error("Error submitting manager review:", error);
+      res.status(500).json({ message: "Failed to submit manager review" });
+    }
+  });
+
+  // Schedule one-on-one meeting and send calendar invite
+  app.post('/api/evaluations/:id/schedule-meeting', isAuthenticated, requireRoles(['manager']), async (req: any, res) => {
+    try {
+      const evaluationId = req.params.id;
+      const managerId = req.user.claims.sub;
+      
+      const { meetingDate, meetingTitle, meetingDescription } = req.body;
+      
+      if (!meetingDate) {
+        return res.status(400).json({ message: "Meeting date is required" });
+      }
+      
+      // Validate the evaluation belongs to this manager
+      const evaluation = await storage.getEvaluation(evaluationId);
+      if (!evaluation) {
+        return res.status(404).json({ message: "Evaluation not found" });
+      }
+      if (evaluation.managerId !== managerId) {
+        return res.status(403).json({ message: "Access denied: You can only schedule meetings for your direct reports" });
+      }
+      if (!evaluation.managerEvaluationSubmittedAt) {
+        return res.status(400).json({ message: "Cannot schedule meeting: Complete your review first" });
+      }
+
+      // Get employee and manager details
+      const employee = await storage.getUser(evaluation.employeeId);
+      const manager = await storage.getUser(managerId);
+      
+      if (!employee || !manager) {
+        return res.status(404).json({ message: "Employee or manager not found" });
+      }
+
+      // Update evaluation with meeting schedule
+      const updatedEvaluation = await storage.updateEvaluation(evaluationId, {
+        meetingScheduledAt: new Date(meetingDate)
+      });
+
+      // Send calendar invite
+      const { sendMeetingInvite } = await import('./emailService');
+      await sendMeetingInvite(
+        employee.email,
+        `${employee.firstName} ${employee.lastName}`,
+        `${manager.firstName} ${manager.lastName}`,
+        new Date(meetingDate),
+        meetingTitle || 'Performance Review One-on-One Meeting',
+        meetingDescription || 'Discussion about your performance review and career development.'
+      );
+
+      res.json({
+        message: "Meeting scheduled successfully and calendar invite sent",
+        evaluation: updatedEvaluation,
+        meetingDetails: {
+          date: meetingDate,
+          title: meetingTitle || 'Performance Review One-on-One Meeting',
+          attendees: [employee.email, manager.email]
+        }
+      });
+    } catch (error) {
+      console.error("Error scheduling meeting:", error);
+      res.status(500).json({ message: "Failed to schedule meeting" });
+    }
+  });
+
+  // Add or update meeting notes
+  app.put('/api/evaluations/:id/meeting-notes', isAuthenticated, requireRoles(['manager']), async (req: any, res) => {
+    try {
+      const evaluationId = req.params.id;
+      const managerId = req.user.claims.sub;
+      
+      const { meetingNotes, finalRating } = req.body;
+      
+      if (!meetingNotes) {
+        return res.status(400).json({ message: "Meeting notes are required" });
+      }
+      
+      // Validate the evaluation belongs to this manager
+      const evaluation = await storage.getEvaluation(evaluationId);
+      if (!evaluation) {
+        return res.status(404).json({ message: "Evaluation not found" });
+      }
+      if (evaluation.managerId !== managerId) {
+        return res.status(403).json({ message: "Access denied: You can only add notes for your direct reports" });
+      }
+      if (!evaluation.meetingScheduledAt) {
+        return res.status(400).json({ message: "Cannot add notes: Schedule a meeting first" });
+      }
+
+      // Update evaluation with meeting notes
+      const updateData: any = {
+        meetingNotes,
+        meetingCompletedAt: new Date()
+      };
+      
+      // Allow updating final rating if provided
+      if (finalRating !== undefined) {
+        updateData.overallRating = finalRating;
+      }
+      
+      const updatedEvaluation = await storage.updateEvaluation(evaluationId, updateData);
+      
+      res.json({
+        message: "Meeting notes saved successfully",
+        evaluation: updatedEvaluation
+      });
+    } catch (error) {
+      console.error("Error saving meeting notes:", error);
+      res.status(500).json({ message: "Failed to save meeting notes" });
+    }
+  });
+
+  // Mark evaluation as completed and send notifications
+  app.post('/api/evaluations/:id/complete', isAuthenticated, requireRoles(['manager']), async (req: any, res) => {
+    try {
+      const evaluationId = req.params.id;
+      const managerId = req.user.claims.sub;
+      
+      // Validate the evaluation belongs to this manager
+      const evaluation = await storage.getEvaluation(evaluationId);
+      if (!evaluation) {
+        return res.status(404).json({ message: "Evaluation not found" });
+      }
+      if (evaluation.managerId !== managerId) {
+        return res.status(403).json({ message: "Access denied: You can only complete evaluations for your direct reports" });
+      }
+      if (!evaluation.managerEvaluationSubmittedAt) {
+        return res.status(400).json({ message: "Cannot complete: Submit your review first" });
+      }
+      if (evaluation.finalizedAt) {
+        return res.status(400).json({ message: "Evaluation already completed" });
+      }
+
+      // Mark evaluation as completed
+      const updatedEvaluation = await storage.updateEvaluation(evaluationId, {
+        status: 'completed',
+        finalizedAt: new Date()
+      });
+
+      // Get all parties for notification
+      const employee = await storage.getUser(evaluation.employeeId);
+      const manager = await storage.getUser(managerId);
+      
+      if (!employee || !manager) {
+        return res.status(404).json({ message: "Employee or manager not found" });
+      }
+
+      // Find HR Manager(s) from the same company
+      const allUsers = await storage.getUsers({ role: 'hr_manager' });
+      const hrManagers = allUsers.filter(user => user.companyId === manager.companyId);
+      
+      // Send completion notifications
+      const { sendEvaluationCompletionNotification } = await import('./emailService');
+      
+      // Notify employee (primary recipient)
+      await sendEvaluationCompletionNotification(
+        employee.email,
+        `${employee.firstName} ${employee.lastName}`,
+        `${manager.firstName} ${manager.lastName}`,
+        updatedEvaluation,
+        'employee'
+      );
+
+      // Notify manager (secondary recipient) 
+      await sendEvaluationCompletionNotification(
+        manager.email,
+        `${manager.firstName} ${manager.lastName}`,
+        `${employee.firstName} ${employee.lastName}`,
+        updatedEvaluation,
+        'manager'
+      );
+
+      // Notify HR Manager(s) (CC recipients)
+      for (const hrManager of hrManagers) {
+        if (hrManager.email) {
+          await sendEvaluationCompletionNotification(
+            hrManager.email,
+            `${hrManager.firstName} ${hrManager.lastName}`,
+            `${employee.firstName} ${employee.lastName}`,
+            updatedEvaluation,
+            'hr_manager'
+          );
+        }
+      }
+
+      res.json({
+        message: "Evaluation completed successfully and notifications sent",
+        evaluation: updatedEvaluation,
+        notificationsSent: {
+          employee: employee.email,
+          manager: manager.email,
+          hrManagers: hrManagers.map(hr => hr.email).filter(Boolean)
+        }
+      });
+    } catch (error) {
+      console.error("Error completing evaluation:", error);
+      res.status(500).json({ message: "Failed to complete evaluation" });
     }
   });
 

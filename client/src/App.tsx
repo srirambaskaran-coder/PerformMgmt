@@ -27,6 +27,7 @@ import AppraisalGroups from "@/pages/AppraisalGroups";
 import InitiateAppraisal from "@/pages/InitiateAppraisal";
 import ReviewAppraisal from "@/pages/ReviewAppraisal";
 import Evaluations from "@/pages/Evaluations";
+import ManagerSubmissions from "@/pages/ManagerSubmissions";
 import Meetings from "@/pages/Meetings";
 import Settings from "@/pages/Settings";
 
@@ -64,6 +65,7 @@ function Router() {
           <Route path="/initiate-appraisal" component={InitiateAppraisal} />
           <Route path="/review-appraisal" component={ReviewAppraisal} />
           <Route path="/evaluations" component={Evaluations} />
+          <Route path="/manager-submissions" component={ManagerSubmissions} />
           <Route path="/meetings" component={Meetings} />
           <Route path="/settings" component={Settings} />
         </>

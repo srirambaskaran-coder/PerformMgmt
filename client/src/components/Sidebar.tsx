@@ -48,6 +48,7 @@ const navItems: NavItem[] = [
   { href: "/review-appraisal", label: "Review Progress", icon: Search, roles: ["hr_manager"] },
   { href: "/questionnaires", label: "Questionnaires", icon: FileText },
   { href: "/evaluations", label: "My Evaluations", icon: ClipboardList, roles: ["employee", "manager"] },
+  { href: "/manager-submissions", label: "Submissions", icon: ClipboardList, roles: ["manager"] },
   { href: "/meetings", label: "Meetings", icon: Calendar },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

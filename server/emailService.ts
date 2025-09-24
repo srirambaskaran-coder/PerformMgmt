@@ -243,3 +243,145 @@ export async function sendCalendarInvite(employeeEmail: string, managerEmail: st
 export function generateRegistrationNotificationEmail(name: string, companyName: string, designation: string, email: string, mobile: string): { subject: string; html: string } {
   return emailService.generateRegistrationNotificationEmail(name, companyName, designation, email, mobile);
 }
+
+// Manager Workflow Email Functions
+
+export async function sendMeetingInvite(
+  employeeEmail: string, 
+  employeeName: string, 
+  managerName: string, 
+  meetingDate: Date, 
+  meetingTitle: string, 
+  meetingDescription: string
+): Promise<void> {
+  const icsContent = emailService.generateCalendarInvite(employeeName, managerName, meetingDate);
+  
+  const subject = `Meeting Invitation: ${meetingTitle}`;
+  const formattedDate = meetingDate.toLocaleDateString();
+  const formattedTime = meetingDate.toLocaleTimeString();
+  
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #2563eb;">Performance Review Meeting Invitation</h2>
+      <p>Dear ${employeeName},</p>
+      <p>${managerName} has scheduled a one-on-one meeting to discuss your performance review.</p>
+      
+      <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="color: #1e40af; margin-top: 0;">Meeting Details</h3>
+        <p><strong>Title:</strong> ${meetingTitle}</p>
+        <p><strong>Date:</strong> ${formattedDate}</p>
+        <p><strong>Time:</strong> ${formattedTime}</p>
+        <p><strong>With:</strong> ${managerName}</p>
+        <p><strong>Description:</strong> ${meetingDescription}</p>
+      </div>
+      
+      <p>Please add this meeting to your calendar using the attached invitation.</p>
+      <p>If you have any scheduling conflicts, please reach out to ${managerName} as soon as possible.</p>
+      
+      <p>Best regards,<br>Performance Management System</p>
+    </div>
+  `;
+
+  return emailService.sendEmail({
+    to: employeeEmail,
+    subject,
+    html,
+    attachments: [{
+      filename: 'meeting-invite.ics',
+      content: icsContent,
+      contentType: 'text/calendar'
+    }] as any
+  });
+}
+
+export async function sendEvaluationCompletionNotification(
+  recipientEmail: string,
+  recipientName: string,
+  otherPartyName: string,
+  evaluation: any,
+  recipientRole: 'employee' | 'manager' | 'hr_manager'
+): Promise<void> {
+  let subject: string;
+  let html: string;
+  
+  if (recipientRole === 'employee') {
+    subject = 'Performance Review Completed - Results Available';
+    html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #059669;">Your Performance Review is Complete!</h2>
+        <p>Dear ${recipientName},</p>
+        <p>Your performance review has been completed by your manager, ${otherPartyName}.</p>
+        
+        <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #059669;">
+          <h3 style="color: #065f46; margin-top: 0;">Review Summary</h3>
+          ${evaluation.overallRating ? `<p><strong>Final Rating:</strong> ${evaluation.overallRating}/5</p>` : ''}
+          <p><strong>Review Completed On:</strong> ${evaluation.finalizedAt ? new Date(evaluation.finalizedAt).toLocaleDateString() : 'N/A'}</p>
+          <p><strong>Manager:</strong> ${otherPartyName}</p>
+        </div>
+        
+        ${evaluation.meetingNotes ? `
+        <div style="background-color: #fefce8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #92400e; margin-top: 0;">Meeting Notes</h3>
+          <p style="white-space: pre-wrap;">${evaluation.meetingNotes}</p>
+        </div>
+        ` : ''}
+        
+        <p>You can view the complete review details in your performance management dashboard.</p>
+        <p>If you have any questions about your review, please discuss them with your manager during your next one-on-one meeting.</p>
+        
+        <p>Best regards,<br>HR Team</p>
+      </div>
+    `;
+  } else if (recipientRole === 'manager') {
+    subject = `Performance Review Completed - ${otherPartyName}`;
+    html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">Performance Review Completion Confirmation</h2>
+        <p>Dear ${recipientName},</p>
+        <p>This confirms that you have successfully completed the performance review for ${otherPartyName}.</p>
+        
+        <div style="background-color: #eff6ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
+          <h3 style="color: #1e40af; margin-top: 0;">Completion Summary</h3>
+          <p><strong>Employee:</strong> ${otherPartyName}</p>
+          ${evaluation.overallRating ? `<p><strong>Final Rating Given:</strong> ${evaluation.overallRating}/5</p>` : ''}
+          <p><strong>Completed On:</strong> ${evaluation.finalizedAt ? new Date(evaluation.finalizedAt).toLocaleDateString() : 'N/A'}</p>
+        </div>
+        
+        <p>The employee has been notified of the completion and can now view their review results.</p>
+        <p>A copy of this notification has also been sent to the HR team for their records.</p>
+        
+        <p>Thank you for your participation in our performance management process.</p>
+        
+        <p>Best regards,<br>Performance Management System</p>
+      </div>
+    `;
+  } else { // hr_manager
+    subject = `Performance Review Completed - ${otherPartyName}`;
+    html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #7c3aed;">Performance Review Completion Notice</h2>
+        <p>Dear ${recipientName},</p>
+        <p>This is to inform you that a performance review has been completed in your organization.</p>
+        
+        <div style="background-color: #faf5ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #7c3aed;">
+          <h3 style="color: #5b21b6; margin-top: 0;">Review Details</h3>
+          <p><strong>Employee:</strong> ${otherPartyName}</p>
+          ${evaluation.overallRating ? `<p><strong>Final Rating:</strong> ${evaluation.overallRating}/5</p>` : ''}
+          <p><strong>Completed On:</strong> ${evaluation.finalizedAt ? new Date(evaluation.finalizedAt).toLocaleDateString() : 'N/A'}</p>
+          <p><strong>Status:</strong> Completed</p>
+        </div>
+        
+        <p>Both the employee and manager have been notified of the completion.</p>
+        <p>You can view detailed analytics and reports in the HR management dashboard.</p>
+        
+        <p>Best regards,<br>Performance Management System</p>
+      </div>
+    `;
+  }
+
+  return emailService.sendEmail({
+    to: recipientEmail,
+    subject,
+    html,
+  });
+}

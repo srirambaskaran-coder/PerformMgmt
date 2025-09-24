@@ -506,6 +506,61 @@ export default function Evaluations() {
                           )}
                         </div>
                       </div>
+
+                      {/* Manager Feedback Section - visible when manager has provided feedback */}
+                      {(evaluation.managerEvaluationData?.managerRemarks || evaluation.meetingNotes || evaluation.finalizedAt) && (
+                        <div className="mt-4 pt-4 border-t border-border space-y-3">
+                          <h4 className="font-medium text-sm text-muted-foreground">Manager Feedback</h4>
+                          
+                          {/* Manager Remarks */}
+                          {evaluation.managerEvaluationData?.managerRemarks && (
+                            <div className="bg-blue-50 p-3 rounded-lg space-y-2">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-blue-600" />
+                                <span className="text-sm font-medium text-blue-800">Manager's Review</span>
+                                {evaluation.managerEvaluationSubmittedAt && (
+                                  <span className="text-xs text-blue-600">
+                                    {new Date(evaluation.managerEvaluationSubmittedAt).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-blue-900 whitespace-pre-wrap">
+                                {evaluation.managerEvaluationData.managerRemarks}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Meeting Notes */}
+                          {evaluation.meetingNotes && (
+                            <div className="bg-green-50 p-3 rounded-lg space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-green-600" />
+                                <span className="text-sm font-medium text-green-800">One-on-One Meeting Notes</span>
+                                {evaluation.meetingCompletedAt && (
+                                  <span className="text-xs text-green-600">
+                                    {new Date(evaluation.meetingCompletedAt).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-green-900 whitespace-pre-wrap">
+                                {evaluation.meetingNotes}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Completion Status */}
+                          {evaluation.finalizedAt && (
+                            <div className="bg-accent/10 p-3 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="h-4 w-4 text-accent" />
+                                <span className="text-sm font-medium text-accent">
+                                  Evaluation Completed on {new Date(evaluation.finalizedAt).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     
                     <div className="flex gap-2">
