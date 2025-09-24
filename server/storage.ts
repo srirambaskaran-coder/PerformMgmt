@@ -1861,16 +1861,14 @@ export class DatabaseStorage implements IStorage {
       };
     }
 
-    const appraisalCreatedAt = initiatedAppraisal[0].createdAt;
-
-    // Get evaluations for these employees that were created after this appraisal was initiated
+    // Get evaluations for these employees that are directly linked to this initiated appraisal
     const memberEvaluations = await db
       .select()
       .from(evaluations)
       .where(
         and(
           inArray(evaluations.employeeId, employeeIds),
-          sql`${evaluations.createdAt} >= ${appraisalCreatedAt}`
+          eq(evaluations.initiatedAppraisalId, appraisalId)
         )
       );
 
