@@ -222,13 +222,14 @@ export interface IStorage {
   deleteAppraisalGroup(id: string, createdById: string): Promise<void>;
   
   // Appraisal Group Member operations 
-  getAppraisalGroupMembers(groupId: string, createdById: string): Promise<AppraisalGroupMember[]>;
+  getAppraisalGroupMembers(groupId: string, createdById: string): Promise<(AppraisalGroupMember & { user: SafeUser | null })[]>;
   addAppraisalGroupMember(member: InsertAppraisalGroupMember, createdById: string): Promise<AppraisalGroupMember>;
   removeAppraisalGroupMember(groupId: string, userId: string, createdById: string): Promise<void>;
   getAppraisalGroupsWithMembers(createdById: string): Promise<(AppraisalGroup & { members: SafeUser[] })[]>;
   
   // Initiated Appraisal operations - HR Manager isolated
   createInitiatedAppraisal(appraisal: any, createdById: string): Promise<InitiatedAppraisal>;
+  updateInitiatedAppraisalStatus(id: string, status: string): Promise<void>;
   createInitiatedAppraisalDetailTiming(timing: InsertInitiatedAppraisalDetailTiming): Promise<InitiatedAppraisalDetailTiming>;
   getInitiatedAppraisalDetailTimings(appraisalId: string): Promise<InitiatedAppraisalDetailTiming[]>;
   getInitiatedAppraisals(createdById: string): Promise<InitiatedAppraisal[]>;
@@ -1705,19 +1706,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Appraisal Group Member operations
-  async getAppraisalGroupMembers(groupId: string, createdById: string): Promise<AppraisalGroupMember[]> {
+  async getAppraisalGroupMembers(groupId: string, createdById: string): Promise<(AppraisalGroupMember & { user: SafeUser | null })[]> {
     // Verify the group belongs to the HR Manager
     const group = await this.getAppraisalGroup(groupId, createdById);
     if (!group) {
       throw new Error('Appraisal Group not found or access denied');
     }
 
-    const results = await db.select()
+    const results = await db.select({
+        member: appraisalGroupMembers,
+        user: users,
+      })
       .from(appraisalGroupMembers)
+      .leftJoin(users, eq(appraisalGroupMembers.userId, users.id))
       .where(eq(appraisalGroupMembers.appraisalGroupId, groupId))
       .orderBy(desc(appraisalGroupMembers.addedAt));
     
-    return results;
+    return results.map(record => ({
+      ...record.member,
+      user: record.user ? sanitizeUser(record.user) : null
+    }));
   }
 
   async addAppraisalGroupMember(member: InsertAppraisalGroupMember, createdById: string): Promise<AppraisalGroupMember> {
@@ -1867,6 +1875,12 @@ export class DatabaseStorage implements IStorage {
     }
     
     return newAppraisal;
+  }
+
+  async updateInitiatedAppraisalStatus(id: string, status: string): Promise<void> {
+    await db.update(initiatedAppraisals)
+      .set({ status: status as any, updatedAt: new Date() })
+      .where(eq(initiatedAppraisals.id, id));
   }
 
   async createInitiatedAppraisalDetailTiming(timing: InsertInitiatedAppraisalDetailTiming): Promise<InitiatedAppraisalDetailTiming> {

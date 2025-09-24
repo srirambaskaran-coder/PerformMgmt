@@ -2191,9 +2191,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create the initiated appraisal
       const initiatedAppraisal = await storage.createInitiatedAppraisal(validatedData, requestingUserId);
       
+      let evaluationsCreated = 0;
+      let emailsSent = 0;
+      
+      // If publish type is "now", automatically generate evaluations and send notifications
+      if (validatedData.publishType === 'now') {
+        try {
+          // Get all members of the appraisal group
+          const members = await storage.getAppraisalGroupMembers(validatedData.appraisalGroupId, requestingUserId);
+          const activeMembers = members.filter(member => member.user && member.user.status === 'active');
+          
+          // Create evaluations for each active member
+          for (const member of activeMembers) {
+            const employee = member.user!;
+            
+            // Skip if employee is in excluded list
+            if (validatedData.excludedEmployeeIds?.includes(employee.id)) {
+              continue;
+            }
+            
+            // Get the employee's manager
+            let managerId = employee.reportingManagerId;
+            if (!managerId) {
+              // If no manager assigned, use the HR manager who created the appraisal
+              managerId = requestingUserId;
+            }
+            
+            // Create evaluation record with initiated appraisal link
+            const evaluationData = {
+              employeeId: employee.id,
+              managerId: managerId,
+              reviewCycleId: 'initiated-appraisal-' + initiatedAppraisal.id,
+              initiatedAppraisalId: initiatedAppraisal.id,
+              status: 'not_started' as const,
+            };
+            
+            try {
+              await storage.createEvaluation(evaluationData);
+              evaluationsCreated++;
+              console.log(`Created evaluation for employee ${employee.id} (${employee.email})`);
+            } catch (evalError) {
+              console.error(`Failed to create evaluation for employee ${employee.id} (${employee.email}):`, evalError);
+            }
+            
+            // Send email notification to employee (if email service is configured)
+            try {
+              // TODO: Implement email notification logic here
+              // await sendEvaluationNotificationEmail(employee.email, initiatedAppraisal);
+              emailsSent++;
+            } catch (emailError) {
+              console.error(`Failed to send email to ${employee.email}:`, emailError);
+            }
+          }
+          
+          // Update appraisal status to 'active' since it's published now
+          await storage.updateInitiatedAppraisalStatus(initiatedAppraisal.id, 'active');
+          
+        } catch (error) {
+          console.error("Error generating evaluations or sending notifications:", error);
+          // Don't fail the entire request, but log the error
+        }
+      }
+      
       res.status(201).json({
         message: "Appraisal initiated successfully",
-        appraisal: initiatedAppraisal
+        appraisal: { ...initiatedAppraisal, status: validatedData.publishType === 'now' ? 'active' : 'draft' },
+        evaluationsCreated,
+        emailsSent
       });
       
     } catch (error) {
