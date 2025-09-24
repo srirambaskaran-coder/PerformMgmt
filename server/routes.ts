@@ -756,6 +756,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export evaluation to PDF/DOCX - secure server-side data fetching
+  app.post('/api/evaluations/export', isAuthenticated, async (req: any, res) => {
+    try {
+      const { evaluationId, format } = req.body;
+      const userId = req.user.claims.sub;
+      const currentUser = await storage.getUser(userId);
+      
+      if (!currentUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const evaluation = await storage.getEvaluation(evaluationId);
+      if (!evaluation) {
+        return res.status(404).json({ message: "Evaluation not found" });
+      }
+
+      // Check access permissions
+      if (currentUser.role === 'employee' && evaluation.employeeId !== currentUser.id) {
+        return res.status(403).json({ message: "Access denied: Can only export your own evaluation" });
+      }
+
+      if (currentUser.role === 'manager' && evaluation.managerId !== currentUser.id && evaluation.employeeId !== currentUser.id) {
+        return res.status(403).json({ message: "Access denied: Can only export evaluations you manage or your own" });
+      }
+
+      // Get additional evaluation details from database (secure)
+      const employee = await storage.getUser(evaluation.employeeId);
+      const manager = await storage.getUser(evaluation.managerId);
+      const reviewCycle = evaluation.reviewCycleId ? await storage.getReviewCycle(evaluation.reviewCycleId) : null;
+      
+      // Extract responses and calculate average from stored data
+      const selfEvaluationData = evaluation.selfEvaluationData as any;
+      const responses = selfEvaluationData?.responses || selfEvaluationData || {};
+      const averageRating = selfEvaluationData?.averageRating || 0;
+      
+      // Get questionnaires associated with this evaluation from database
+      let questionnaires: any[] = [];
+      if (evaluation.initiatedAppraisalId) {
+        const initiatedAppraisal = await storage.getInitiatedAppraisal(evaluation.initiatedAppraisalId);
+        if (initiatedAppraisal && initiatedAppraisal.questionnaireTemplateIds) {
+          questionnaires = await Promise.all(
+            initiatedAppraisal.questionnaireTemplateIds.map(id => storage.getQuestionnaireTemplate(id))
+          );
+        }
+      }
+
+      if (format === 'pdf') {
+        // Generate PDF using PDFKit
+        const PDFDocument = require('pdfkit');
+        const doc = new PDFDocument();
+        
+        // Set response headers for PDF
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="evaluation-${evaluationId}.pdf"`);
+        
+        // Pipe the PDF to the response
+        doc.pipe(res);
+        
+        // Add content to PDF
+        doc.fontSize(20).text('Performance Evaluation Report', 50, 50);
+        doc.fontSize(12).moveDown();
+        
+        // Employee information
+        doc.text(`Employee: ${employee?.firstName} ${employee?.lastName}`, 50);
+        doc.text(`Manager: ${manager?.firstName} ${manager?.lastName}`, 50);
+        doc.text(`Review Cycle: ${reviewCycle?.name || 'N/A'}`, 50);
+        doc.text(`Average Rating: ${averageRating?.toFixed(1) || 'N/A'}/5.0`, 50);
+        doc.moveDown();
+        
+        // Questionnaires and responses
+        if (questionnaires && questionnaires.length > 0) {
+          questionnaires.forEach((questionnaire: any, qIndex: number) => {
+            doc.fontSize(16).text(`${questionnaire.name}`, 50);
+            doc.fontSize(10).text(`${questionnaire.description || ''}`, 50);
+            doc.moveDown();
+            
+            if (questionnaire.questions) {
+              questionnaire.questions.forEach((question: any, index: number) => {
+                const questionKey = `${questionnaire.id}_${question.id || index}`;
+                const response = responses?.find((r: any) => r.questionId === questionKey);
+                
+                doc.fontSize(12).text(`Q${index + 1}: ${question.text}`, 50);
+                
+                if (response) {
+                  if (response.rating) {
+                    doc.fontSize(10).text(`Rating: ${response.rating}/5`, 70);
+                  }
+                  if (response.response) {
+                    doc.fontSize(10).text(`Response: ${response.response}`, 70);
+                  }
+                  if (response.remarks) {
+                    doc.fontSize(10).text(`Remarks: ${response.remarks}`, 70);
+                  }
+                } else {
+                  doc.fontSize(10).text('No response provided', 70);
+                }
+                doc.moveDown();
+              });
+            }
+            doc.moveDown();
+          });
+        }
+        
+        // Finalize the PDF
+        doc.end();
+        
+      } else if (format === 'docx') {
+        // Generate DOCX using docxtemplater
+        const PizZip = require('pizzip');
+        const Docxtemplater = require('docxtemplater');
+        const fs = require('fs');
+        const path = require('path');
+        
+        // Create a simple DOCX template
+        const templateContent = `
+          Performance Evaluation Report
+          
+          Employee: ${employee?.firstName} ${employee?.lastName}
+          Manager: ${manager?.firstName} ${manager?.lastName}
+          Review Cycle: ${reviewCycle?.name || 'N/A'}
+          Average Rating: ${averageRating?.toFixed(1) || 'N/A'}/5.0
+          
+          ${questionnaires?.map((questionnaire: any, qIndex: number) => `
+            ${questionnaire.name}
+            ${questionnaire.description || ''}
+            
+            ${questionnaire.questions?.map((question: any, index: number) => {
+              const questionKey = `${questionnaire.id}_${question.id || index}`;
+              const response = responses?.find((r: any) => r.questionId === questionKey);
+              
+              return `Q${index + 1}: ${question.text}
+              ${response?.rating ? `Rating: ${response.rating}/5` : ''}
+              ${response?.response ? `Response: ${response.response}` : 'No response provided'}
+              ${response?.remarks ? `Remarks: ${response.remarks}` : ''}
+              `;
+            }).join('\n') || ''}
+          `).join('\n') || ''}
+        `;
+        
+        // Create a minimal DOCX structure
+        const zip = new PizZip();
+        
+        // Add basic DOCX structure
+        zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+            <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+            <Default Extension="xml" ContentType="application/xml"/>
+            <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+          </Types>`);
+          
+        zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+            <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+          </Relationships>`);
+          
+        zip.file('word/document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:body>
+              <w:p><w:r><w:t>${templateContent.replace(/\n/g, '</w:t></w:r></w:p><w:p><w:r><w:t>')}</w:t></w:r></w:p>
+            </w:body>
+          </w:document>`);
+        
+        const buffer = zip.generate({ type: 'nodebuffer' });
+        
+        // Set response headers for DOCX
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="evaluation-${evaluationId}.docx"`);
+        
+        res.send(buffer);
+        
+      } else {
+        return res.status(400).json({ message: "Invalid format. Supported formats: pdf, docx" });
+      }
+      
+    } catch (error) {
+      console.error("Error exporting evaluation:", error);
+      res.status(500).json({ message: "Failed to export evaluation" });
+    }
+  });
+
   // Send review invitations
   app.post('/api/send-review-invitations', isAuthenticated, requireRoles(['super_admin', 'admin', 'hr_manager']), async (req, res) => {
     try {

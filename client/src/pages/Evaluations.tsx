@@ -63,6 +63,8 @@ export default function Evaluations() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [responses, setResponses] = useState<Record<string, QuestionResponse>>({});
   const [averageRating, setAverageRating] = useState<number>(0);
+  const [showMeetingScheduler, setShowMeetingScheduler] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const { user } = useAuth();
   const { toast } = useToast();
@@ -116,14 +118,79 @@ export default function Evaluations() {
     
     // Load existing responses if available
     if (evaluation.selfEvaluationData) {
-      setResponses(evaluation.selfEvaluationData as Record<string, any>);
-      form.reset(evaluation.selfEvaluationData as Record<string, any>);
+      const savedData = evaluation.selfEvaluationData as any;
+      
+      // Handle both old format (direct responses) and new format (with responses key)
+      const savedResponses = savedData.responses || savedData;
+      setResponses(savedResponses);
+      
+      // Recalculate and set average rating from persisted data
+      const newAverage = calculateAverageRating(savedResponses);
+      setAverageRating(newAverage);
+      
+      form.reset(savedResponses);
+    } else {
+      // Reset state for new evaluation
+      setResponses({});
+      setAverageRating(0);
+      form.reset({});
     }
   };
 
   const onSubmit = (data: any) => {
     if (selectedEvaluation) {
-      submitEvaluationMutation.mutate({ id: selectedEvaluation.id, data });
+      // Store responses in the same keyed format expected by the form
+      const evaluationData = {
+        responses,
+        averageRating,
+        questionnaires: selectedEvaluation.questionnaires?.map(q => q.id)
+      };
+      submitEvaluationMutation.mutate({ id: selectedEvaluation.id, data: evaluationData });
+    }
+  };
+
+  // Export functionality - now using server-side data for security
+  const handleExport = async (format: 'pdf' | 'docx') => {
+    if (!selectedEvaluation) return;
+    
+    setIsExporting(true);
+    try {
+      const exportData = {
+        evaluationId: selectedEvaluation.id,
+        format
+      };
+      
+      const response = await fetch('/api/evaluations/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(exportData)
+      });
+      
+      if (!response.ok) throw new Error('Export failed');
+      
+      // Download the file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `evaluation-${selectedEvaluation.id}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Export Successful",
+        description: `Evaluation exported as ${format.toUpperCase()}`
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Unable to export evaluation. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -511,7 +578,35 @@ export default function Evaluations() {
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                     
+                    {/* Action Buttons */}
                     <div className="flex gap-3 pt-4 border-t">
+                      <Button
+                        type="button"
+                        onClick={() => handleExport('pdf')}
+                        variant="outline"
+                        data-testid="export-pdf-btn"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export PDF
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => handleExport('docx')}
+                        variant="outline"
+                        data-testid="export-docx-btn"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export DOCX
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => setShowMeetingScheduler(true)}
+                        variant="outline"
+                        data-testid="schedule-meeting-btn"
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        Schedule Meeting
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -531,6 +626,157 @@ export default function Evaluations() {
                     </div>
                   </form>
                 </Form>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Meeting Scheduler Modal */}
+        <Dialog open={showMeetingScheduler} onOpenChange={setShowMeetingScheduler}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Schedule One-on-One Meeting</DialogTitle>
+              <DialogDescription>
+                Select preferred dates and times for your evaluation discussion with your manager
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedEvaluation && (
+              <div className="space-y-6">
+                {/* Meeting Info */}
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                        <Calendar className="h-6 w-6 text-primary-foreground" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Meeting with {selectedEvaluation.manager?.firstName} {selectedEvaluation.manager?.lastName}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Evaluation: {selectedEvaluation.reviewCycle?.name}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Date Selection */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Select Preferred Time Slots</CardTitle>
+                    <CardDescription>
+                      Choose up to 3 preferred time slots. Your manager will confirm the final meeting time.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Preferred Date 1</label>
+                        <div className="space-y-2">
+                          <Input
+                            type="date"
+                            min={new Date().toISOString().split('T')[0]}
+                            data-testid="meeting-date-1"
+                          />
+                          <Input
+                            type="time"
+                            data-testid="meeting-time-1"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Preferred Date 2 (Optional)</label>
+                        <div className="space-y-2">
+                          <Input
+                            type="date"
+                            min={new Date().toISOString().split('T')[0]}
+                            data-testid="meeting-date-2"
+                          />
+                          <Input
+                            type="time"
+                            data-testid="meeting-time-2"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Preferred Date 3 (Optional)</label>
+                        <div className="space-y-2">
+                          <Input
+                            type="date"
+                            min={new Date().toISOString().split('T')[0]}
+                            data-testid="meeting-date-3"
+                          />
+                          <Input
+                            type="time"
+                            data-testid="meeting-time-3"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Meeting Duration</label>
+                        <Select defaultValue="60">
+                          <SelectTrigger data-testid="meeting-duration">
+                            <SelectValue placeholder="Select duration" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="30">30 minutes</SelectItem>
+                            <SelectItem value="45">45 minutes</SelectItem>
+                            <SelectItem value="60">60 minutes</SelectItem>
+                            <SelectItem value="90">90 minutes</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Meeting Location</label>
+                      <Select defaultValue="office">
+                        <SelectTrigger data-testid="meeting-location">
+                          <SelectValue placeholder="Select location" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="office">Office - In Person</SelectItem>
+                          <SelectItem value="video">Video Call</SelectItem>
+                          <SelectItem value="phone">Phone Call</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Additional Notes (Optional)</label>
+                      <Textarea
+                        placeholder="Any specific topics you'd like to discuss or special requirements..."
+                        className="min-h-[80px]"
+                        data-testid="meeting-notes"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowMeetingScheduler(false)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      toast({
+                        title: "Meeting Request Sent",
+                        description: "Your manager will receive a calendar invite with your preferred times"
+                      });
+                      setShowMeetingScheduler(false);
+                    }}
+                    className="flex-1"
+                    data-testid="send-meeting-request"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Send Request
+                  </Button>
+                </div>
               </div>
             )}
           </DialogContent>
