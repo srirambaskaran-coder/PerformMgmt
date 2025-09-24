@@ -1793,7 +1793,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = {
         appraisalGroupId: parsedData.appraisalGroupId,
         appraisalType: parsedData.appraisalType,
-        questionnaireTemplateId: parsedData.questionnaireTemplateId || null,
+        questionnaireTemplateIds: Array.isArray(parsedData.questionnaireTemplateIds) 
+          ? parsedData.questionnaireTemplateIds 
+          : [],
         documentUrl: documentUrl || parsedData.documentUrl || null,
         frequencyCalendarId: parsedData.frequencyCalendarId || null,
         calendarDetailTimings: parsedData.calendarDetailTimings || [], // Add calendar detail timings
@@ -1817,8 +1819,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Type-specific validation
-      if (validatedData.appraisalType === 'questionnaire_based' && !validatedData.questionnaireTemplateId) {
-        return res.status(400).json({ message: "Questionnaire template is required for questionnaire-based appraisals" });
+      if (validatedData.appraisalType === 'questionnaire_based' && (!validatedData.questionnaireTemplateIds || validatedData.questionnaireTemplateIds.length === 0)) {
+        return res.status(400).json({ message: "At least one questionnaire template is required for questionnaire-based appraisals" });
       }
 
       if ((validatedData.appraisalType === 'kpi_based' || validatedData.appraisalType === 'mbo_based') && !validatedData.documentUrl) {

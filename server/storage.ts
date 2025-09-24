@@ -1720,10 +1720,13 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Additional validations
-    if (appraisalData.questionnaireTemplateId) {
-      const template = await this.getQuestionnaireTemplate(appraisalData.questionnaireTemplateId, createdById);
-      if (!template) {
-        throw new Error('Questionnaire template not found or access denied');
+    if (appraisalData.questionnaireTemplateIds && appraisalData.questionnaireTemplateIds.length > 0) {
+      // Validate each questionnaire template exists and belongs to the user
+      for (const templateId of appraisalData.questionnaireTemplateIds) {
+        const template = await this.getQuestionnaireTemplate(templateId, createdById);
+        if (!template) {
+          throw new Error(`Questionnaire template ${templateId} not found or access denied`);
+        }
       }
     }
 
@@ -1731,7 +1734,7 @@ export class DatabaseStorage implements IStorage {
     const [newAppraisal] = await db.insert(initiatedAppraisals).values({
       appraisalGroupId: appraisalData.appraisalGroupId,
       appraisalType: appraisalData.appraisalType,
-      questionnaireTemplateId: appraisalData.questionnaireTemplateId,
+      questionnaireTemplateIds: appraisalData.questionnaireTemplateIds || [],
       documentUrl: appraisalData.documentUrl,
       frequencyCalendarId: appraisalData.frequencyCalendarId,
       daysToInitiate: appraisalData.daysToInitiate,
