@@ -95,6 +95,19 @@ export default function AppraisalGroups() {
     queryKey: ['/api/users'],
   });
 
+  // Fetch master data for proper dropdown labels
+  const { data: locations = [] } = useQuery<Array<{id: string, name: string}>>({
+    queryKey: ['/api/locations'],
+  });
+
+  const { data: levels = [] } = useQuery<Array<{id: string, name: string}>>({
+    queryKey: ['/api/levels'],
+  });
+
+  const { data: grades = [] } = useQuery<Array<{id: string, name: string}>>({
+    queryKey: ['/api/grades'],
+  });
+
   // Create group mutation
   const createGroupMutation = useMutation({
     mutationFn: async (data: InsertAppraisalGroup) => {
@@ -312,15 +325,35 @@ export default function AppraisalGroups() {
     const values = allUsers
       .map(user => {
         switch (field) {
+          case 'locationId':
+            return user.locationId ? {
+              value: user.locationId,
+              label: locations.find(loc => loc.id === user.locationId)?.name || user.locationId
+            } : null;
+          case 'levelId':
+            return user.levelId ? {
+              value: user.levelId,
+              label: levels.find(level => level.id === user.levelId)?.name || user.levelId
+            } : null;
+          case 'gradeId':
+            return user.gradeId ? {
+              value: user.gradeId,
+              label: grades.find(grade => grade.id === user.gradeId)?.name || user.gradeId
+            } : null;
           case 'reportingManagerId':
             return user.reportingManagerId ? {
               value: user.reportingManagerId,
               label: allUsers.find(manager => manager.id === user.reportingManagerId)?.firstName + ' ' + allUsers.find(manager => manager.id === user.reportingManagerId)?.lastName || user.reportingManagerId
             } : null;
           case 'role':
-            return user.role ? { value: user.role, label: user.role } : null;
+            return user.role ? { 
+              value: user.role, 
+              label: user.role.charAt(0).toUpperCase() + user.role.slice(1).replace('_', ' ')
+            } : null;
+          case 'department':
+            return user.department ? { value: user.department, label: user.department } : null;
           default:
-            return user[field] ? { value: user[field]!, label: user[field]! } : null;
+            return null;
         }
       })
       .filter((item): item is { value: string; label: string } => item !== null)
@@ -399,6 +432,19 @@ export default function AppraisalGroups() {
         : [...value, optionValue];
       onChange(newValue);
     };
+
+    const handleSelectAll = () => {
+      if (value.length === options.length) {
+        // If all are selected, deselect all
+        onChange([]);
+      } else {
+        // Select all options
+        onChange(options.map(option => option.value));
+      }
+    };
+
+    const allSelected = options.length > 0 && value.length === options.length;
+    const someSelected = value.length > 0 && value.length < options.length;
     
     const displayValue = value.length > 0 
       ? value.length === 1 
@@ -422,24 +468,44 @@ export default function AppraisalGroups() {
         </PopoverTrigger>
         <PopoverContent className="w-full p-0" align="start">
           <div className="max-h-60 overflow-auto p-1">
-            {options.map((option) => (
-              <div
-                key={option.value}
-                className="flex items-center space-x-2 rounded-md px-2 py-1 hover:bg-accent"
-              >
-                <Checkbox
-                  id={option.value}
-                  checked={value.includes(option.value)}
-                  onCheckedChange={() => handleToggle(option.value)}
-                />
-                <label
-                  htmlFor={option.value}
-                  className="flex-1 cursor-pointer text-sm"
-                >
-                  {option.label}
-                </label>
-              </div>
-            ))}
+            {options.length > 0 && (
+              <>
+                {/* Select All option */}
+                <div className="flex items-center space-x-2 rounded-md px-2 py-1 hover:bg-accent border-b border-border mb-1">
+                  <Checkbox
+                    id="select-all"
+                    checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                    onCheckedChange={handleSelectAll}
+                  />
+                  <label
+                    htmlFor="select-all"
+                    className="flex-1 cursor-pointer text-sm font-medium"
+                  >
+                    Select All
+                  </label>
+                </div>
+                
+                {/* Individual options */}
+                {options.map((option) => (
+                  <div
+                    key={option.value}
+                    className="flex items-center space-x-2 rounded-md px-2 py-1 hover:bg-accent"
+                  >
+                    <Checkbox
+                      id={option.value}
+                      checked={value.includes(option.value)}
+                      onCheckedChange={() => handleToggle(option.value)}
+                    />
+                    <label
+                      htmlFor={option.value}
+                      className="flex-1 cursor-pointer text-sm"
+                    >
+                      {option.label}
+                    </label>
+                  </div>
+                ))}
+              </>
+            )}
             {options.length === 0 && (
               <div className="px-2 py-3 text-center text-sm text-muted-foreground">
                 No options available
