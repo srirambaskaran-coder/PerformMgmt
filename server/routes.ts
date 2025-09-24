@@ -359,6 +359,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userData = insertUserSchema.parse(req.body);
       const creatorId = req.user.claims.sub;
+      
+      // Check for duplicates before creating user - more efficient individual checks
+      const creator = await storage.getUser(creatorId);
+      
+      // Check for duplicate email
+      if (userData.email) {
+        const existingEmailUser = await storage.getUserByEmail(userData.email);
+        if (existingEmailUser) {
+          // For admins, also check if it's in their company scope
+          if (creator && creator.role === 'admin' && creator.companyId && existingEmailUser.companyId !== creator.companyId) {
+            // Allow if it's a different company
+          } else {
+            return res.status(400).json({ 
+              message: "Email address already exists. Please use a different email address.",
+              field: "email"
+            });
+          }
+        }
+      }
+      
+      // Check for duplicate code  
+      if (userData.code && userData.code.trim() !== '') {
+        const existingCodeUser = await storage.getUserByCode(userData.code);
+        if (existingCodeUser) {
+          // For admins, also check if it's in their company scope
+          if (creator && creator.role === 'admin' && creator.companyId && existingCodeUser.companyId !== creator.companyId) {
+            // Allow if it's a different company
+          } else {
+            return res.status(400).json({ 
+              message: "Employee code already exists. Please use a different code.",
+              field: "code"
+            });
+          }
+        }
+      }
+      
+      // Check for duplicate mobile number
+      if (userData.mobileNumber && userData.mobileNumber.trim() !== '') {
+        const existingMobileUser = await storage.getUserByMobile(userData.mobileNumber);
+        if (existingMobileUser) {
+          // For admins, also check if it's in their company scope
+          if (creator && creator.role === 'admin' && creator.companyId && existingMobileUser.companyId !== creator.companyId) {
+            // Allow if it's a different company
+          } else {
+            return res.status(400).json({ 
+              message: "Mobile number already exists. Please use a different mobile number.",
+              field: "mobileNumber"
+            });
+          }
+        }
+      }
+      
       const user = await storage.createUser(userData, creatorId);
       res.status(201).json(user);
     } catch (error) {

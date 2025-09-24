@@ -370,6 +370,16 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByCode(code: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.code, code));
+    return user;
+  }
+
+  async getUserByMobile(mobileNumber: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.mobileNumber, mobileNumber));
+    return user;
+  }
+
   async createUser(user: InsertUser, creatorId?: string): Promise<SafeUser> {
     // Handle empty codes by converting to null to avoid unique constraint violations
     const userData: any = {
