@@ -936,9 +936,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         submissionsForReview.map(async (evaluation) => {
           // Get employee details
           const employee = await storage.getUser(evaluation.employeeId);
-          // Get questionnaire template details if available
+          // Get questionnaire template details from selfEvaluationData
           let questionnaireTemplate = null;
-          if (evaluation.reviewCycleId && !evaluation.reviewCycleId.startsWith('initiated-appraisal-')) {
+          
+          // First try to get from selfEvaluationData.questionnaires array
+          if (evaluation.selfEvaluationData?.questionnaires && Array.isArray(evaluation.selfEvaluationData.questionnaires)) {
+            const questionnaireIds = evaluation.selfEvaluationData.questionnaires;
+            if (questionnaireIds.length > 0) {
+              // Get all questionnaire templates referenced in the evaluation
+              const templates = await Promise.all(
+                questionnaireIds.map(async (templateId: string) => {
+                  return await storage.getQuestionnaireTemplate(templateId);
+                })
+              );
+              // Filter out null results and return array of templates
+              questionnaireTemplate = templates.filter(template => template !== null);
+            }
+          }
+          
+          // Fallback to reviewCycle approach if no questionnaires found
+          if (!questionnaireTemplate && evaluation.reviewCycleId && !evaluation.reviewCycleId.startsWith('initiated-appraisal-')) {
             const reviewCycle = await storage.getReviewCycle(evaluation.reviewCycleId);
             if (reviewCycle?.questionnaireTemplateId) {
               questionnaireTemplate = await storage.getQuestionnaireTemplate(reviewCycle.questionnaireTemplateId);

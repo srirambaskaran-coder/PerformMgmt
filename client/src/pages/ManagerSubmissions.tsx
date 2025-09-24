@@ -61,6 +61,20 @@ interface Evaluation {
   updatedAt: string;
 }
 
+interface Question {
+  id: string;
+  text: string;
+  type: 'text' | 'textarea' | 'rating';
+  required: boolean;
+}
+
+interface EmployeeResponse {
+  questionId: string;
+  response: string;
+  remarks?: string;
+  rating?: number;
+}
+
 interface ManagerReviewData {
   managerEvaluationData: Record<string, any>;
   finalRating: number;
@@ -82,7 +96,10 @@ export default function ManagerSubmissions() {
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [isMeetingDialogOpen, setIsMeetingDialogOpen] = useState(false);
   const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
-  const [reviewData, setReviewData] = useState<ManagerReviewData>({ managerEvaluationData: {}, finalRating: 5 });
+  const [reviewData, setReviewData] = useState<ManagerReviewData>({ 
+    managerEvaluationData: { questionRemarks: {}, overallRemarks: '' }, 
+    finalRating: 5 
+  });
   const [meetingData, setMeetingData] = useState<MeetingSchedule>({
     meetingDate: addDays(new Date(), 7),
     meetingTitle: 'Performance Review One-on-One',
@@ -224,6 +241,155 @@ export default function ManagerSubmissions() {
 
   const canCompleteEvaluation = (evaluation: Evaluation) => {
     return evaluation.managerEvaluationSubmittedAt && !evaluation.finalizedAt;
+  };
+
+  // Parse questionnaire templates and employee responses for manager review
+  const renderQuestionnaireReview = (evaluation: Evaluation) => {
+    const selfEvalData = evaluation.selfEvaluationData;
+    const responses = selfEvalData?.responses || {};
+    const questionnaireTemplates = Array.isArray(evaluation.questionnaireTemplate) 
+      ? evaluation.questionnaireTemplate 
+      : [evaluation.questionnaireTemplate].filter(Boolean);
+
+    // Collect all questions from all questionnaires
+    const allQuestions: { question: Question; questionnaireId: string; questionnaireName: string }[] = [];
+    
+    questionnaireTemplates.forEach((template: any) => {
+      if (template && template.questions) {
+        const questions = Array.isArray(template.questions) ? template.questions : JSON.parse(template.questions);
+        questions.forEach((question: Question) => {
+          allQuestions.push({
+            question,
+            questionnaireId: template.id,
+            questionnaireName: template.name
+          });
+        });
+      }
+    });
+
+    return (
+      <div className="space-y-6">
+        {allQuestions.map(({ question, questionnaireId, questionnaireName }) => {
+          const responseKey = `${questionnaireId}_${question.id}`;
+          const employeeResponse: EmployeeResponse = responses[responseKey];
+          
+          if (!employeeResponse) return null;
+
+          return (
+            <div key={responseKey} className="border rounded-lg p-6 space-y-4">
+              {/* Question */}
+              <div className="space-y-2">
+                <h4 className="font-semibold text-lg text-gray-900">{question.text}</h4>
+                <p className="text-sm text-gray-500">From: {questionnaireName}</p>
+              </div>
+
+              {/* Employee Response */}
+              <div className="bg-blue-50 rounded-lg p-4 space-y-3">
+                <h5 className="font-medium text-blue-900">Employee's Response</h5>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">Answer:</p>
+                    <p className="text-gray-700 bg-white p-3 rounded border">{employeeResponse.response}</p>
+                  </div>
+                  
+                  {question.type === 'rating' && employeeResponse.rating && (
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">Rating:</p>
+                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={cn(
+                                "h-4 w-4",
+                                star <= employeeResponse.rating! ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                              )}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-sm font-medium">{employeeResponse.rating}/5</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {employeeResponse.remarks && (
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">Employee's Remarks:</p>
+                      <p className="text-gray-700 bg-white p-3 rounded border">{employeeResponse.remarks}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Manager Remarks Input */}
+              <div className="bg-green-50 rounded-lg p-4 space-y-3">
+                <h5 className="font-medium text-green-900">Your Manager Remarks</h5>
+                <div>
+                  <Label htmlFor={`manager-remarks-${responseKey}`} className="text-sm font-medium text-green-800">
+                    Add your feedback and comments for this response:
+                  </Label>
+                  <Textarea
+                    id={`manager-remarks-${responseKey}`}
+                    placeholder="Enter your manager remarks for this question..."
+                    rows={3}
+                    className="mt-2 border-green-200 focus:border-green-400"
+                    value={reviewData.managerEvaluationData.questionRemarks?.[responseKey] || ''}
+                    onChange={(e) => setReviewData(prev => ({
+                      ...prev,
+                      managerEvaluationData: {
+                        ...prev.managerEvaluationData,
+                        questionRemarks: {
+                          ...prev.managerEvaluationData.questionRemarks,
+                          [responseKey]: e.target.value
+                        }
+                      }
+                    }))}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Overall Manager Review */}
+        <div className="border-t pt-6 space-y-4">
+          <h4 className="font-semibold text-lg">Overall Evaluation</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="overall-remarks">Overall Manager Remarks</Label>
+              <Textarea
+                id="overall-remarks"
+                placeholder="Enter your overall review and feedback..."
+                rows={4}
+                value={reviewData.managerEvaluationData.overallRemarks || ''}
+                onChange={(e) => setReviewData(prev => ({
+                  ...prev,
+                  managerEvaluationData: { ...prev.managerEvaluationData, overallRemarks: e.target.value }
+                }))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="final-rating">Final Rating (1-5)</Label>
+              <Select
+                value={String(reviewData.finalRating)}
+                onValueChange={(value) => setReviewData(prev => ({ ...prev, finalRating: parseInt(value) }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select rating" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 - Below Expectations</SelectItem>
+                  <SelectItem value="2">2 - Partially Meets Expectations</SelectItem>
+                  <SelectItem value="3">3 - Meets Expectations</SelectItem>
+                  <SelectItem value="4">4 - Exceeds Expectations</SelectItem>
+                  <SelectItem value="5">5 - Outstanding</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -392,6 +558,10 @@ export default function ManagerSubmissions() {
                             <Button
                               onClick={() => {
                                 setSelectedEvaluation(evaluation);
+                                setReviewData({ 
+                                  managerEvaluationData: { questionRemarks: {}, overallRemarks: '' }, 
+                                  finalRating: 5 
+                                });
                                 setIsReviewDialogOpen(true);
                               }}
                               data-testid={`review-button-${evaluation.id}`}
@@ -466,62 +636,13 @@ export default function ManagerSubmissions() {
 
             {selectedEvaluation && (
               <div className="space-y-6">
-                {/* Employee's Self Evaluation */}
-                {selectedEvaluation.selfEvaluationData && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Employee's Self Evaluation</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                      {Object.entries(selectedEvaluation.selfEvaluationData).map(([key, value]) => (
-                        <div key={key}>
-                          <p className="font-medium text-sm text-gray-700 capitalize mb-1">
-                            {key.replace(/([A-Z])/g, ' $1').trim()}
-                          </p>
-                          <p className="text-sm bg-white p-2 rounded border">
-                            {typeof value === 'string' ? value : JSON.stringify(value)}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
+                {/* Employee's Self Evaluation with Manager Review */}
+                {selectedEvaluation.selfEvaluationData && selectedEvaluation.questionnaireTemplate && (
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-semibold">Employee's Self Evaluation & Your Review</h3>
+                    {renderQuestionnaireReview(selectedEvaluation)}
                   </div>
                 )}
-
-                {/* Manager Review Form */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Your Review</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="manager-remarks">Manager Remarks</Label>
-                      <Textarea
-                        id="manager-remarks"
-                        placeholder="Enter your detailed review and feedback..."
-                        rows={6}
-                        value={reviewData.managerEvaluationData.remarks || ''}
-                        onChange={(e) => setReviewData(prev => ({
-                          ...prev,
-                          managerEvaluationData: { ...prev.managerEvaluationData, remarks: e.target.value }
-                        }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="final-rating">Final Rating (1-5)</Label>
-                      <Select
-                        value={String(reviewData.finalRating)}
-                        onValueChange={(value) => setReviewData(prev => ({ ...prev, finalRating: parseInt(value) }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select rating" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">1 - Below Expectations</SelectItem>
-                          <SelectItem value="2">2 - Partially Meets Expectations</SelectItem>
-                          <SelectItem value="3">3 - Meets Expectations</SelectItem>
-                          <SelectItem value="4">4 - Exceeds Expectations</SelectItem>
-                          <SelectItem value="5">5 - Outstanding</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
 
