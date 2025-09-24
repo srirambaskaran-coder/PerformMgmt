@@ -236,13 +236,21 @@ export default function Evaluations() {
 
   // Get all questions from questionnaires
   const getAllQuestions = (questionnaires: QuestionnaireTemplate[]): Question[] => {
-    return questionnaires.flatMap((questionnaire, qIndex) => 
-      questionnaire.questions.map((question, index) => ({
+    if (!questionnaires || !Array.isArray(questionnaires)) {
+      return [];
+    }
+    
+    return questionnaires.flatMap((questionnaire, qIndex) => {
+      if (!questionnaire || !questionnaire.questions || !Array.isArray(questionnaire.questions)) {
+        return [];
+      }
+      
+      return questionnaire.questions.map((question, index) => ({
         ...question,
         id: `${questionnaire.id}_${question.id || index}`,
         questionnaireName: questionnaire.name
-      }))
-    );
+      }));
+    });
   };
 
   const renderQuestion = (question: Question) => {
