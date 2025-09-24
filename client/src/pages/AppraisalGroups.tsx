@@ -46,6 +46,7 @@ interface EmployeeFilters {
   level: string[];
   grade: string[];
   reportingManager: string[];
+  role: string[];
 }
 
 export default function AppraisalGroups() {
@@ -58,6 +59,7 @@ export default function AppraisalGroups() {
     level: [],
     grade: [],
     reportingManager: [],
+    role: [],
   });
   // Applied filters that actually control the results
   const [appliedFilters, setAppliedFilters] = useState<EmployeeFilters>({
@@ -67,6 +69,7 @@ export default function AppraisalGroups() {
     level: [],
     grade: [],
     reportingManager: [],
+    role: [],
   });
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<AppraisalGroupWithMembers | null>(null);
@@ -182,6 +185,7 @@ export default function AppraisalGroups() {
         level: [],
         grade: [],
         reportingManager: [],
+        role: [],
       });
       setAppliedFilters({
         nameOrCode: "",
@@ -190,6 +194,7 @@ export default function AppraisalGroups() {
         level: [],
         grade: [],
         reportingManager: [],
+        role: [],
       });
       toast({
         title: "Success",
@@ -303,7 +308,7 @@ export default function AppraisalGroups() {
   };
 
   // Extract unique filter options from all users
-  const getUniqueOptions = (field: 'locationId' | 'department' | 'levelId' | 'gradeId' | 'reportingManagerId') => {
+  const getUniqueOptions = (field: 'locationId' | 'department' | 'levelId' | 'gradeId' | 'reportingManagerId' | 'role') => {
     const values = allUsers
       .map(user => {
         switch (field) {
@@ -312,6 +317,8 @@ export default function AppraisalGroups() {
               value: user.reportingManagerId,
               label: allUsers.find(manager => manager.id === user.reportingManagerId)?.firstName + ' ' + allUsers.find(manager => manager.id === user.reportingManagerId)?.lastName || user.reportingManagerId
             } : null;
+          case 'role':
+            return user.role ? { value: user.role, label: user.role } : null;
           default:
             return user[field] ? { value: user[field]!, label: user[field]! } : null;
         }
@@ -360,6 +367,11 @@ export default function AppraisalGroups() {
     // Reporting Manager filter
     if (appliedFilters.reportingManager.length > 0) {
       if (!appliedFilters.reportingManager.includes(user.reportingManagerId ?? '')) return false;
+    }
+
+    // Role filter
+    if (appliedFilters.role.length > 0) {
+      if (!appliedFilters.role.includes(user.role ?? '')) return false;
     }
 
     return true;
@@ -752,6 +764,17 @@ export default function AppraisalGroups() {
                       testId="dialog-filter-reporting-manager"
                     />
                   </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Role</label>
+                    <MultiSelect
+                      options={getUniqueOptions('role')}
+                      value={draftFilters.role}
+                      onChange={(value) => setDraftFilters({ ...draftFilters, role: value })}
+                      placeholder="Select roles..."
+                      testId="dialog-filter-role"
+                    />
+                  </div>
                 </div>
                 
                 {/* Search Button and Clear Filters */}
@@ -778,6 +801,7 @@ export default function AppraisalGroups() {
                         level: [],
                         grade: [],
                         reportingManager: [],
+                        role: [],
                       };
                       setDraftFilters(emptyFilters);
                       setAppliedFilters(emptyFilters);
@@ -851,7 +875,8 @@ export default function AppraisalGroups() {
                     appliedFilters.department.length > 0 ||
                     appliedFilters.level.length > 0 ||
                     appliedFilters.grade.length > 0 ||
-                    appliedFilters.reportingManager.length > 0)
+                    appliedFilters.reportingManager.length > 0 ||
+                    appliedFilters.role.length > 0)
                     ? "No employees found matching your filter criteria."
                     : "All employees are already in this group."
                   }
@@ -877,6 +902,7 @@ export default function AppraisalGroups() {
                       level: [],
                       grade: [],
                       reportingManager: [],
+                      role: [],
                     });
                     setAppliedFilters({
                       nameOrCode: "",
@@ -885,6 +911,7 @@ export default function AppraisalGroups() {
                       level: [],
                       grade: [],
                       reportingManager: [],
+                      role: [],
                     });
                   }}
                   data-testid="cancel-employee-selection"
