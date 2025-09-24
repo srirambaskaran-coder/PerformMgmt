@@ -239,3 +239,7 @@ export async function sendCalendarInvite(employeeEmail: string, managerEmail: st
     html,
   });
 }
+
+export function generateRegistrationNotificationEmail(name: string, companyName: string, designation: string, email: string, mobile: string): { subject: string; html: string } {
+  return emailService.generateRegistrationNotificationEmail(name, companyName, designation, email, mobile);
+}

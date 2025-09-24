@@ -28,8 +28,7 @@ import {
   sendReminderRequestSchema,
   type SafeUser,
 } from "@shared/schema";
-import { sendEmail, sendReviewInvitation, sendReviewReminder, sendReviewCompletion } from "./emailService";
-import emailService from "./emailService";
+import { sendEmail, sendReviewInvitation, sendReviewReminder, sendReviewCompletion, generateRegistrationNotificationEmail } from "./emailService";
 import { ObjectStorageService } from "./objectStorage";
 import { seedTestUsers, testUsers } from "./seedUsers";
 
@@ -47,7 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Send notification email to kiran.shetty@refur.app
       try {
-        const { subject, html } = emailService.generateRegistrationNotificationEmail(
+        const { subject, html } = generateRegistrationNotificationEmail(
           registrationData.name,
           registrationData.companyName,
           registrationData.designation,

@@ -36,7 +36,10 @@ function Router() {
   return (
     <Switch>
       {isLoading || !isAuthenticated ? (
-        <Route path="/" component={import.meta.env.DEV ? DevLogin : Landing} />
+        <>
+          <Route path="/" component={Landing} />
+          <Route path="/dev" component={DevLogin} />
+        </>
       ) : (
         <>
           <Route path="/" component={Dashboard} />
