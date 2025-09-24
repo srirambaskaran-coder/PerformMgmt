@@ -172,7 +172,19 @@ export const requireRoles = (allowedRoles: string[]): RequestHandler => {
         return res.status(403).json({ message: "Access forbidden - no role assigned" });
       }
 
-      if (!allowedRoles.includes(userProfile.role)) {
+      // Use active role from session if available, otherwise fall back to database role
+      const activeRole = user.activeRole || userProfile.role;
+      
+      // Check if the user has the required role in their available roles
+      const availableRoles = userProfile.roles || [userProfile.role];
+      
+      // Verify the active role is valid for this user
+      if (!availableRoles.includes(activeRole)) {
+        return res.status(403).json({ message: "Access forbidden - invalid active role" });
+      }
+
+      // Check if the active role is in the allowed roles for this endpoint
+      if (!allowedRoles.includes(activeRole)) {
         return res.status(403).json({ message: "Access forbidden - insufficient permissions" });
       }
 

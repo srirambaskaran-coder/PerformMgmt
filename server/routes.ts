@@ -165,10 +165,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Sanitize user object to exclude passwordHash
       const { passwordHash, ...safeUser } = user;
-      res.json(safeUser);
+      
+      // Include active role from session if available, otherwise use database role
+      const activeRole = req.user.activeRole || user.role;
+      res.json({ ...safeUser, activeRole, availableRoles: user.roles || [user.role] });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Role switching endpoint
+  app.post('/api/auth/switch-role', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { role } = req.body;
+
+      if (!role) {
+        return res.status(400).json({ message: "Role is required" });
+      }
+
+      // Get current user data
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if user has the requested role
+      const availableRoles = user.roles || [user.role];
+      if (!availableRoles.includes(role)) {
+        return res.status(403).json({ 
+          message: "You don't have permission to switch to this role",
+          availableRoles 
+        });
+      }
+
+      // Update session with new active role
+      req.user.activeRole = role;
+      
+      // Save session
+      req.session.save((err: any) => {
+        if (err) {
+          console.error('Error saving session after role switch:', err);
+          return res.status(500).json({ message: 'Failed to switch role' });
+        }
+
+        // Return updated user data
+        const { passwordHash, ...safeUser } = user;
+        res.json({ 
+          message: 'Role switched successfully',
+          user: { ...safeUser, activeRole: role, availableRoles }
+        });
+      });
+    } catch (error) {
+      console.error("Error switching role:", error);
+      res.status(500).json({ message: "Failed to switch role" });
     }
   });
 
