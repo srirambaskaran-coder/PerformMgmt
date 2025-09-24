@@ -1954,6 +1954,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
+  // Generate evaluations for initiated appraisal
+  app.post('/api/initiated-appraisals/:appraisalId/generate-evaluations', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const { appraisalId } = req.params;
+      const requestingUserId = req.user.claims.sub;
+      
+      // Verify initiated appraisal exists and belongs to the HR manager
+      const userAppraisals = await storage.getInitiatedAppraisals(requestingUserId);
+      const targetAppraisal = userAppraisals.find(appraisal => appraisal.id === appraisalId);
+      
+      if (!targetAppraisal) {
+        return res.status(403).json({ message: "Initiated appraisal not found or access denied" });
+      }
+
+      // Get all members of the appraisal group
+      const members = await storage.getAppraisalGroupMembers(targetAppraisal.appraisalGroupId);
+      const activeMembers = members.filter(member => member.user && member.user.status === 'active');
+      
+      if (activeMembers.length === 0) {
+        return res.status(400).json({ message: "No active members found in the appraisal group" });
+      }
+
+      const createdEvaluations = [];
+      
+      for (const member of activeMembers) {
+        const employee = member.user!;
+        
+        // Check if evaluation already exists for this employee and initiated appraisal
+        const existingEvaluations = await storage.getEvaluationsByInitiatedAppraisal(appraisalId);
+        const existingEvaluation = existingEvaluations.find(evaluation => evaluation.employeeId === employee.id);
+        
+        if (existingEvaluation) {
+          console.log(`Evaluation already exists for employee ${employee.id} in initiated appraisal ${appraisalId}, skipping`);
+          continue;
+        }
+        
+        // Get the employee's manager
+        let managerId = employee.reportingManagerId;
+        if (!managerId) {
+          // If no manager assigned, use the HR manager who created the appraisal
+          managerId = requestingUserId;
+          console.warn(`No manager found for employee ${employee.id}, using HR manager as fallback`);
+        }
+        
+        // Create evaluation record with initiated appraisal link
+        const evaluationData = {
+          employeeId: employee.id,
+          managerId: managerId,
+          reviewCycleId: 'initiated-appraisal-' + appraisalId, // Create a synthetic review cycle ID
+          initiatedAppraisalId: appraisalId, // Link to the initiated appraisal
+          status: 'not_started' as const,
+        };
+        
+        const evaluation = await storage.createEvaluation(evaluationData);
+        createdEvaluations.push(evaluation);
+      }
+      
+      res.status(201).json({
+        message: `Created ${createdEvaluations.length} evaluations for initiated appraisal`,
+        evaluations: createdEvaluations,
+        totalMembers: activeMembers.length,
+        skipped: activeMembers.length - createdEvaluations.length
+      });
+    } catch (error) {
+      console.error("Error generating evaluations for initiated appraisal:", error);
+      res.status(500).json({ message: "Failed to generate evaluations" });
+    }
+  });
+
   // Send Reminder Email endpoint
   app.post('/api/send-reminder', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
     try {

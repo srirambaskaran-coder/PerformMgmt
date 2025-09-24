@@ -130,6 +130,7 @@ export interface IStorage {
   updateEvaluation(id: string, evaluation: Partial<InsertEvaluation>): Promise<Evaluation>;
   deleteEvaluation(id: string): Promise<void>;
   getEvaluationByEmployeeAndCycle(employeeId: string, reviewCycleId: string): Promise<Evaluation | undefined>;
+  getEvaluationsByInitiatedAppraisal(initiatedAppraisalId: string): Promise<Evaluation[]>;
   
   // Email operations
   getEmailTemplates(): Promise<EmailTemplate[]>;
@@ -769,6 +770,15 @@ export class DatabaseStorage implements IStorage {
       .from(evaluations)
       .where(and(eq(evaluations.employeeId, employeeId), eq(evaluations.reviewCycleId, reviewCycleId)));
     return evaluation;
+  }
+
+  async getEvaluationsByInitiatedAppraisal(initiatedAppraisalId: string): Promise<Evaluation[]> {
+    const results = await db
+      .select()
+      .from(evaluations)
+      .where(eq(evaluations.initiatedAppraisalId, initiatedAppraisalId))
+      .orderBy(desc(evaluations.createdAt));
+    return results;
   }
 
   // Email operations
