@@ -158,10 +158,11 @@ class EmailService {
     return { subject, html };
   }
 
-  generateCalendarInvite(employeeName: string, managerName: string, meetingDate: Date, duration?: number, location?: string, notes?: string): string {
+  generateCalendarInvite(employeeName: string, managerName: string, meetingDate: Date, duration?: number, location?: string, notes?: string, employeeEmail?: string, managerEmail?: string): string {
     const durationMinutes = duration || 60;
     const startDate = meetingDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
     const endDate = new Date(meetingDate.getTime() + durationMinutes * 60 * 1000).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const uid = `${Date.now()}-${Math.random().toString(36).substring(2)}@performance-review.com`;
     
     let description = `One-on-one performance review meeting between ${employeeName} and ${managerName}`;
     if (notes) {
@@ -170,18 +171,28 @@ class EmailService {
     
     const locationLine = location ? `\nLOCATION:${location.charAt(0).toUpperCase() + location.slice(1)}` : '';
     
+    // Use actual email addresses if provided, otherwise use placeholders
+    const empEmail = employeeEmail || 'employee@company.com';
+    const mgEmail = managerEmail || 'manager@company.com';
+    
+    // RFC5546-compliant ICS with METHOD:REQUEST for proper RSVP functionality
     return `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Performance Review System//EN
+METHOD:REQUEST
 BEGIN:VEVENT
-UID:${Date.now()}@performance-review.com
+UID:${uid}
 DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z
 DTSTART:${startDate}
 DTEND:${endDate}
-SUMMARY:Performance Review Meeting - ${employeeName} (${durationMinutes}min)
-DESCRIPTION:${description}${locationLine}
-ATTENDEE;CN=${employeeName}:mailto:employee@company.com
-ATTENDEE;CN=${managerName}:mailto:manager@company.com
+SUMMARY:Performance Review Meeting - ${employeeName}
+DESCRIPTION:${description}
+ORGANIZER;CN=${employeeName}:mailto:${empEmail}
+ATTENDEE;CN=${employeeName};ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;RSVP=FALSE:mailto:${empEmail}
+ATTENDEE;CN=${managerName};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${mgEmail}
+SEQUENCE:0
+STATUS:CONFIRMED${locationLine}
+TRANSP:OPAQUE
 END:VEVENT
 END:VCALENDAR`;
   }
@@ -235,6 +246,13 @@ export async function sendCalendarInvite(employeeEmail: string, managerEmail: st
     location,
     notes
   );
+
+  // If Google Calendar or Outlook API succeeded, they will send their own invitations
+  // with native RSVP functionality - no need to send our own email
+  if (calendarResult.success && calendarResult.provider !== 'ics') {
+    console.log(`Calendar invitation sent via ${calendarResult.provider} API with event ID: ${calendarResult.eventId}`);
+    return; // Let Google/Outlook handle the invitation
+  }
 
   // Format dates like Gmail calendar invitations
   const startTime = meetingDate.toLocaleTimeString('en-US', { 
@@ -446,8 +464,8 @@ export async function sendCalendarInvite(employeeEmail: string, managerEmail: st
     </div>
   `;
 
-  // Generate ICS content as fallback or for email attachment
-  const icsContent = emailService.generateCalendarInvite(employeeName, managerName, meetingDate, duration, location, notes);
+  // Generate RFC5546-compliant ICS content with proper RSVP functionality for fallback
+  const icsContent = emailService.generateCalendarInvite(employeeName, managerName, meetingDate, duration, location, notes, employeeEmail, managerEmail);
 
   const emailOptions: any = {
     subject,
