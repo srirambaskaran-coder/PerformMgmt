@@ -256,11 +256,37 @@ export class DatabaseStorage implements IStorage {
     // UpsertUser only contains basic auth fields from Replit Auth
     // For NEW users: Set default role and roles to 'employee'
     // For EXISTING users: Only update auth fields, NEVER update role/roles to preserve existing permissions
+    
+    console.log('🔍 UPSERT USER DEBUG - Input userData:', {
+      id: userData.id,
+      email: userData.email,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      role: (userData as any).role,
+      roles: (userData as any).roles
+    });
+    
+    // Check if user exists first
+    const existingUser = await this.getUser(userData.id);
+    console.log('🔍 EXISTING USER:', existingUser ? {
+      id: existingUser.id,
+      email: existingUser.email,
+      role: existingUser.role,
+      roles: existingUser.roles
+    } : 'NOT FOUND');
+    
     const normalizedData: any = { 
       ...userData,
       role: (userData as any).role || 'employee' as any,
       roles: (userData as any).roles || [(userData as any).role || 'employee']
     };
+    
+    console.log('🔍 NORMALIZED DATA for INSERT:', {
+      id: normalizedData.id,
+      email: normalizedData.email,
+      role: normalizedData.role,
+      roles: normalizedData.roles
+    });
     
     // Build update data - ONLY update profile fields from auth, NEVER role/roles for existing users
     const updateData: any = {
@@ -272,6 +298,8 @@ export class DatabaseStorage implements IStorage {
     if (userData.firstName) updateData.firstName = userData.firstName;
     if (userData.lastName) updateData.lastName = userData.lastName;
     if (userData.profileImageUrl) updateData.profileImageUrl = userData.profileImageUrl;
+    
+    console.log('🔍 UPDATE DATA for existing user:', updateData);
     
     // CRITICAL: Never update role/roles for existing users from Replit auth
     // This preserves manually assigned roles like super_admin
@@ -285,6 +313,14 @@ export class DatabaseStorage implements IStorage {
         set: updateData,
       })
       .returning();
+      
+    console.log('🔍 FINAL USER RESULT:', {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      roles: user.roles
+    });
+    
     return user;
   }
 
