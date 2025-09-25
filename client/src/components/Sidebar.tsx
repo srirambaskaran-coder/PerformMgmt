@@ -46,7 +46,7 @@ const navItems: NavItem[] = [
   { href: "/appraisal-groups", label: "Appraisal Groups", icon: Users, roles: ["hr_manager"] },
   { href: "/initiate-appraisal", label: "Initiate Appraisal", icon: Play, roles: ["hr_manager"] },
   { href: "/review-appraisal", label: "Review Progress", icon: Search, roles: ["hr_manager"] },
-  { href: "/questionnaires", label: "Questionnaires", icon: FileText, roles: ["super_admin", "admin", "hr_manager", "employee"] },
+  { href: "/questionnaires", label: "Questionnaires", icon: FileText, roles: ["super_admin", "admin", "hr_manager"] },
   { href: "/evaluations", label: "My Evaluations", icon: ClipboardList, roles: ["employee"] },
   { href: "/manager-submissions", label: "Submissions", icon: ClipboardList, roles: ["manager"] },
   { href: "/meetings", label: "Meetings", icon: Calendar },
