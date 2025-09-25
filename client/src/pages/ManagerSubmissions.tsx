@@ -765,14 +765,13 @@ export default function ManagerSubmissions() {
               <div>
                 <Label htmlFor="updated-rating">Update Final Rating (Optional)</Label>
                 <Select
-                  value={notesData.finalRating ? String(notesData.finalRating) : ''}
+                  value={notesData.finalRating ? String(notesData.finalRating) : undefined}
                   onValueChange={(value) => setNotesData(prev => ({ ...prev, finalRating: value ? parseInt(value) : undefined }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Keep current rating or update" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Keep current rating</SelectItem>
                     <SelectItem value="1">1 - Below Expectations</SelectItem>
                     <SelectItem value="2">2 - Partially Meets Expectations</SelectItem>
                     <SelectItem value="3">3 - Meets Expectations</SelectItem>
