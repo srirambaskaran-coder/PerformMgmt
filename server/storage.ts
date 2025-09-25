@@ -254,22 +254,35 @@ export class DatabaseStorage implements IStorage {
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     // UpsertUser only contains basic auth fields from Replit Auth
-    // Set default role and roles for new users from Replit Auth, but preserve existing roles if provided
+    // For NEW users: Set default role and roles to 'employee'
+    // For EXISTING users: Only update auth fields, NEVER update role/roles to preserve existing permissions
     const normalizedData: any = { 
       ...userData,
       role: (userData as any).role || 'employee' as any,
       roles: (userData as any).roles || [(userData as any).role || 'employee']
     };
     
+    // Build update data - ONLY update profile fields from auth, NEVER role/roles for existing users
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+    
+    // Only update these safe profile fields from Replit auth
+    if (userData.email) updateData.email = userData.email;
+    if (userData.firstName) updateData.firstName = userData.firstName;
+    if (userData.lastName) updateData.lastName = userData.lastName;
+    if (userData.profileImageUrl) updateData.profileImageUrl = userData.profileImageUrl;
+    
+    // CRITICAL: Never update role/roles for existing users from Replit auth
+    // This preserves manually assigned roles like super_admin
+    // Role/roles are only set during INSERT for new users, never during UPDATE
+    
     const [user] = await db
       .insert(users)
       .values(normalizedData)
       .onConflictDoUpdate({
         target: users.id,
-        set: {
-          ...normalizedData,
-          updatedAt: new Date(),
-        },
+        set: updateData,
       })
       .returning();
     return user;
