@@ -63,6 +63,9 @@ export const appraisalCycleStatusEnum = pgEnum('appraisal_cycle_status', [
   'cancelled'
 ]);
 
+// Calendar provider enum
+export const calendarProviderEnum = pgEnum('calendar_provider', ['google', 'outlook']);
+
 // User storage table - mandatory for Replit Auth
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -232,9 +235,6 @@ export const accessTokens = pgTable("access_tokens", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
-
-// Calendar provider enum
-export const calendarProviderEnum = pgEnum('calendar_provider', ['google', 'outlook']);
 
 // Calendar credentials table for storing OAuth tokens
 export const calendarCredentials = pgTable("calendar_credentials", {
