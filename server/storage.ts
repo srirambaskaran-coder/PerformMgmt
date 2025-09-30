@@ -358,9 +358,16 @@ export class DatabaseStorage implements IStorage {
     if (requestingUserId) {
       const requestingUser = await this.getUser(requestingUserId);
       
+      console.log('===== getUsers DEBUG =====');
+      console.log('Requesting user ID:', requestingUserId);
+      console.log('Requesting user role:', requestingUser?.role);
+      console.log('Requesting user companyId:', requestingUser?.companyId);
+      console.log('Filters:', filters);
+      
       if (requestingUser && (requestingUser.role === 'admin' || requestingUser.role === 'hr_manager')) {
         if (!requestingUser.companyId) {
           // Admin/HR Manager without company cannot view any users
+          console.log('No company - returning empty array');
           return [];
         }
         // Force company filter for administrators and HR managers
@@ -368,14 +375,19 @@ export class DatabaseStorage implements IStorage {
         // Also exclude users with NULL company_id
         conditions.push(sql`${users.companyId} IS NOT NULL`);
         
+        console.log('Added company filter for:', requestingUser.companyId);
+        
         // SECURITY: HR Managers cannot see Super Admin and Admin roles
         if (requestingUser.role === 'hr_manager') {
           // Exclude users with super_admin or admin as primary role
           conditions.push(sql`${users.role} NOT IN ('super_admin', 'admin')`);
           // Exclude users with super_admin or admin in their roles array (handle NULL case)
           conditions.push(sql`(${users.roles} IS NULL OR NOT (${users.roles} && ARRAY['super_admin', 'admin']::text[]))`);
+          console.log('Added HR Manager role exclusion filters');
         }
       }
+      console.log('Total conditions:', conditions.length);
+      console.log('==========================');
       // Super admins and other roles can see all users (no automatic filter)
       // But they can still use explicit companyId filter if provided
     }
@@ -403,10 +415,15 @@ export class DatabaseStorage implements IStorage {
     
     if (conditions.length > 0) {
       const filteredUsers = await db.select().from(users).where(and(...conditions)).orderBy(asc(users.firstName));
+      console.log('Filtered users count:', filteredUsers.length);
+      if (filteredUsers.length > 0) {
+        console.log('Sample user roles:', filteredUsers.slice(0, 3).map(u => ({ email: u.email, role: u.role, roles: (u as any).roles })));
+      }
       return sanitizeUsers(filteredUsers);
     }
     
     const userList = await db.select().from(users).orderBy(asc(users.firstName));
+    console.log('Unfiltered users count:', userList.length);
     return sanitizeUsers(userList);
   }
 
