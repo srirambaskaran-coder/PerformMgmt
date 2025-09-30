@@ -372,8 +372,8 @@ export class DatabaseStorage implements IStorage {
         if (requestingUser.role === 'hr_manager') {
           // Exclude users with super_admin or admin as primary role
           conditions.push(sql`${users.role} NOT IN ('super_admin', 'admin')`);
-          // Exclude users with super_admin or admin in their roles array
-          conditions.push(sql`NOT (${users.roles} && ARRAY['super_admin', 'admin']::text[])`);
+          // Exclude users with super_admin or admin in their roles array (handle NULL case)
+          conditions.push(sql`(${users.roles} IS NULL OR NOT (${users.roles} && ARRAY['super_admin', 'admin']::text[]))`);
         }
       }
       // Super admins and other roles can see all users (no automatic filter)
