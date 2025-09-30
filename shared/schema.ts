@@ -420,6 +420,23 @@ export const initiatedAppraisalDetailTimings = pgTable("initiated_appraisal_deta
   unique().on(table.initiatedAppraisalId, table.frequencyCalendarDetailId), // One timing config per detail per appraisal
 ]);
 
+// Scheduled Appraisal Tasks - For calendar-based publishing
+export const scheduledAppraisalTasks = pgTable("scheduled_appraisal_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  initiatedAppraisalId: varchar("initiated_appraisal_id").notNull(),
+  frequencyCalendarDetailId: varchar("frequency_calendar_detail_id").notNull(),
+  scheduledDate: timestamp("scheduled_date").notNull(), // When to create evaluations
+  status: varchar("status").notNull().default('pending'), // pending, completed, failed
+  executedAt: timestamp("executed_at"),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("scheduled_appraisal_tasks_date_idx").on(table.scheduledDate),
+  index("scheduled_appraisal_tasks_status_idx").on(table.status),
+  index("scheduled_appraisal_tasks_appraisal_id_idx").on(table.initiatedAppraisalId),
+]);
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   reportingManager: one(users, {
@@ -896,6 +913,12 @@ export const insertInitiatedAppraisalDetailTimingSchema = createInsertSchema(ini
   updatedAt: true,
 });
 
+export const insertScheduledAppraisalTaskSchema = createInsertSchema(scheduledAppraisalTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Export types
 export type AppraisalGroup = typeof appraisalGroups.$inferSelect;
 export type InsertAppraisalGroup = z.infer<typeof insertAppraisalGroupSchema>;
@@ -905,3 +928,5 @@ export type InitiatedAppraisal = typeof initiatedAppraisals.$inferSelect;
 export type InsertInitiatedAppraisal = z.infer<typeof insertInitiatedAppraisalSchema>;
 export type InitiatedAppraisalDetailTiming = typeof initiatedAppraisalDetailTimings.$inferSelect;
 export type InsertInitiatedAppraisalDetailTiming = z.infer<typeof insertInitiatedAppraisalDetailTimingSchema>;
+export type ScheduledAppraisalTask = typeof scheduledAppraisalTasks.$inferSelect;
+export type InsertScheduledAppraisalTask = z.infer<typeof insertScheduledAppraisalTaskSchema>;

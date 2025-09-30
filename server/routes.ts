@@ -3023,11 +3023,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Send email notification to employee (if email service is configured)
             try {
-              // TODO: Implement email notification logic here
-              // await sendEvaluationNotificationEmail(employee.email, initiatedAppraisal);
+              const { sendAppraisalInitiationEmail } = await import('./emailService');
+              const dueDate = new Date();
+              dueDate.setDate(dueDate.getDate() + validatedData.daysToClose);
+              
+              await sendAppraisalInitiationEmail(
+                employee.email,
+                `${employee.firstName} ${employee.lastName}`,
+                validatedData.appraisalType,
+                dueDate
+              );
               emailsSent++;
+              console.log(`Email sent successfully to ${employee.email}`);
             } catch (emailError) {
               console.error(`Failed to send email to ${employee.email}:`, emailError);
+              // Don't fail the whole process if email fails
             }
           }
           
