@@ -357,22 +357,16 @@ export class DatabaseStorage implements IStorage {
     // SECURITY: Company isolation for Administrators and HR Managers
     if (requestingUserId) {
       const requestingUser = await this.getUser(requestingUserId);
-      console.log('[getUsers] Requesting user:', {
-        id: requestingUser?.id,
-        role: requestingUser?.role,
-        companyId: requestingUser?.companyId,
-        email: requestingUser?.email
-      });
       
       if (requestingUser && (requestingUser.role === 'admin' || requestingUser.role === 'hr_manager')) {
         if (!requestingUser.companyId) {
           // Admin/HR Manager without company cannot view any users
-          console.log('[getUsers] No company assigned - returning empty array');
           return [];
         }
         // Force company filter for administrators and HR managers
         conditions.push(eq(users.companyId, requestingUser.companyId));
-        console.log('[getUsers] Added company filter:', requestingUser.companyId);
+        // Also exclude users with NULL company_id
+        conditions.push(sql`${users.companyId} IS NOT NULL`);
         
         // SECURITY: HR Managers cannot see Super Admin and Admin roles
         if (requestingUser.role === 'hr_manager') {
@@ -380,7 +374,6 @@ export class DatabaseStorage implements IStorage {
           conditions.push(sql`${users.role} NOT IN ('super_admin', 'admin')`);
           // Exclude users with super_admin or admin in their roles array
           conditions.push(sql`NOT (${users.roles} && ARRAY['super_admin', 'admin']::text[])`);
-          console.log('[getUsers] Added HR Manager role exclusion filters');
         }
       }
       // Super admins and other roles can see all users (no automatic filter)
