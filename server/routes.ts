@@ -31,6 +31,7 @@ import {
 import { sendEmail, sendReviewInvitation, sendReviewReminder, sendReviewCompletion, generateRegistrationNotificationEmail } from "./emailService";
 import { ObjectStorageService } from "./objectStorage";
 import { seedTestUsers, testUsers } from "./seedUsers";
+import * as XLSX from 'xlsx';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -1171,6 +1172,221 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  // Bulk upload routes
+  app.get('/api/users/bulk-upload/template', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req: any, res) => {
+    try {
+      // Create sample template with headers and one example row
+      const sampleData = [
+        {
+          'Email*': 'john.doe@example.com',
+          'First Name*': 'John',
+          'Last Name*': 'Doe',
+          'Employee Code*': 'EMP001',
+          'Designation': 'Software Engineer',
+          'Department': 'Engineering',
+          'Date of Joining (YYYY-MM-DD)*': '2024-01-15',
+          'Mobile Number': '+1234567890',
+          'Location ID': '',
+          'Level ID': '',
+          'Grade ID': '',
+          'Reporting Manager ID': '',
+          'Role': 'employee',
+          'Status': 'active'
+        }
+      ];
+
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(sampleData);
+
+      // Set column widths
+      ws['!cols'] = [
+        { wch: 25 }, // Email
+        { wch: 15 }, // First Name
+        { wch: 15 }, // Last Name
+        { wch: 15 }, // Employee Code
+        { wch: 20 }, // Designation
+        { wch: 15 }, // Department
+        { wch: 25 }, // Date of Joining
+        { wch: 15 }, // Mobile Number
+        { wch: 30 }, // Location ID
+        { wch: 30 }, // Level ID
+        { wch: 30 }, // Grade ID
+        { wch: 30 }, // Reporting Manager ID
+        { wch: 15 }, // Role
+        { wch: 10 }  // Status
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Users');
+
+      // Generate buffer
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      // Set response headers
+      res.setHeader('Content-Disposition', 'attachment; filename=user_bulk_upload_template.xlsx');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error generating template:", error);
+      res.status(500).json({ message: "Failed to generate template" });
+    }
+  });
+
+  app.post('/api/users/bulk-upload', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req: any, res) => {
+    try {
+      const { fileData } = req.body;
+      
+      if (!fileData) {
+        return res.status(400).json({ message: "No file data provided" });
+      }
+
+      // Parse base64 file data
+      const buffer = Buffer.from(fileData, 'base64');
+      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      
+      // Get first worksheet
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      
+      // Convert to JSON
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+      
+      if (!jsonData || jsonData.length === 0) {
+        return res.status(400).json({ message: "No data found in spreadsheet" });
+      }
+
+      const creatorId = req.user.claims.sub;
+      const creator = await storage.getUser(creatorId);
+      
+      // Validate company restriction for administrators
+      if (creator && creator.role === 'admin' && !creator.companyId) {
+        return res.status(403).json({ 
+          message: "Administrator must be assigned to a company before creating users."
+        });
+      }
+
+      const results = {
+        success: [] as any[],
+        errors: [] as any[]
+      };
+
+      // Process each row
+      for (let i = 0; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        const rowNumber = i + 2; // Excel row number (accounting for header)
+
+        try {
+          // Map Excel columns to user data
+          const userData: any = {
+            email: row['Email*'],
+            firstName: row['First Name*'],
+            lastName: row['Last Name*'],
+            code: row['Employee Code*'],
+            designation: row['Designation'],
+            department: row['Department'],
+            dateOfJoining: row['Date of Joining (YYYY-MM-DD)*'] ? new Date(row['Date of Joining (YYYY-MM-DD)*']) : undefined,
+            mobileNumber: row['Mobile Number'],
+            locationId: row['Location ID'] || null,
+            levelId: row['Level ID'] || null,
+            gradeId: row['Grade ID'] || null,
+            reportingManagerId: row['Reporting Manager ID'] || null,
+            role: row['Role'] || 'employee',
+            status: row['Status'] || 'active',
+            createdById: creatorId
+          };
+
+          // Force company assignment for administrators
+          if (creator && creator.role === 'admin') {
+            userData.companyId = creator.companyId;
+          }
+
+          // Validate using schema
+          const validatedData = insertUserSchema.parse(userData);
+
+          // Check for duplicates
+          if (validatedData.email) {
+            const existingEmailUser = await storage.getUserByEmail(validatedData.email);
+            if (existingEmailUser) {
+              if (creator && creator.role === 'admin' && creator.companyId && existingEmailUser.companyId !== creator.companyId) {
+                // Allow if different company
+              } else {
+                results.errors.push({
+                  row: rowNumber,
+                  email: validatedData.email,
+                  error: "Email already exists"
+                });
+                continue;
+              }
+            }
+          }
+
+          if (validatedData.code) {
+            const existingCodeUser = await storage.getUserByCode(validatedData.code);
+            if (existingCodeUser) {
+              if (creator && creator.role === 'admin' && creator.companyId && existingCodeUser.companyId !== creator.companyId) {
+                // Allow if different company
+              } else {
+                results.errors.push({
+                  row: rowNumber,
+                  email: validatedData.email,
+                  error: "Employee code already exists"
+                });
+                continue;
+              }
+            }
+          }
+
+          if (validatedData.mobileNumber) {
+            const existingMobileUser = await storage.getUserByMobile(validatedData.mobileNumber);
+            if (existingMobileUser) {
+              if (creator && creator.role === 'admin' && creator.companyId && existingMobileUser.companyId !== creator.companyId) {
+                // Allow if different company
+              } else {
+                results.errors.push({
+                  row: rowNumber,
+                  email: validatedData.email,
+                  error: "Mobile number already exists"
+                });
+                continue;
+              }
+            }
+          }
+
+          // Create user
+          const newUser = await storage.createUser(validatedData);
+          results.success.push({
+            row: rowNumber,
+            email: validatedData.email,
+            name: `${validatedData.firstName} ${validatedData.lastName}`
+          });
+
+        } catch (error) {
+          console.error(`Error processing row ${rowNumber}:`, error);
+          results.errors.push({
+            row: rowNumber,
+            email: row['Email*'],
+            error: error instanceof Error ? error.message : "Validation failed"
+          });
+        }
+      }
+
+      res.json({
+        message: "Bulk upload completed",
+        summary: {
+          total: jsonData.length,
+          successful: results.success.length,
+          failed: results.errors.length
+        },
+        results
+      });
+
+    } catch (error) {
+      console.error("Error processing bulk upload:", error);
+      res.status(500).json({ message: "Failed to process bulk upload" });
     }
   });
 
