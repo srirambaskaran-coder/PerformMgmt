@@ -942,6 +942,86 @@ export default function InitiateAppraisal() {
                       )}
                     />
 
+                    {/* DOJ Date Range Filters */}
+                    <div className="space-y-2">
+                      <Label>Exclude by Date of Joining (DOJ)</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Exclude employees based on their date of joining
+                      </p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="excludeDojFromDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>DOJ From Date</FormLabel>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant="outline"
+                                      className="w-full justify-start text-left font-normal"
+                                      data-testid="exclude-doj-from-date"
+                                    >
+                                      <CalendarIcon className="mr-2 h-4 w-4" />
+                                      {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <CalendarComponent
+                                    mode="single"
+                                    selected={field.value}
+                                    onSelect={field.onChange}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              <FormDescription>
+                                Exclude employees who joined from this date
+                              </FormDescription>
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="excludeDojTillDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>DOJ Till Date</FormLabel>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant="outline"
+                                      className="w-full justify-start text-left font-normal"
+                                      data-testid="exclude-doj-till-date"
+                                    >
+                                      <CalendarIcon className="mr-2 h-4 w-4" />
+                                      {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <CalendarComponent
+                                    mode="single"
+                                    selected={field.value}
+                                    onSelect={field.onChange}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              <FormDescription>
+                                Exclude employees who joined till this date
+                              </FormDescription>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
                     {/* Individual Employee Exclusions */}
                     <div className="space-y-2">
                       <Label>Exclude Specific Employees</Label>
