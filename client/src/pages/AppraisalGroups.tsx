@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Users, Edit2, Trash2, UserPlus, X, Search } from "lucide-react";
+import { Plus, Users, Edit2, Trash2, UserPlus, X, Search, Calendar as CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
@@ -47,6 +49,8 @@ interface EmployeeFilters {
   grade: string[];
   reportingManager: string[];
   role: string[];
+  dojFromDate: Date | undefined;
+  dojTillDate: Date | undefined;
 }
 
 export default function AppraisalGroups() {
@@ -60,6 +64,8 @@ export default function AppraisalGroups() {
     grade: [],
     reportingManager: [],
     role: [],
+    dojFromDate: undefined,
+    dojTillDate: undefined,
   });
   // Applied filters that actually control the results
   const [appliedFilters, setAppliedFilters] = useState<EmployeeFilters>({
@@ -70,6 +76,8 @@ export default function AppraisalGroups() {
     grade: [],
     reportingManager: [],
     role: [],
+    dojFromDate: undefined,
+    dojTillDate: undefined,
   });
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<AppraisalGroupWithMembers | null>(null);
@@ -844,6 +852,54 @@ export default function AppraisalGroups() {
                       testId="dialog-filter-role"
                     />
                   </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">DOJ From Date</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                          data-testid="dialog-filter-doj-from"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {draftFilters.dojFromDate ? format(draftFilters.dojFromDate, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={draftFilters.dojFromDate}
+                          onSelect={(date) => setDraftFilters({ ...draftFilters, dojFromDate: date })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">DOJ Till Date</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                          data-testid="dialog-filter-doj-till"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {draftFilters.dojTillDate ? format(draftFilters.dojTillDate, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={draftFilters.dojTillDate}
+                          onSelect={(date) => setDraftFilters({ ...draftFilters, dojTillDate: date })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
                 
                 {/* Search Button and Clear Filters */}
@@ -871,6 +927,8 @@ export default function AppraisalGroups() {
                         grade: [],
                         reportingManager: [],
                         role: [],
+                        dojFromDate: undefined,
+                        dojTillDate: undefined,
                       };
                       setDraftFilters(emptyFilters);
                       setAppliedFilters(emptyFilters);
