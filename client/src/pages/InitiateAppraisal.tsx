@@ -1031,7 +1031,32 @@ export default function InitiateAppraisal() {
                       
                       <ScrollArea className="h-40 border rounded-md p-4">
                         <div className="space-y-2">
-                          {selectedGroup.members.map((member) => {
+                          {selectedGroup.members.filter((member) => {
+                            const dojFromDate = form.watch('excludeDojFromDate');
+                            const dojTillDate = form.watch('excludeDojTillDate');
+                            
+                            // Filter by DOJ From Date
+                            if (dojFromDate) {
+                              if (!member.dateOfJoining) return false;
+                              const memberDoj = new Date(member.dateOfJoining);
+                              const fromDate = new Date(dojFromDate);
+                              fromDate.setHours(0, 0, 0, 0);
+                              memberDoj.setHours(0, 0, 0, 0);
+                              if (memberDoj < fromDate) return false;
+                            }
+                            
+                            // Filter by DOJ Till Date
+                            if (dojTillDate) {
+                              if (!member.dateOfJoining) return false;
+                              const memberDoj = new Date(member.dateOfJoining);
+                              const tillDate = new Date(dojTillDate);
+                              tillDate.setHours(23, 59, 59, 999);
+                              memberDoj.setHours(0, 0, 0, 0);
+                              if (memberDoj > tillDate) return false;
+                            }
+                            
+                            return true;
+                          }).map((member) => {
                             const isExcluded = form.watch('excludedEmployeeIds').includes(member.id);
                             return (
                               <div key={member.id} className="flex items-center space-x-2">
