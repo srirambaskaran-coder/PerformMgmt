@@ -114,3 +114,60 @@ All identified limitations have been successfully resolved:
 - **Evaluation Creation**: HR managers can generate evaluations linked to specific initiated appraisals
 - **Cross-Cycle Protection**: Evaluations are now properly scoped to their initiated appraisal cycle
 - **Email Integration**: Send Reminder functionality implemented with proper authorization checks
+
+## Appraisal Initiation with Email Notifications
+
+### Overview
+The Initiate Appraisal Cycle feature now supports two publishing modes with automated email notifications:
+1. **Publish Now**: Immediately creates evaluations and sends email notifications to all employees
+2. **Publish As Per Calendar**: Schedules evaluations based on frequency calendar periods with automated processing
+
+### Publishing Modes
+
+#### Publish Now (Immediate)
+- Creates evaluation records for all active members of the appraisal group
+- Sends immediate email notifications to each employee with:
+  - Appraisal type information
+  - Due date calculated from daysToClose setting
+  - Direct link to employee evaluation dashboard
+- Updates appraisal status to 'active' automatically
+- Provides real-time feedback on evaluations created and emails sent
+
+#### Publish As Per Calendar (Scheduled)
+- Creates scheduled tasks for each calendar detail period
+- Stores tasks in `scheduled_appraisal_tasks` table with:
+  - Calculated scheduled date (period start + daysToInitiate)
+  - Link to initiated appraisal and calendar detail
+  - Status tracking (pending, completed, failed)
+- Tasks are processed via `/api/process-scheduled-tasks` endpoint
+- Email notifications sent automatically when scheduled date arrives
+
+### Email Service Integration
+- **Template**: `sendAppraisalInitiationEmail` in emailService.ts
+- **Content**: Professional HTML email with appraisal details and action link
+- **Error Handling**: Individual email failures don't block evaluation creation
+- **Configuration**: Uses existing SMTP settings from email_config table
+
+### Database Schema
+New table: `scheduled_appraisal_tasks`
+- `id`: Primary key (UUID)
+- `initiated_appraisal_id`: Foreign key to initiated appraisals
+- `frequency_calendar_detail_id`: Link to calendar period
+- `scheduled_date`: When to process the task
+- `status`: pending, completed, or failed
+- `executed_at`: Timestamp of task execution
+- `error`: Error message if task failed
+
+### Security
+- Email sending includes proper error handling and logging
+- Scheduled task processing protected by authentication (super_admin, admin, hr_manager roles)
+- Individual failures logged without blocking batch operations
+- No sensitive data exposed in email templates
+
+### Technical Flow
+1. HR Manager initiates appraisal with selected publish type
+2. If "Publish Now": Immediate evaluation creation + email sending
+3. If "As Per Calendar": Scheduled task creation for each period
+4. Background processor (authenticated) checks for pending tasks
+5. On scheduled date: Creates evaluations + sends emails automatically
+6. Task status updated with results and any error messages
