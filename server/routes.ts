@@ -2946,6 +2946,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : [],
         documentUrl: documentUrl || parsedData.documentUrl || null,
         frequencyCalendarId: parsedData.frequencyCalendarId || null,
+        selectedCalendarDetailIds: parsedData.selectedCalendarDetailIds || [], // Selected calendar detail IDs for multi-select
         calendarDetailTimings: parsedData.calendarDetailTimings || [], // Add calendar detail timings
         daysToInitiate: parsedData.daysToInitiate || 0,
         daysToClose: parsedData.daysToClose || 30,
@@ -3056,8 +3057,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Get the calendar details for this frequency calendar
           const calendarDetails = await storage.getFrequencyCalendarDetailsByCalendarId(validatedData.frequencyCalendarId!);
           
-          // Create scheduled tasks for each calendar detail period
-          for (const detail of calendarDetails) {
+          // Filter calendar details to only include selected ones
+          const selectedDetails = validatedData.selectedCalendarDetailIds && validatedData.selectedCalendarDetailIds.length > 0
+            ? calendarDetails.filter(detail => validatedData.selectedCalendarDetailIds.includes(detail.id))
+            : calendarDetails; // If no selection, process all (backward compatibility)
+          
+          // Create scheduled tasks for each selected calendar detail period
+          for (const detail of selectedDetails) {
             // Find the timing config for this detail from calendarDetailTimings
             const timingConfig = validatedData.calendarDetailTimings.find(
               (t: any) => t.detailId === detail.id
@@ -3083,7 +3089,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`Created scheduled task for detail ${detail.id} at ${scheduledDate}`);
           }
           
-          console.log(`Created ${calendarDetails.length} scheduled tasks for calendar-based appraisal`);
+          console.log(`Created ${selectedDetails.length} scheduled tasks for calendar-based appraisal`);
         } catch (error) {
           console.error("Error creating scheduled tasks:", error);
           // Don't fail the request, but log the error
