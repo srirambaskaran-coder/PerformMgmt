@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Play, Users, FileText, Calendar, Settings2, Upload, X, Plus, ChevronDown } from "lucide-react";
+import { format } from "date-fns";
+import { Play, Users, FileText, Calendar, Settings2, Upload, X, Plus, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +39,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
@@ -147,6 +149,8 @@ const initiateAppraisalSchema = z.object({
   daysToClose: z.coerce.number().min(1).max(365).default(30),
   numberOfReminders: z.coerce.number().min(1).max(10).default(3),
   excludeTenureLessThanYear: z.boolean().default(false),
+  excludeDojFromDate: z.date().optional(),
+  excludeDojTillDate: z.date().optional(),
   excludedEmployeeIds: z.array(z.string()).default([]),
   makePublic: z.boolean().default(false),
   publishType: z.enum(['now', 'as_per_calendar']).default('now'),
@@ -186,6 +190,8 @@ export default function InitiateAppraisal() {
       daysToClose: 30,
       numberOfReminders: 3,
       excludeTenureLessThanYear: false,
+      excludeDojFromDate: undefined,
+      excludeDojTillDate: undefined,
       excludedEmployeeIds: [],
       makePublic: false,
       publishType: 'now',
@@ -277,6 +283,8 @@ export default function InitiateAppraisal() {
       daysToClose: 30,
       numberOfReminders: 3,
       excludeTenureLessThanYear: false,
+      excludeDojFromDate: undefined,
+      excludeDojTillDate: undefined,
       excludedEmployeeIds: [],
       makePublic: false,
       publishType: 'now',
