@@ -364,13 +364,23 @@ export class DatabaseStorage implements IStorage {
         }
         // Force company filter for administrators and HR managers
         conditions.push(eq(users.companyId, requestingUser.companyId));
+        
+        // SECURITY: HR Managers cannot see Super Admin and Admin roles
+        if (requestingUser.role === 'hr_manager') {
+          conditions.push(
+            and(
+              sql`${users.role} NOT IN ('super_admin', 'admin')`,
+              sql`NOT (${users.roles} && ARRAY['super_admin', 'admin']::text[])`
+            )
+          );
+        }
       }
       // Super admins and other roles can see all users (no automatic filter)
       // But they can still use explicit companyId filter if provided
     }
     
     // SECURITY: Explicit company filter (for super admins and other roles)
-    if (filters?.companyId && !conditions.find(c => c.toString().includes('companyId'))) {
+    if (filters?.companyId && !conditions.find(c => c?.toString().includes('companyId'))) {
       conditions.push(eq(users.companyId, filters.companyId));
     }
     
