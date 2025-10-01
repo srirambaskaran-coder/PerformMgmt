@@ -2878,10 +2878,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Frequency Calendar Details management routes - Administrator isolated through parent calendar
-  app.get('/api/frequency-calendar-details', isAuthenticated, requireRoles(['admin']), async (req: any, res) => {
+  app.get('/api/frequency-calendar-details', isAuthenticated, requireRoles(['admin', 'hr_manager']), async (req: any, res) => {
     try {
-      const createdById = req.user.claims.sub;
-      const details = await storage.getFrequencyCalendarDetails(createdById);
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // HR managers can see all active frequency calendar details in their company, admins see only theirs
+      const activeRole = req.user.activeRole || user.role;
+      let details;
+      if (activeRole === 'hr_manager') {
+        details = await storage.getAllFrequencyCalendarDetails(user.companyId);
+      } else {
+        details = await storage.getFrequencyCalendarDetails(userId);
+      }
+      
       res.json(details);
     } catch (error) {
       console.error("Error fetching frequency calendar details:", error);

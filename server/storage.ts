@@ -216,6 +216,7 @@ export interface IStorage {
   
   // Frequency Calendar Details operations - Administrator isolated through parent calendar
   getFrequencyCalendarDetails(createdById: string): Promise<FrequencyCalendarDetails[]>;
+  getAllFrequencyCalendarDetails(companyId: string): Promise<FrequencyCalendarDetails[]>; // For HR managers to see all details in their company
   getFrequencyCalendarDetailsByCalendarId(calendarId: string): Promise<FrequencyCalendarDetails[]>; // For showing details of a specific calendar
   getFrequencyCalendarDetail(id: string, createdById: string): Promise<FrequencyCalendarDetails | undefined>;
   createFrequencyCalendarDetails(details: InsertFrequencyCalendarDetails, createdById: string): Promise<FrequencyCalendarDetails>;
@@ -1634,6 +1635,32 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(asc(frequencyCalendarDetails.startDate));
+  }
+
+  // Get all frequency calendar details for HR managers in their company
+  async getAllFrequencyCalendarDetails(companyId: string): Promise<FrequencyCalendarDetails[]> {
+    // Join with frequency calendars and users to filter by company
+    return await db.select({
+      id: frequencyCalendarDetails.id,
+      frequencyCalendarId: frequencyCalendarDetails.frequencyCalendarId,
+      displayName: frequencyCalendarDetails.displayName,
+      startDate: frequencyCalendarDetails.startDate,
+      endDate: frequencyCalendarDetails.endDate,
+      status: frequencyCalendarDetails.status,
+      createdAt: frequencyCalendarDetails.createdAt,
+      updatedAt: frequencyCalendarDetails.updatedAt,
+      createdById: frequencyCalendarDetails.createdById,
+    })
+    .from(frequencyCalendarDetails)
+    .innerJoin(frequencyCalendars, eq(frequencyCalendarDetails.frequencyCalendarId, frequencyCalendars.id))
+    .innerJoin(users, eq(frequencyCalendars.createdById, users.id))
+    .where(
+      and(
+        eq(frequencyCalendarDetails.status, 'active'),
+        eq(users.companyId, companyId)
+      )
+    )
+    .orderBy(asc(frequencyCalendarDetails.startDate));
   }
 
   // Get frequency calendar details by calendar ID (for HR managers)
