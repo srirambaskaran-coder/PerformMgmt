@@ -1,6 +1,9 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RoleGuard } from "@/components/RoleGuard";
 import { 
   Calendar, 
@@ -8,7 +11,9 @@ import {
   User, 
   CheckCircle,
   CalendarCheck,
-  Building2
+  Building2,
+  Search,
+  X
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -45,12 +50,98 @@ export default function HRMeetingsView() {
     queryKey: ["/api/hr-manager/scheduled-meetings"],
   });
 
-  // Statistics
-  const totalMeetings = meetings.length;
-  const scheduledMeetings = meetings.filter(
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+
+  // Get unique departments from meetings
+  const departments = useMemo(() => {
+    const depts = new Set<string>();
+    meetings.forEach((meeting) => {
+      if (meeting.employee?.department) depts.add(meeting.employee.department);
+      if (meeting.manager?.department) depts.add(meeting.manager.department);
+    });
+    return Array.from(depts).sort();
+  }, [meetings]);
+
+  // Filter meetings
+  const filteredMeetings = useMemo(() => {
+    return meetings.filter((meeting) => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const employeeName = meeting.employee
+          ? `${meeting.employee.firstName} ${meeting.employee.lastName}`.toLowerCase()
+          : "";
+        const managerName = meeting.manager
+          ? `${meeting.manager.firstName} ${meeting.manager.lastName}`.toLowerCase()
+          : "";
+        
+        if (!employeeName.includes(query) && !managerName.includes(query)) {
+          return false;
+        }
+      }
+
+      // Department filter
+      if (departmentFilter !== "all") {
+        const employeeDept = meeting.employee?.department || "";
+        const managerDept = meeting.manager?.department || "";
+        if (employeeDept !== departmentFilter && managerDept !== departmentFilter) {
+          return false;
+        }
+      }
+
+      // Status filter
+      if (statusFilter !== "all") {
+        if (statusFilter === "completed" && !meeting.meetingCompletedAt) {
+          return false;
+        }
+        if (statusFilter === "scheduled" && (!meeting.meetingScheduledAt || meeting.meetingCompletedAt)) {
+          return false;
+        }
+      }
+
+      // Date range filter
+      if (dateFrom || dateTo) {
+        const meetingDate = meeting.meetingScheduledAt ? new Date(meeting.meetingScheduledAt) : null;
+        if (!meetingDate) return false;
+        
+        if (dateFrom) {
+          const fromDate = new Date(dateFrom);
+          fromDate.setHours(0, 0, 0, 0);
+          if (meetingDate < fromDate) return false;
+        }
+        
+        if (dateTo) {
+          const toDate = new Date(dateTo);
+          toDate.setHours(23, 59, 59, 999);
+          if (meetingDate > toDate) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [meetings, searchQuery, departmentFilter, statusFilter, dateFrom, dateTo]);
+
+  // Statistics based on filtered data
+  const totalMeetings = filteredMeetings.length;
+  const scheduledMeetings = filteredMeetings.filter(
     (m) => m.meetingScheduledAt && !m.meetingCompletedAt
   ).length;
-  const completedMeetings = meetings.filter((m) => m.meetingCompletedAt).length;
+  const completedMeetings = filteredMeetings.filter((m) => m.meetingCompletedAt).length;
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setDepartmentFilter("all");
+    setStatusFilter("all");
+    setDateFrom("");
+    setDateTo("");
+  };
+
+  const hasActiveFilters = searchQuery || departmentFilter !== "all" || statusFilter !== "all" || dateFrom || dateTo;
 
   const getMeetingStatusBadge = (meeting: MeetingData) => {
     if (meeting.meetingCompletedAt) {
@@ -135,6 +226,88 @@ export default function HRMeetingsView() {
           </Card>
         </div>
 
+        {/* Filters */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by employee or manager name..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                      data-testid="input-search-meetings"
+                    />
+                  </div>
+                </div>
+                <div className="w-full md:w-48">
+                  <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                    <SelectTrigger data-testid="select-department-filter">
+                      <SelectValue placeholder="All Departments" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Departments</SelectItem>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept} value={dept}>
+                          {dept}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-full md:w-48">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger data-testid="select-status-filter">
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="flex flex-col md:flex-row gap-4 items-end">
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">From Date</label>
+                    <Input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      data-testid="input-date-from"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">To Date</label>
+                    <Input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      data-testid="input-date-to"
+                    />
+                  </div>
+                </div>
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearFilters}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors border rounded-md hover:bg-muted/50"
+                    data-testid="button-clear-filters"
+                  >
+                    <X className="h-4 w-4" />
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Meetings List */}
         <Card>
           <CardHeader>
@@ -156,17 +329,21 @@ export default function HRMeetingsView() {
                   </div>
                 ))}
               </div>
-            ) : meetings.length === 0 ? (
+            ) : filteredMeetings.length === 0 ? (
               <div className="text-center py-8">
                 <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground text-lg mb-2">No meetings scheduled yet</p>
+                <p className="text-muted-foreground text-lg mb-2">
+                  {meetings.length === 0 ? "No meetings scheduled yet" : "No meetings match your filters"}
+                </p>
                 <p className="text-muted-foreground text-sm">
-                  Meetings will appear here once employees and managers schedule them
+                  {meetings.length === 0 
+                    ? "Meetings will appear here once employees and managers schedule them"
+                    : "Try adjusting your filters to see more results"}
                 </p>
               </div>
             ) : (
               <div className="space-y-4">
-                {meetings.map((meeting) => (
+                {filteredMeetings.map((meeting) => (
                   <div
                     key={meeting.id}
                     className="flex items-start justify-between p-4 border rounded-lg hover:bg-muted/20 transition-colors"
