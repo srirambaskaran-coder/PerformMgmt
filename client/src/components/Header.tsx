@@ -1,4 +1,4 @@
-import { Bell, Plus, LogOut, User, RefreshCw } from "lucide-react";
+import { Bell, LogOut, User, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -44,11 +44,6 @@ export function Header() {
     switchRoleMutation.mutate(role);
   };
 
-  const handleStartReview = () => {
-    // TODO: Implement start review cycle modal
-    console.log("Start review cycle");
-  };
-
   const handleLogout = () => {
     window.location.href = "/api/logout";
   };
@@ -87,14 +82,6 @@ export function Header() {
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full"></span>
             </Button>
           </div>
-
-          {/* Quick Actions - Only show for HR Manager */}
-          {activeRole === 'hr_manager' && (
-            <Button onClick={handleStartReview} data-testid="start-review-button">
-              <Plus className="h-4 w-4 mr-2" />
-              Start Review Cycle
-            </Button>
-          )}
 
           {/* User Profile */}
           <DropdownMenu>

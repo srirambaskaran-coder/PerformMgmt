@@ -372,7 +372,7 @@ export default function InitiateAppraisal() {
       <div className="container mx-auto py-8">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold">Initiate Appraisal</h1>
+            <h1 className="text-3xl font-bold">Initiate Appraisal Cycle</h1>
             <p className="text-muted-foreground mt-2">
               Select an appraisal group to initiate performance evaluations
             </p>
@@ -491,7 +491,7 @@ export default function InitiateAppraisal() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Settings2 className="h-5 w-5" />
-                Initiate Appraisal
+                Initiate Appraisal Cycle
               </DialogTitle>
               <DialogDescription>
                 Configure the appraisal settings for the selected group
@@ -1082,62 +1082,6 @@ export default function InitiateAppraisal() {
                         </div>
                       </ScrollArea>
                     </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Publication Settings */}
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-semibold">Publication Settings</h4>
-                    
-                    <FormField
-                      control={form.control}
-                      name="makePublic"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">
-                              Make appraisal results public
-                            </FormLabel>
-                            <FormDescription>
-                              Allow other employees to view the results of this appraisal
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              data-testid="switch-make-public"
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="publishType"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Publish Type</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-publish-type">
-                                <SelectValue placeholder="Select publish type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="now">Publish Now</SelectItem>
-                              <SelectItem value="as_per_calendar">As Per Calendar</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Choose when to publish this appraisal to employees
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </div>
 
                   <DialogFooter className="pt-6">

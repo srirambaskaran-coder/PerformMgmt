@@ -45,7 +45,7 @@ const navItems: NavItem[] = [
   { href: "/frequency-calendars", label: "Frequency Calendars", icon: Calendar, roles: ["admin"] },
   { href: "/frequency-calendar-details", label: "Calendar Details", icon: CalendarDays, roles: ["admin"] },
   { href: "/appraisal-groups", label: "Appraisal Groups", icon: Users, roles: ["hr_manager"] },
-  { href: "/initiate-appraisal", label: "Initiate Appraisal", icon: Play, roles: ["hr_manager"] },
+  { href: "/initiate-appraisal", label: "Initiate Appraisal Cycle", icon: Play, roles: ["hr_manager"] },
   { href: "/review-appraisal", label: "Review Progress", icon: Search, roles: ["hr_manager"] },
   { href: "/hr-meetings", label: "View Meetings", icon: CalendarCheck, roles: ["hr_manager"] },
   { href: "/questionnaires", label: "Questionnaires", icon: FileText, roles: ["super_admin", "admin", "hr_manager"] },
