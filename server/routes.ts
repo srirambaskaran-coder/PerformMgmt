@@ -32,6 +32,9 @@ import { sendEmail, sendReviewInvitation, sendReviewReminder, sendReviewCompleti
 import { ObjectStorageService } from "./objectStorage";
 import { seedTestUsers, testUsers } from "./seedUsers";
 import * as XLSX from 'xlsx';
+import PDFDocument from 'pdfkit';
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -1999,7 +2002,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (format === 'pdf') {
         // Generate PDF using PDFKit
-        const PDFDocument = require('pdfkit');
         const doc = new PDFDocument();
         
         // Set response headers for PDF
@@ -2058,11 +2060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.end();
         
       } else if (format === 'docx') {
-        // Generate DOCX using docxtemplater
-        const PizZip = require('pizzip');
-        const Docxtemplater = require('docxtemplater');
-        const fs = require('fs');
-        const path = require('path');
+        // Generate DOCX using docxtemplater and pizzip
         
         // Create a simple DOCX template
         const templateContent = `
