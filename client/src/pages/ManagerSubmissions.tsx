@@ -77,7 +77,6 @@ interface EmployeeResponse {
 
 interface ManagerReviewData {
   managerEvaluationData: Record<string, any>;
-  finalRating: number;
 }
 
 interface MeetingSchedule {
@@ -97,8 +96,7 @@ export default function ManagerSubmissions() {
   const [isMeetingDialogOpen, setIsMeetingDialogOpen] = useState(false);
   const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
   const [reviewData, setReviewData] = useState<ManagerReviewData>({ 
-    managerEvaluationData: { questionRemarks: {}, overallRemarks: '' }, 
-    finalRating: 5 
+    managerEvaluationData: { questionRemarks: {} }
   });
   const [meetingData, setMeetingData] = useState<MeetingSchedule>({
     meetingDate: addDays(new Date(), 7),
@@ -350,44 +348,6 @@ export default function ManagerSubmissions() {
             </div>
           );
         })}
-
-        {/* Overall Manager Review */}
-        <div className="border-t pt-6 space-y-4">
-          <h4 className="font-semibold text-lg">Overall Evaluation</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="overall-remarks">Overall Manager Remarks</Label>
-              <Textarea
-                id="overall-remarks"
-                placeholder="Enter your overall review and feedback..."
-                rows={4}
-                value={reviewData.managerEvaluationData.overallRemarks || ''}
-                onChange={(e) => setReviewData(prev => ({
-                  ...prev,
-                  managerEvaluationData: { ...prev.managerEvaluationData, overallRemarks: e.target.value }
-                }))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="final-rating">Final Rating (1-5)</Label>
-              <Select
-                value={String(reviewData.finalRating)}
-                onValueChange={(value) => setReviewData(prev => ({ ...prev, finalRating: parseInt(value) }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select rating" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 - Below Expectations</SelectItem>
-                  <SelectItem value="2">2 - Partially Meets Expectations</SelectItem>
-                  <SelectItem value="3">3 - Meets Expectations</SelectItem>
-                  <SelectItem value="4">4 - Exceeds Expectations</SelectItem>
-                  <SelectItem value="5">5 - Outstanding</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
       </div>
     );
   };
@@ -559,8 +519,7 @@ export default function ManagerSubmissions() {
                               onClick={() => {
                                 setSelectedEvaluation(evaluation);
                                 setReviewData({ 
-                                  managerEvaluationData: { questionRemarks: {}, overallRemarks: '' }, 
-                                  finalRating: 5 
+                                  managerEvaluationData: { questionRemarks: {} }
                                 });
                                 setIsReviewDialogOpen(true);
                               }}

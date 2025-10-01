@@ -3891,19 +3891,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cannot review: Employee hasn't submitted their evaluation yet" });
       }
       
-      // Prepare manager evaluation data with remarks
+      // Prepare manager evaluation data with remarks (only add if provided)
       const completeManagerEvaluationData = {
         ...managerEvaluationData,
-        managerRemarks: managerRemarks
+        ...(managerRemarks && { managerRemarks })
       };
       
-      // Update evaluation with manager review
-      const updatedEvaluation = await storage.updateEvaluation(evaluationId, {
+      // Prepare update data
+      const updateData: any = {
         managerEvaluationData: completeManagerEvaluationData,
-        overallRating: finalRating,
         managerEvaluationSubmittedAt: new Date(),
         status: 'reviewed'
-      });
+      };
+      
+      // Only set overallRating if finalRating is provided
+      if (finalRating !== undefined && finalRating !== null) {
+        updateData.overallRating = finalRating;
+      }
+      
+      // Update evaluation with manager review
+      const updatedEvaluation = await storage.updateEvaluation(evaluationId, updateData);
       
       res.json({
         message: "Manager review submitted successfully",
