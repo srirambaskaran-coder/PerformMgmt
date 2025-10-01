@@ -1933,7 +1933,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Export evaluation to PDF/DOCX - secure server-side data fetching
   app.post('/api/evaluations/export', isAuthenticated, async (req: any, res) => {
     try {
-      const { evaluationId, format } = req.body;
+      // Validate request body
+      const exportSchema = z.object({
+        evaluationId: z.string().uuid("Invalid evaluation ID format"),
+        format: z.enum(['pdf', 'docx'], { errorMap: () => ({ message: "Format must be either 'pdf' or 'docx'" }) }),
+      });
+
+      const validation = exportSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid request", 
+          errors: validation.error.errors 
+        });
+      }
+
+      const { evaluationId, format } = validation.data;
       const userId = req.user.claims.sub;
       const currentUser = await storage.getUser(userId);
       
@@ -1958,6 +1972,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get additional evaluation details from database (secure)
       const employee = await storage.getUser(evaluation.employeeId);
       const manager = await storage.getUser(evaluation.managerId);
+
+      // HR Managers can export evaluations for employees in their company
+      if (currentUser.role === 'hr_manager') {
+        if (!employee || employee.companyId !== currentUser.companyId) {
+          return res.status(403).json({ message: "Access denied: Can only export evaluations for employees in your company" });
+        }
+      }
       const reviewCycle = evaluation.reviewCycleId ? await storage.getReviewCycle(evaluation.reviewCycleId) : null;
       
       // Extract responses and calculate average from stored data

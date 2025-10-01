@@ -21,7 +21,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Calendar, Filter, Mail, ChevronDown, ChevronRight, Users, LayoutGrid, LayoutList, Download } from "lucide-react";
+import { Calendar, Filter, Mail, ChevronDown, ChevronRight, Users, LayoutGrid, LayoutList, Download, FileDown } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -122,6 +122,48 @@ export default function ReviewAppraisal() {
     sendReminderMutation.mutate({ employeeId, initiatedAppraisalId });
   };
 
+  // Download evaluation mutation
+  const downloadEvaluationMutation = useMutation({
+    mutationFn: async ({ evaluationId, format }: { evaluationId: string; format: 'pdf' | 'docx' }) => {
+      const response = await apiRequest("POST", "/api/evaluations/export", { evaluationId, format });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "An error occurred" }));
+        throw new Error(errorData.message || "Failed to download evaluation");
+      }
+      
+      return { response, format, evaluationId };
+    },
+    onSuccess: async (data) => {
+      // Download the file
+      const blob = await data.response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `evaluation-${data.evaluationId}.${data.format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Download Successful",
+        description: `Evaluation downloaded as ${data.format.toUpperCase()}`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Download Failed",
+        description: error.message || "An error occurred while downloading the evaluation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const downloadEvaluation = (evaluationId: string, format: 'pdf' | 'docx') => {
+    downloadEvaluationMutation.mutate({ evaluationId, format });
+  };
+
   // Export to Excel function
   const exportToExcel = () => {
     try {
@@ -200,6 +242,7 @@ export default function ReviewAppraisal() {
         rows.push({
           employeeId: empProgress.employee.id,
           initiatedAppraisalId: appraisal.id,
+          evaluationId: empProgress.evaluation?.id || null,
           employeeName: `${empProgress.employee.firstName} ${empProgress.employee.lastName}`,
           employeeFirstName: empProgress.employee.firstName,
           employeeLastName: empProgress.employee.lastName,
@@ -595,18 +638,44 @@ export default function ReviewAppraisal() {
                           {row.dueDate ? format(new Date(row.dueDate), 'MMM dd, yyyy') : 'N/A'}
                         </TableCell>
                         <TableCell data-testid={`table-actions-${index}`}>
-                          {row.status !== 'completed' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => sendReminder(row.employeeId, row.initiatedAppraisalId)}
-                              data-testid={`table-button-send-reminder-${index}`}
-                              disabled={sendReminderMutation.isPending}
-                            >
-                              <Mail className="h-4 w-4 mr-1" />
-                              Send Reminder
-                            </Button>
-                          )}
+                          <div className="flex gap-2">
+                            {row.status !== 'completed' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => sendReminder(row.employeeId, row.initiatedAppraisalId)}
+                                data-testid={`table-button-send-reminder-${index}`}
+                                disabled={sendReminderMutation.isPending}
+                              >
+                                <Mail className="h-4 w-4 mr-1" />
+                                Send Reminder
+                              </Button>
+                            )}
+                            {row.status === 'completed' && row.evaluationId && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => downloadEvaluation(row.evaluationId, 'pdf')}
+                                  data-testid={`table-button-download-pdf-${index}`}
+                                  disabled={downloadEvaluationMutation.isPending}
+                                >
+                                  <FileDown className="h-4 w-4 mr-1" />
+                                  PDF
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => downloadEvaluation(row.evaluationId, 'docx')}
+                                  data-testid={`table-button-download-docx-${index}`}
+                                  disabled={downloadEvaluationMutation.isPending}
+                                >
+                                  <FileDown className="h-4 w-4 mr-1" />
+                                  DOCX
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -708,18 +777,44 @@ export default function ReviewAppraisal() {
                                       </Badge>
                                     </TableCell>
                                     <TableCell data-testid={`employee-actions-${employeeProgress.employee.id}`}>
-                                      {employeeProgress.status !== 'completed' && (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => sendReminder(employeeProgress.employee.id, appraisal.id)}
-                                          data-testid={`button-send-reminder-${employeeProgress.employee.id}`}
-                                          disabled={sendReminderMutation.isPending}
-                                        >
-                                          <Mail className="h-4 w-4 mr-1" />
-                                          Send Reminder
-                                        </Button>
-                                      )}
+                                      <div className="flex gap-2">
+                                        {employeeProgress.status !== 'completed' && (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => sendReminder(employeeProgress.employee.id, appraisal.id)}
+                                            data-testid={`button-send-reminder-${employeeProgress.employee.id}`}
+                                            disabled={sendReminderMutation.isPending}
+                                          >
+                                            <Mail className="h-4 w-4 mr-1" />
+                                            Send Reminder
+                                          </Button>
+                                        )}
+                                        {employeeProgress.status === 'completed' && employeeProgress.evaluation?.id && (
+                                          <>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => downloadEvaluation(employeeProgress.evaluation.id, 'pdf')}
+                                              data-testid={`button-download-pdf-${employeeProgress.employee.id}`}
+                                              disabled={downloadEvaluationMutation.isPending}
+                                            >
+                                              <FileDown className="h-4 w-4 mr-1" />
+                                              PDF
+                                            </Button>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => downloadEvaluation(employeeProgress.evaluation.id, 'docx')}
+                                              data-testid={`button-download-docx-${employeeProgress.employee.id}`}
+                                              disabled={downloadEvaluationMutation.isPending}
+                                            >
+                                              <FileDown className="h-4 w-4 mr-1" />
+                                              DOCX
+                                            </Button>
+                                          </>
+                                        )}
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                 ))
