@@ -177,6 +177,8 @@ export default function ReviewAppraisal() {
         "Frequency Calendar": row.frequencyCalendarName,
         "Status": row.status.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
         "Due Date": row.dueDate ? format(new Date(row.dueDate), 'MMM dd, yyyy') : 'N/A',
+        "Member Rating": typeof row.memberRating === 'number' ? row.memberRating.toFixed(1) : 'N/A',
+        "Final Manager Rating": typeof row.finalManagerRating === 'number' ? row.finalManagerRating.toFixed(1) : 'N/A',
       }));
 
       // Create workbook and worksheet
@@ -194,6 +196,8 @@ export default function ReviewAppraisal() {
         { wch: 25 }, // Frequency Calendar
         { wch: 15 }, // Status
         { wch: 15 }, // Due Date
+        { wch: 18 }, // Member Rating
+        { wch: 22 }, // Final Manager Rating
       ];
       worksheet['!cols'] = columnWidths;
 
@@ -239,6 +243,11 @@ export default function ReviewAppraisal() {
           dueDate = new Date(createdDate.getTime() + appraisal.daysToClose * 24 * 60 * 60 * 1000);
         }
 
+        // Extract ratings from evaluation data
+        const memberRating = empProgress.evaluation?.selfEvaluationData?.averageRating ?? null;
+        const finalManagerRating = empProgress.evaluation?.overallRating ?? 
+                                   empProgress.evaluation?.managerEvaluationData?.averageRating ?? null;
+
         rows.push({
           employeeId: empProgress.employee.id,
           initiatedAppraisalId: appraisal.id,
@@ -265,6 +274,8 @@ export default function ReviewAppraisal() {
           status: empProgress.status,
           dueDate: dueDate,
           appraisalStatus: appraisal.status,
+          memberRating: memberRating,
+          finalManagerRating: finalManagerRating,
         });
       });
     });
