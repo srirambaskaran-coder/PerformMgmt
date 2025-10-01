@@ -4098,7 +4098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const evaluationId = req.params.id;
       const managerId = req.user.claims.sub;
       
-      const { meetingNotes, finalRating } = req.body;
+      const { meetingNotes, finalRating, showNotesToEmployee } = req.body;
       
       if (!meetingNotes) {
         return res.status(400).json({ message: "Meeting notes are required" });
@@ -4121,6 +4121,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         meetingNotes,
         meetingCompletedAt: new Date()
       };
+      
+      // Only set showNotesToEmployee if provided
+      if (showNotesToEmployee !== undefined) {
+        updateData.showNotesToEmployee = showNotesToEmployee;
+      }
       
       // Allow updating final rating if provided
       if (finalRating !== undefined) {

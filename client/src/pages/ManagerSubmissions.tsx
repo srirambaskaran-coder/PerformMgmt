@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { RoleGuard } from '@/components/RoleGuard';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -53,6 +54,7 @@ interface Evaluation {
   status: string;
   meetingScheduledAt: string | null;
   meetingNotes: string | null;
+  showNotesToEmployee: boolean | null;
   meetingCompletedAt: string | null;
   finalizedAt: string | null;
   employee: Employee;
@@ -89,6 +91,7 @@ interface MeetingSchedule {
 interface MeetingNotesData {
   meetingNotes: string;
   finalRating?: number;
+  showNotesToEmployee: boolean;
 }
 
 export default function ManagerSubmissions() {
@@ -105,7 +108,7 @@ export default function ManagerSubmissions() {
     meetingTitle: 'Performance Review One-on-One',
     meetingDescription: 'Discussion about your performance review and career development.'
   });
-  const [notesData, setNotesData] = useState<MeetingNotesData>({ meetingNotes: '' });
+  const [notesData, setNotesData] = useState<MeetingNotesData>({ meetingNotes: '', showNotesToEmployee: false });
   const [selectedTab, setSelectedTab] = useState<'pending' | 'reviewed' | 'completed'>('pending');
   const { toast } = useToast();
 
@@ -576,7 +579,8 @@ export default function ManagerSubmissions() {
                                 setSelectedEvaluation(evaluation);
                                 setNotesData({ 
                                   meetingNotes: evaluation.meetingNotes || '',
-                                  finalRating: evaluation.overallRating || undefined
+                                  finalRating: evaluation.overallRating || undefined,
+                                  showNotesToEmployee: evaluation.showNotesToEmployee ?? false
                                 });
                                 setIsNotesDialogOpen(true);
                               }}
@@ -763,6 +767,24 @@ export default function ManagerSubmissions() {
                     <SelectItem value="5">5 - Outstanding</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label>Show Meeting Notes to Employee</Label>
+                <RadioGroup
+                  value={notesData.showNotesToEmployee ? "yes" : "no"}
+                  onValueChange={(value) => setNotesData(prev => ({ ...prev, showNotesToEmployee: value === "yes" }))}
+                  className="flex gap-4 mt-2"
+                  data-testid="show-notes-radio"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="yes" id="show-yes" />
+                    <Label htmlFor="show-yes" className="font-normal cursor-pointer">Yes</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="no" id="show-no" />
+                    <Label htmlFor="show-no" className="font-normal cursor-pointer">No</Label>
+                  </div>
+                </RadioGroup>
               </div>
             </div>
 

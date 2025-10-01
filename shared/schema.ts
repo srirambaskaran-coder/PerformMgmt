@@ -177,6 +177,7 @@ export const evaluations = pgTable("evaluations", {
   status: varchar("status").default('not_started'), // not_started, in_progress, completed, overdue
   meetingScheduledAt: timestamp("meeting_scheduled_at"),
   meetingNotes: text("meeting_notes"),
+  showNotesToEmployee: boolean("show_notes_to_employee").default(false),
   meetingCompletedAt: timestamp("meeting_completed_at"),
   finalizedAt: timestamp("finalized_at"),
   createdAt: timestamp("created_at").defaultNow(),
