@@ -2029,24 +2029,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Evaluation not found" });
       }
 
-      // Check access permissions
-      if (currentUser.role === 'employee' && evaluation.employeeId !== currentUser.id) {
-        return res.status(403).json({ message: "Access denied: Can only export your own evaluation" });
-      }
-
-      if (currentUser.role === 'manager' && evaluation.managerId !== currentUser.id && evaluation.employeeId !== currentUser.id) {
-        return res.status(403).json({ message: "Access denied: Can only export evaluations you manage or your own" });
-      }
-
       // Get additional evaluation details from database (secure)
       const employee = await storage.getUser(evaluation.employeeId);
       const manager = await storage.getUser(evaluation.managerId);
 
+      // Helper function to check if user has a specific role
+      const hasRole = (role: string) => {
+        return currentUser.role === role || (currentUser.roles || []).includes(role);
+      };
+
+      // Check access permissions (check both role field and roles array)
+      const isEmployee = hasRole('employee');
+      const isManager = hasRole('manager');
+      const isHRManager = hasRole('hr_manager');
+      const isAdmin = hasRole('admin');
+      const isSuperAdmin = hasRole('super_admin');
+
+      // Super admin and admin have full access
+      if (isSuperAdmin || isAdmin) {
+        // Continue to export
+      }
       // HR Managers can export evaluations for employees in their company
-      if (currentUser.role === 'hr_manager') {
+      else if (isHRManager) {
         if (!employee || employee.companyId !== currentUser.companyId) {
           return res.status(403).json({ message: "Access denied: Can only export evaluations for employees in your company" });
         }
+      }
+      // Managers can export evaluations they manage or their own
+      else if (isManager) {
+        if (evaluation.managerId !== currentUser.id && evaluation.employeeId !== currentUser.id) {
+          return res.status(403).json({ message: "Access denied: Can only export evaluations you manage or your own" });
+        }
+      }
+      // Employees can only export their own evaluations
+      else if (isEmployee) {
+        if (evaluation.employeeId !== currentUser.id) {
+          return res.status(403).json({ message: "Access denied: Can only export your own evaluation" });
+        }
+      }
+      // No valid role
+      else {
+        return res.status(403).json({ message: "Access denied: Insufficient permissions" });
       }
       const reviewCycle = evaluation.reviewCycleId ? await storage.getReviewCycle(evaluation.reviewCycleId) : null;
       
