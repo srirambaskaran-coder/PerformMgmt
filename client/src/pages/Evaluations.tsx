@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -26,7 +27,7 @@ import {
   FileText,
   Play
 } from "lucide-react";
-import type { Evaluation, User as UserType, ReviewCycle, AppraisalCycle, FrequencyCalendar, FrequencyCalendarDetail } from "@shared/schema";
+import type { Evaluation, User as UserType, ReviewCycle, AppraisalCycle, FrequencyCalendar, FrequencyCalendarDetails } from "@shared/schema";
 
 interface EvaluationWithDetails extends Evaluation {
   employee?: UserType;
@@ -35,7 +36,7 @@ interface EvaluationWithDetails extends Evaluation {
   questionnaires?: QuestionnaireTemplate[];
   appraisalCycle?: AppraisalCycle;
   frequencyCalendar?: FrequencyCalendar;
-  frequencyCalendarDetail?: FrequencyCalendarDetail;
+  frequencyCalendarDetail?: FrequencyCalendarDetails;
 }
 
 interface QuestionnaireTemplate {
@@ -614,13 +615,37 @@ export default function Evaluations() {
                         {evaluation.selfEvaluationSubmittedAt ? 'View' : 'Start'}
                       </Button>
                       {evaluation.selfEvaluationSubmittedAt && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          data-testid={`export-evaluation-${evaluation.id}`}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              data-testid={`export-evaluation-${evaluation.id}`}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem
+                              onClick={async () => {
+                                setSelectedEvaluation(evaluation);
+                                await handleExport('pdf');
+                              }}
+                              data-testid={`export-pdf-card-${evaluation.id}`}
+                            >
+                              Export as PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={async () => {
+                                setSelectedEvaluation(evaluation);
+                                await handleExport('docx');
+                              }}
+                              data-testid={`export-docx-card-${evaluation.id}`}
+                            >
+                              Export as DOCX
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                       {evaluation.managerEvaluationSubmittedAt && !evaluation.meetingCompletedAt && (
                         <Button
