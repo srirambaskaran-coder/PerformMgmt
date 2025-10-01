@@ -817,11 +817,11 @@ export default function Evaluations() {
 
         {/* Meeting Scheduler Modal */}
         <Dialog open={showMeetingScheduler} onOpenChange={setShowMeetingScheduler}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Schedule One-on-One Meeting</DialogTitle>
               <DialogDescription>
-                Select preferred dates and times for your evaluation discussion with your manager
+                Select your preferred date and time for your evaluation discussion with your manager
               </DialogDescription>
             </DialogHeader>
             
@@ -847,15 +847,15 @@ export default function Evaluations() {
                 {/* Date Selection */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Select Preferred Time Slots</CardTitle>
+                    <CardTitle className="text-lg">Select Preferred Time Slot</CardTitle>
                     <CardDescription>
-                      Choose up to 3 preferred time slots. Your manager will confirm the final meeting time.
+                      Choose your preferred date and time. Your manager will confirm the final meeting time.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm font-medium mb-2 block">Preferred Date 1</label>
+                        <label className="text-sm font-medium mb-2 block">Preferred Date</label>
                         <div className="space-y-2">
                           <Input
                             type="date"
@@ -869,34 +869,6 @@ export default function Evaluations() {
                             value={meetingData.time}
                             onChange={(e) => setMeetingData(prev => ({ ...prev, time: e.target.value }))}
                             data-testid="meeting-time-1"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-2 block">Preferred Date 2 (Optional)</label>
-                        <div className="space-y-2">
-                          <Input
-                            type="date"
-                            min={new Date().toISOString().split('T')[0]}
-                            data-testid="meeting-date-2"
-                          />
-                          <Input
-                            type="time"
-                            data-testid="meeting-time-2"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-2 block">Preferred Date 3 (Optional)</label>
-                        <div className="space-y-2">
-                          <Input
-                            type="date"
-                            min={new Date().toISOString().split('T')[0]}
-                            data-testid="meeting-date-3"
-                          />
-                          <Input
-                            type="time"
-                            data-testid="meeting-time-3"
                           />
                         </div>
                       </div>
