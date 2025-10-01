@@ -732,7 +732,7 @@ export default function QuestionnaireTemplates() {
             filteredTemplates.map((template) => (
               <Card key={template.id} data-testid={`template-card-${template.id}`}>
                 <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
                         <FileText className="h-6 w-6 text-primary-foreground" />
@@ -751,7 +751,7 @@ export default function QuestionnaireTemplates() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
+                    <div className="flex gap-2 flex-shrink-0 mt-1">
                       <RoleGuard allowedRoles={['admin', 'hr_manager']}>
                         <Button
                           variant="outline"
