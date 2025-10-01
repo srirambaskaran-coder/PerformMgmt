@@ -50,7 +50,7 @@ For testing HR Manager functionality:
 - **Manager**: Team member evaluation, review approval, meeting coordination.
 
 ### Key Features
-- **Email Integration**: Configurable SMTP, automated notifications (invitations, reminders, completion), calendar invite generation.
+- **Email Integration**: Configurable SMTP, automated notifications (invitations, reminders, completion, employee submission alerts), calendar invite generation. When an employee submits their self-evaluation, the system automatically sends an email notification to their manager with CC to all HR managers for the company.
 - **File Management System**: Google Cloud Storage integration, PDF/DOCX generation for evaluations, company asset management.
 - **Progress Tracking**: Accurate, real-time tracking of evaluation progress with comprehensive filtering (Appraisal Cycle, Frequency Calendar, Frequency Calendar Details, Group, Employee, Location, Department, Level, Grade, Manager) and different view modes (Card, Table). The Appraisal Cycle filter displays actual cycles in "code - description" format (e.g., "FY 2025-26 - Annual Appraisal from April 2025 to March 2026"). Includes functional "Send Reminder" capabilities. Excel export includes Location, Member Rating, and Final Manager Rating columns with proper handling of 0 ratings.
 - **Appraisal Initiation**: Supports "Publish Now" for immediate evaluation creation and email notifications, and "Publish As Per Calendar" for scheduled initiation based on frequency calendar periods.
