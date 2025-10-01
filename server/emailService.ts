@@ -6,6 +6,8 @@ interface EmailOptions {
   subject: string;
   html: string;
   text?: string;
+  cc?: string | string[];
+  bcc?: string | string[];
 }
 
 class EmailService {
@@ -57,6 +59,8 @@ class EmailService {
       subject: options.subject,
       html: options.html,
       text: options.text,
+      cc: options.cc,
+      bcc: options.bcc,
     };
 
     try {
