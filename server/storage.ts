@@ -193,7 +193,7 @@ export interface IStorage {
   
   // Appraisal Cycle operations - Administrator isolated
   getAppraisalCycles(createdById: string): Promise<AppraisalCycle[]>;
-  getAllAppraisalCycles(): Promise<AppraisalCycle[]>; // For HR managers to see all cycles
+  getAllAppraisalCycles(companyId: string): Promise<AppraisalCycle[]>; // For HR managers to see all cycles in their company
   getAppraisalCycle(id: string, createdById: string): Promise<AppraisalCycle | undefined>;
   createAppraisalCycle(cycle: InsertAppraisalCycle, createdById: string): Promise<AppraisalCycle>;
   updateAppraisalCycle(id: string, cycle: Partial<InsertAppraisalCycle>, createdById: string): Promise<AppraisalCycle>;
@@ -1391,11 +1391,29 @@ export class DatabaseStorage implements IStorage {
     ).orderBy(asc(appraisalCycles.code));
   }
 
-  // Get all appraisal cycles for HR managers
-  async getAllAppraisalCycles(): Promise<AppraisalCycle[]> {
-    return await db.select().from(appraisalCycles).where(
-      eq(appraisalCycles.status, 'active')
-    ).orderBy(asc(appraisalCycles.code));
+  // Get all appraisal cycles for HR managers in their company
+  async getAllAppraisalCycles(companyId: string): Promise<AppraisalCycle[]> {
+    // Join with users table to filter by company
+    return await db.select({
+      id: appraisalCycles.id,
+      code: appraisalCycles.code,
+      description: appraisalCycles.description,
+      fromDate: appraisalCycles.fromDate,
+      toDate: appraisalCycles.toDate,
+      status: appraisalCycles.status,
+      createdAt: appraisalCycles.createdAt,
+      updatedAt: appraisalCycles.updatedAt,
+      createdById: appraisalCycles.createdById,
+    })
+    .from(appraisalCycles)
+    .leftJoin(users, eq(appraisalCycles.createdById, users.id))
+    .where(
+      and(
+        eq(appraisalCycles.status, 'active'),
+        eq(users.companyId, companyId)
+      )
+    )
+    .orderBy(asc(appraisalCycles.code));
   }
 
   async getAppraisalCycle(id: string, createdById: string): Promise<AppraisalCycle | undefined> {

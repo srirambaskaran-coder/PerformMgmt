@@ -2603,11 +2603,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // HR managers can see all active appraisal cycles, admins see only theirs
+      // HR managers can see all active appraisal cycles in their company, admins see only theirs
       const activeRole = req.user.activeRole || user.role;
       let cycles;
       if (activeRole === 'hr_manager') {
-        cycles = await storage.getAllAppraisalCycles();
+        cycles = await storage.getAllAppraisalCycles(user.companyId);
       } else {
         cycles = await storage.getAppraisalCycles(userId);
       }
