@@ -383,6 +383,11 @@ export default function AppraisalGroups() {
   const availableEmployees = allUsers.filter(user => {
     if (existingMemberIds.includes(user.id)) return false;
     
+    // Exclude super_admin and admin roles (check both role field and roles array)
+    const hasAdminRole = user.role === 'super_admin' || user.role === 'admin' || 
+                        (user.roles || []).some(r => r === 'admin' || r === 'super_admin');
+    if (hasAdminRole) return false;
+    
     // Apply structured filters
     // Name or Code filter
     if (appliedFilters.nameOrCode) {

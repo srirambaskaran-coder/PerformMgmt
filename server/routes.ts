@@ -3242,6 +3242,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { groupId } = req.params;
       const { userId } = req.body;
       
+      // Validate that the user being added is not an admin or super_admin
+      const userToAdd = await storage.getUser(userId);
+      if (!userToAdd) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Check both role field and roles array
+      const hasAdminRole = userToAdd.role === 'admin' || userToAdd.role === 'super_admin' ||
+                          (userToAdd.roles || []).some(r => r === 'admin' || r === 'super_admin');
+      
+      if (hasAdminRole) {
+        return res.status(403).json({ message: "Cannot add users with admin or super_admin roles to appraisal groups" });
+      }
+      
       const memberData = {
         appraisalGroupId: groupId,
         userId: userId,
