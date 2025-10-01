@@ -3661,6 +3661,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get scheduled meetings for HR Manager
+  app.get('/api/hr-manager/scheduled-meetings', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      
+      // Get user to find company ID
+      const user = await storage.getUser(requestingUserId);
+      if (!user || !user.companyId) {
+        return res.status(404).json({ message: "User or company not found" });
+      }
+      
+      // Get all scheduled meetings for the company
+      const meetings = await storage.getScheduledMeetingsForCompany(user.companyId);
+      
+      res.json(meetings);
+    } catch (error) {
+      console.error("Error fetching scheduled meetings:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Send Reminder Email endpoint
   app.post('/api/send-reminder', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
     try {
