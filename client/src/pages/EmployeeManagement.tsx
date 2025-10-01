@@ -1137,9 +1137,17 @@ export default function EmployeeManagement() {
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
-                      <Badge variant={user.role === 'super_admin' ? 'default' : 'secondary'}>
-                        {user.role?.replace('_', ' ')}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        {((user as any).roles && Array.isArray((user as any).roles) ? (user as any).roles : [user.role]).map((role: string, index: number) => (
+                          <Badge 
+                            key={`${user.id}-${role}-${index}`}
+                            variant={role === 'super_admin' ? 'default' : 'secondary'}
+                            data-testid={`user-role-${user.id}-${role}`}
+                          >
+                            {role === 'hr_manager' ? 'HR Manager' : role?.replace('_', ' ')}
+                          </Badge>
+                        ))}
+                      </div>
                       <Badge variant={user.status === 'active' ? 'default' : 'secondary'}>
                         {user.status}
                       </Badge>
