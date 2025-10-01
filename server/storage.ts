@@ -246,6 +246,7 @@ export interface IStorage {
   updateInitiatedAppraisalStatus(id: string, status: string): Promise<void>;
   createInitiatedAppraisalDetailTiming(timing: InsertInitiatedAppraisalDetailTiming): Promise<InitiatedAppraisalDetailTiming>;
   getInitiatedAppraisalDetailTimings(appraisalId: string): Promise<InitiatedAppraisalDetailTiming[]>;
+  getInitiatedAppraisal(id: string): Promise<InitiatedAppraisal | null>;
   getInitiatedAppraisals(createdById: string): Promise<InitiatedAppraisal[]>;
   
   // Scheduled Appraisal Task operations
@@ -2073,6 +2074,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(initiatedAppraisalDetailTimings).where(
       eq(initiatedAppraisalDetailTimings.initiatedAppraisalId, appraisalId)
     ).orderBy(asc(initiatedAppraisalDetailTimings.createdAt));
+  }
+
+  async getInitiatedAppraisal(id: string): Promise<InitiatedAppraisal | null> {
+    const [appraisal] = await db.select().from(initiatedAppraisals).where(eq(initiatedAppraisals.id, id));
+    return appraisal || null;
   }
 
   async getInitiatedAppraisals(createdById: string): Promise<(InitiatedAppraisal & { progress?: any })[]> {
