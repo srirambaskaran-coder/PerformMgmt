@@ -50,13 +50,14 @@ For testing HR Manager functionality:
 - **Manager**: Team member evaluation, review approval, meeting coordination.
 
 ### Key Features
-- **Email Integration**: Configurable SMTP, automated notifications (invitations, reminders, completion, employee submission alerts), calendar invite generation. When an employee submits their self-evaluation, the system automatically sends an email notification to their manager with CC to all HR managers for the company.
+- **Email Integration**: Configurable SMTP, automated notifications (invitations, reminders, completion, employee submission alerts), calendar invite generation. When an employee submits their self-evaluation, the system automatically sends an email notification to their manager with CC to all HR managers for the company. Performance Review Completion emails include Employee Code, Employee Name, Employee Email ID, Final Rating, Meeting Completed On date, Meeting Notes (with visibility control), and Manager information. Meeting notes are only shown to employees if the manager explicitly enables the "Show notes to employee" option.
 - **File Management System**: Google Cloud Storage integration, PDF/DOCX generation for evaluations, company asset management.
 - **Progress Tracking**: Accurate, real-time tracking of evaluation progress with comprehensive filtering (Appraisal Cycle, Frequency Calendar, Frequency Calendar Details, Group, Employee, Location, Department, Level, Grade, Manager) and different view modes (Card, Table). The Appraisal Cycle filter displays actual cycles in "code - description" format (e.g., "FY 2025-26 - Annual Appraisal from April 2025 to March 2026"). Includes functional "Send Reminder" capabilities. Excel export includes Location, Member Rating, and Final Manager Rating columns with proper handling of 0 ratings.
 - **Appraisal Initiation**: Supports "Publish Now" for immediate evaluation creation and email notifications, and "Publish As Per Calendar" for scheduled initiation based on frequency calendar periods.
 - **Multi-Select Period Selection**: HR Managers can selectively choose specific calendar periods for appraisal initiation, preserving per-period timing configurations.
 - **Password Management**: All user roles (HR Manager, Employee, Manager, Administrator, Super Administrator) can change their own passwords through the Settings page with secure validation and current password verification.
 - **Meeting Scheduler**: Streamlined one-on-one meeting scheduler with single preferred date/time selection. Modal optimized for 100% zoom visibility (max-w-xl, max-h-90vh with scrolling).
+- **Meeting Notes with Visibility Control**: Managers can add meeting notes after completing performance reviews with a toggle to control whether notes are visible to employees. The "Show notes to employee" setting defaults to "No" (hidden) and is preserved when editing notes. Meeting notes visibility is enforced in all email notifications based on this setting.
 
 ## External Dependencies
 
