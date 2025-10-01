@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Users, Edit2, Trash2, UserPlus, X, Search, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, Users, Edit2, Trash2, UserPlus, X, Search, Calendar as CalendarIcon, LayoutGrid, LayoutList } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,8 @@ interface EmployeeFilters {
 
 export default function AppraisalGroups() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+  const [memberSearchQueries, setMemberSearchQueries] = useState<Record<string, string>>({});
   // Draft filters that user is typing (not yet applied)
   const [draftFilters, setDraftFilters] = useState<EmployeeFilters>({
     nameOrCode: "",
@@ -663,10 +665,32 @@ export default function AppraisalGroups() {
         {/* Groups List */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Users className="h-5 w-5 mr-2" />
-              Appraisal Groups ({filteredGroups.length})
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center">
+                <Users className="h-5 w-5 mr-2" />
+                Appraisal Groups ({filteredGroups.length})
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant={viewMode === 'card' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('card')}
+                  data-testid="view-mode-card"
+                >
+                  <LayoutGrid className="h-4 w-4 mr-1" />
+                  Card
+                </Button>
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  data-testid="view-mode-table"
+                >
+                  <LayoutList className="h-4 w-4 mr-1" />
+                  Table
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {isLoadingGroups ? (
@@ -692,102 +716,196 @@ export default function AppraisalGroups() {
                   </Button>
                 )}
               </div>
-            ) : (
+            ) : viewMode === 'card' ? (
               <div className="space-y-4">
-                {filteredGroups.map((group) => (
-                  <Card key={group.id} className="p-4">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-semibold" data-testid={`group-name-${group.id}`}>
-                            {group.name}
-                          </h3>
-                          <Badge variant="secondary" data-testid={`group-count-${group.id}`}>
-                            {group.members.length} members
-                          </Badge>
-                        </div>
-                        {group.description && (
-                          <p className="text-sm text-muted-foreground mb-2" data-testid={`group-description-${group.id}`}>
-                            {group.description}
+                {filteredGroups.map((group) => {
+                  const memberSearchQuery = memberSearchQueries[group.id] || '';
+                  const filteredMembers = group.members.filter(member => {
+                    if (!memberSearchQuery) return true;
+                    const query = memberSearchQuery.toLowerCase();
+                    const fullName = `${member.firstName || ''} ${member.lastName || ''}`.toLowerCase();
+                    const email = (member.email || '').toLowerCase();
+                    const code = (member.code || '').toLowerCase();
+                    return fullName.includes(query) || email.includes(query) || code.includes(query);
+                  });
+
+                  return (
+                    <Card key={group.id} className="p-4">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-lg font-semibold" data-testid={`group-name-${group.id}`}>
+                              {group.name}
+                            </h3>
+                            <Badge variant="secondary" data-testid={`group-count-${group.id}`}>
+                              {group.members.length} members
+                            </Badge>
+                          </div>
+                          {group.description && (
+                            <p className="text-sm text-muted-foreground mb-2" data-testid={`group-description-${group.id}`}>
+                              {group.description}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            Created: {group.createdAt ? new Date(group.createdAt).toLocaleDateString() : 'N/A'}
                           </p>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                          Created: {new Date(group.createdAt).toLocaleDateString()}
-                        </p>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleAddEmployees(group.id)}
+                            data-testid={`add-employees-${group.id}`}
+                          >
+                            <UserPlus className="h-4 w-4 mr-1" />
+                            Add Employees
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(group)}
+                            data-testid={`edit-group-${group.id}`}
+                          >
+                            <Edit2 className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDelete(group.id)}
+                            data-testid={`delete-group-${group.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
                       </div>
                       
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAddEmployees(group.id)}
-                          data-testid={`add-employees-${group.id}`}
-                        >
-                          <UserPlus className="h-4 w-4 mr-1" />
-                          Add Employees
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(group)}
-                          data-testid={`edit-group-${group.id}`}
-                        >
-                          <Edit2 className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(group.id)}
-                          data-testid={`delete-group-${group.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    {/* Group Members */}
-                    {group.members.length > 0 && (
-                      <div className="border-t pt-4">
-                        <h4 className="font-medium mb-3">Group Members</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {group.members.map((member) => (
-                            <div
-                              key={member.id}
-                              className="flex items-center justify-between p-2 bg-muted rounded"
-                              data-testid={`member-${group.id}-${member.id}`}
-                            >
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">
-                                  {member.firstName} {member.lastName}
-                                </p>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {member.email}
-                                </p>
-                                {member.department && (
-                                  <p className="text-xs text-muted-foreground truncate">
-                                    {member.department}
-                                  </p>
-                                )}
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveMember(group.id, member.id)}
-                                className="h-6 w-6 p-0 ml-2"
-                                data-testid={`remove-member-${group.id}-${member.id}`}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
+                      {/* Group Members */}
+                      {group.members.length > 0 && (
+                        <div className="border-t pt-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-medium">Group Members</h4>
+                            <div className="relative w-64">
+                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                placeholder="Search by name, code, or email..."
+                                value={memberSearchQuery}
+                                onChange={(e) => setMemberSearchQueries({
+                                  ...memberSearchQueries,
+                                  [group.id]: e.target.value
+                                })}
+                                className="pl-10 h-8"
+                                data-testid={`search-members-${group.id}`}
+                              />
                             </div>
-                          ))}
+                          </div>
+                          {filteredMembers.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">
+                              No members found matching your search.
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                              {filteredMembers.map((member) => (
+                                <div
+                                  key={member.id}
+                                  className="flex items-center justify-between p-2 bg-muted rounded"
+                                  data-testid={`member-${group.id}-${member.id}`}
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">
+                                      {member.firstName} {member.lastName}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                      {member.email}
+                                    </p>
+                                    {member.code && (
+                                      <p className="text-xs text-muted-foreground truncate">
+                                        Code: {member.code}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveMember(group.id, member.id)}
+                                    className="h-6 w-6 p-0 ml-2"
+                                    data-testid={`remove-member-${group.id}-${member.id}`}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
-                  </Card>
-                ))}
+                      )}
+                    </Card>
+                  );
+                })}
               </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Group Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Members</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredGroups.map((group) => (
+                    <TableRow key={group.id}>
+                      <TableCell className="font-medium" data-testid={`table-group-name-${group.id}`}>
+                        {group.name}
+                      </TableCell>
+                      <TableCell data-testid={`table-group-description-${group.id}`}>
+                        {group.description || '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" data-testid={`table-group-count-${group.id}`}>
+                          {group.members.length}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {group.createdAt ? new Date(group.createdAt).toLocaleDateString() : 'N/A'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleAddEmployees(group.id)}
+                            data-testid={`table-add-employees-${group.id}`}
+                          >
+                            <UserPlus className="h-4 w-4 mr-1" />
+                            Add
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(group)}
+                            data-testid={`table-edit-group-${group.id}`}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDelete(group.id)}
+                            data-testid={`table-delete-group-${group.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
