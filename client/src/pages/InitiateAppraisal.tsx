@@ -45,6 +45,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -1082,6 +1083,76 @@ export default function InitiateAppraisal() {
                         </div>
                       </ScrollArea>
                     </div>
+                  </div>
+
+                  {/* Publish Options */}
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-semibold">Publish Options</h4>
+                    
+                    <FormField
+                      control={form.control}
+                      name="publishType"
+                      render={({ field }) => (
+                        <FormItem className="space-y-3">
+                          <FormLabel>When should the appraisal be published?</FormLabel>
+                          <FormControl>
+                            <RadioGroup
+                              onValueChange={field.onChange}
+                              value={field.value}
+                              className="flex flex-col space-y-2"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="now" id="publish-now" data-testid="radio-publish-now" />
+                                <Label htmlFor="publish-now" className="font-normal cursor-pointer">
+                                  <div>
+                                    <div className="font-medium">Publish Now</div>
+                                    <div className="text-sm text-muted-foreground">
+                                      Immediately initiate the questionnaire to all employees in the selected appraisal group
+                                    </div>
+                                  </div>
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="as_per_calendar" id="publish-calendar" data-testid="radio-publish-calendar" />
+                                <Label htmlFor="publish-calendar" className="font-normal cursor-pointer">
+                                  <div>
+                                    <div className="font-medium">Publish As Per Calendar</div>
+                                    <div className="text-sm text-muted-foreground">
+                                      Publish the questionnaire on the scheduled date (end date of frequency calendar + days to initiate)
+                                    </div>
+                                  </div>
+                                </Label>
+                              </div>
+                            </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Info message for calendar-based publishing */}
+                    {form.watch('publishType') === 'as_per_calendar' && selectedCalendarDetailIds.length > 0 && (
+                      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                          <strong>Scheduled Publishing:</strong> The appraisal will be published to employees based on each selected calendar period's end date plus the configured "Days to Initiate" value.
+                        </p>
+                        {form.watch('calendarDetailTimings').map((timing: any) => {
+                          const detail = calendarDetails.find(d => d.id === timing.detailId);
+                          if (!detail) return null;
+                          
+                          // Calculate scheduled date: end date + daysToInitiate
+                          const endDate = new Date(detail.endDate);
+                          const scheduledDate = new Date(endDate);
+                          scheduledDate.setDate(scheduledDate.getDate() + (timing.daysToInitiate || 0));
+                          
+                          return (
+                            <p key={timing.detailId} className="text-sm text-blue-700 dark:text-blue-300 mt-2">
+                              • {detail.displayName}: Will be published on <strong>{scheduledDate.toLocaleDateString()}</strong> ({detail.endDate ? new Date(detail.endDate).toLocaleDateString() : 'N/A'} + {timing.daysToInitiate || 0} days)
+                            </p>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   <DialogFooter className="pt-6">
