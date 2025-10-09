@@ -8,6 +8,15 @@ This is a comprehensive employee performance evaluation and review management sy
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### Date Handling Fix (October 2025)
+Fixed timezone-related date display issues in Frequency Calendar system:
+- **Problem**: Database stored UTC timestamps (e.g., `2025-03-31 18:30:00`) representing local IST dates. PostgreSQL returned these without timezone info, causing JavaScript to interpret them as local time, resulting in off-by-one date errors.
+- **Solution**: Updated database to store actual local dates (`2025-04-01 00:00:00` instead of `2025-03-31 18:30:00`).
+- **Impact**: Calendar periods now display correctly (e.g., Q1-2025 shows 4/1/2025 - 6/30/2025 instead of 3/31/2025 - 6/29/2025).
+- **Implementation**: Date formatting uses local component extraction to ensure consistency across timezones.
+
 ## Test Credentials
 
 For testing HR Manager functionality:

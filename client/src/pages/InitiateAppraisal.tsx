@@ -692,10 +692,24 @@ export default function InitiateAppraisal() {
                                   <FormLabel>Frequency Calendar Details*</FormLabel>
                                   <FormControl>
                                     <MultiSelect
-                                      options={calendarDetails.map(detail => ({
-                                        value: detail.id,
-                                        label: `${detail.displayName} (${new Date(detail.startDate).toLocaleDateString()} - ${new Date(detail.endDate).toLocaleDateString()})`
-                                      }))}
+                                      options={calendarDetails.map(detail => {
+                                        // Format dates properly to avoid timezone issues
+                                        const formatDate = (dateValue: any) => {
+                                          // First convert to Date object if it's a string
+                                          const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+                                          // Then extract LOCAL date components
+                                          return new Date(
+                                            date.getFullYear(),
+                                            date.getMonth(),
+                                            date.getDate()
+                                          ).toLocaleDateString();
+                                        };
+                                        
+                                        return {
+                                          value: detail.id,
+                                          label: `${detail.displayName} (${formatDate(detail.startDate)} - ${formatDate(detail.endDate)})`
+                                        };
+                                      })}
                                       value={field.value || []}
                                       onChange={handleCalendarDetailSelection}
                                       placeholder="Select calendar periods..."
@@ -728,7 +742,15 @@ export default function InitiateAppraisal() {
                                           <div>
                                             <h6 className="font-medium">{detail.displayName}</h6>
                                             <p className="text-sm text-muted-foreground">
-                                              {new Date(detail.startDate).toLocaleDateString()} - {new Date(detail.endDate).toLocaleDateString()}
+                                              {(() => {
+                                                const formatDate = (dateValue: any) => {
+                                                  // First convert to Date object if it's a string
+                                                  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+                                                  // Then extract LOCAL date components
+                                                  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).toLocaleDateString();
+                                                };
+                                                return `${formatDate(detail.startDate)} - ${formatDate(detail.endDate)}`;
+                                              })()}
                                             </p>
                                           </div>
                                         </div>
@@ -1141,13 +1163,25 @@ export default function InitiateAppraisal() {
                           if (!detail) return null;
                           
                           // Calculate scheduled date: end date + daysToInitiate
-                          const endDate = new Date(detail.endDate);
+                          // First convert to Date object if needed, then extract local components
+                          const endDateValue = detail.endDate;
+                          const tempDate = endDateValue instanceof Date ? endDateValue : new Date(endDateValue);
+                          // Extract LOCAL date components to preserve the intended date
+                          const endDate = new Date(
+                            tempDate.getFullYear(),
+                            tempDate.getMonth(),
+                            tempDate.getDate()
+                          );
+                          
+                          const daysToAdd = Number(timing.daysToInitiate) || 0;
+                          
+                          // Create scheduled date by adding days
                           const scheduledDate = new Date(endDate);
-                          scheduledDate.setDate(scheduledDate.getDate() + (timing.daysToInitiate || 0));
+                          scheduledDate.setDate(scheduledDate.getDate() + daysToAdd);
                           
                           return (
                             <p key={timing.detailId} className="text-sm text-blue-700 dark:text-blue-300 mt-2">
-                              • {detail.displayName}: Will be published on <strong>{scheduledDate.toLocaleDateString()}</strong> ({detail.endDate ? new Date(detail.endDate).toLocaleDateString() : 'N/A'} + {timing.daysToInitiate || 0} days)
+                              • {detail.displayName}: Will be published on <strong>{scheduledDate.toLocaleDateString()}</strong> ({endDate.toLocaleDateString()} + {daysToAdd} {daysToAdd === 1 ? 'day' : 'days'})
                             </p>
                           );
                         })}

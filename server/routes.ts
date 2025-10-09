@@ -3475,9 +3475,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
               continue;
             }
             
-            // Calculate the scheduled date: detail.startDate + daysToInitiate
-            const scheduledDate = new Date(detail.startDate);
-            scheduledDate.setDate(scheduledDate.getDate() + timingConfig.daysToInitiate);
+            // Calculate the scheduled date: detail.endDate + daysToInitiate
+            // Use local date components to preserve the intended date
+            let scheduledDate: Date;
+            
+            if (detail.endDate instanceof Date) {
+              // Use LOCAL date components to preserve the date as it appears in server timezone
+              scheduledDate = new Date(
+                detail.endDate.getFullYear(),
+                detail.endDate.getMonth(),
+                detail.endDate.getDate()
+              );
+            } else {
+              // Parse string date
+              const dateStr = String(detail.endDate).split('T')[0];
+              const [year, month, day] = dateStr.split('-').map(Number);
+              scheduledDate = new Date(year, month - 1, day);
+            }
+            
+            scheduledDate.setDate(scheduledDate.getDate() + Number(timingConfig.daysToInitiate));
             
             // Create the scheduled task
             await storage.createScheduledAppraisalTask({
