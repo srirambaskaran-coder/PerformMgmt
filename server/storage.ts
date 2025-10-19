@@ -76,7 +76,6 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, like, inArray, or, sql, isNotNull } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
 import bcrypt from "bcrypt";
 
 // Helper function to sanitize user objects by removing passwordHash
@@ -1046,13 +1045,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEvaluationsForCalibration(companyId: string): Promise<any[]> {
-    const manager = alias(users, 'manager');
-    
     const results = await db
       .select({
         evaluation: evaluations,
         employee: users,
-        manager: manager,
+        manager: {
+          id: sql`manager.id`,
+          firstName: sql`manager.first_name`,
+          lastName: sql`manager.last_name`,
+          email: sql`manager.email`,
+        },
         location: locations,
         department: departments,
         level: levels,
@@ -1064,7 +1066,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(evaluations)
       .leftJoin(users, eq(evaluations.employeeId, users.id))
-      .leftJoin(manager, eq(evaluations.managerId, manager.id))
+      .leftJoin(sql`users as manager`, sql`${evaluations.managerId} = manager.id`)
       .leftJoin(locations, eq(users.locationId, locations.id))
       .leftJoin(departments, eq(users.departmentId, departments.id))
       .leftJoin(levels, eq(users.levelId, levels.id))
