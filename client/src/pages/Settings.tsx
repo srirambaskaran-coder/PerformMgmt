@@ -175,6 +175,7 @@ export default function Settings() {
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
+        credentials: 'include',
       });
 
       if (!uploadResponse.ok) {
@@ -182,11 +183,14 @@ export default function Settings() {
       }
 
       const { url } = await uploadResponse.json();
+      console.log('Uploaded logo URL:', url);
+      console.log('Making PUT request to:', '/api/companies/current/logo');
 
       // Update company with new logo URL using dedicated logo endpoint
       const updateResponse = await apiRequest('PUT', `/api/companies/current/logo`, {
         logoUrl: url,
       });
+      console.log('PUT response:', updateResponse);
       
       if (!updateResponse.ok) {
         const errorText = await updateResponse.text();
