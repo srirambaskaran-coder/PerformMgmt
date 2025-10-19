@@ -142,6 +142,9 @@ export interface IStorage {
   getEvaluationByEmployeeAndCycle(employeeId: string, reviewCycleId: string): Promise<Evaluation | undefined>;
   getEvaluationsByInitiatedAppraisal(initiatedAppraisalId: string): Promise<Evaluation[]>;
   getScheduledMeetingsForCompany(companyId: string): Promise<any[]>;
+  getEvaluationsForCalibration(companyId: string): Promise<any[]>;
+  getEvaluationById(id: string): Promise<Evaluation | undefined>;
+  updateEvaluationCalibration(id: string, calibration: { calibratedRating: number | null; calibrationRemarks: string; calibratedBy: string; calibratedAt: Date }): Promise<Evaluation>;
   
   // Email operations
   getEmailTemplates(): Promise<EmailTemplate[]>;
@@ -1039,6 +1042,102 @@ export class DatabaseStorage implements IStorage {
       } : null,
       manager: result.manager,
     }));
+  }
+
+  async getEvaluationsForCalibration(companyId: string): Promise<any[]> {
+    const results = await db
+      .select({
+        evaluation: evaluations,
+        employee: users,
+        manager: sql`manager`,
+        location: locations,
+        department: departments,
+        level: levels,
+        grade: grades,
+        initiatedAppraisal: initiatedAppraisals,
+        appraisalCycle: appraisalCycles,
+        appraisalGroup: appraisalGroups,
+        frequencyCalendar: frequencyCalendars,
+      })
+      .from(evaluations)
+      .leftJoin(users, eq(evaluations.employeeId, users.id))
+      .leftJoin(sql`users as manager`, sql`${evaluations.managerId} = manager.id`)
+      .leftJoin(locations, eq(users.locationId, locations.id))
+      .leftJoin(departments, eq(users.departmentId, departments.id))
+      .leftJoin(levels, eq(users.levelId, levels.id))
+      .leftJoin(grades, eq(users.gradeId, grades.id))
+      .leftJoin(initiatedAppraisals, eq(evaluations.initiatedAppraisalId, initiatedAppraisals.id))
+      .leftJoin(appraisalCycles, eq(initiatedAppraisals.appraisalCycleId, appraisalCycles.id))
+      .leftJoin(appraisalGroups, eq(initiatedAppraisals.appraisalGroupId, appraisalGroups.id))
+      .leftJoin(frequencyCalendars, eq(initiatedAppraisals.frequencyCalendarId, frequencyCalendars.id))
+      .where(
+        and(
+          eq(users.companyId, companyId),
+          isNotNull(evaluations.overallRating)
+        )
+      )
+      .orderBy(desc(evaluations.updatedAt));
+    
+    return results.map(result => ({
+      id: result.evaluation.id,
+      employeeId: result.evaluation.employeeId,
+      employeeName: result.employee ? `${result.employee.firstName} ${result.employee.lastName}` : 'Unknown',
+      employeeCode: result.employee?.employeeCode || 'N/A',
+      managerId: result.evaluation.managerId,
+      managerName: result.manager ? `${result.manager.first_name} ${result.manager.last_name}` : 'Unknown',
+      locationId: result.employee?.locationId,
+      locationName: result.location?.name || 'N/A',
+      departmentId: result.employee?.departmentId,
+      departmentName: result.department?.name || 'N/A',
+      levelId: result.employee?.levelId,
+      levelName: result.level?.name || 'N/A',
+      gradeId: result.employee?.gradeId,
+      gradeName: result.grade?.name || 'N/A',
+      appraisalGroupId: result.initiatedAppraisal?.appraisalGroupId,
+      appraisalGroupName: result.appraisalGroup?.name || 'N/A',
+      appraisalCycleId: result.initiatedAppraisal?.appraisalCycleId,
+      appraisalCycleName: result.appraisalCycle ? `${result.appraisalCycle.code} - ${result.appraisalCycle.description}` : 'N/A',
+      frequencyCalendarId: result.initiatedAppraisal?.frequencyCalendarId,
+      frequencyCalendarName: result.frequencyCalendar?.name || 'N/A',
+      frequencyCalendarDetailId: result.initiatedAppraisal?.frequencyCalendarDetailId,
+      overallRating: result.evaluation.overallRating,
+      calibratedRating: result.evaluation.calibratedRating,
+      calibrationRemarks: result.evaluation.calibrationRemarks,
+      calibratedBy: result.evaluation.calibratedBy,
+      calibratedAt: result.evaluation.calibratedAt,
+      meetingCompletedAt: result.evaluation.meetingCompletedAt,
+    }));
+  }
+
+  async getEvaluationById(id: string): Promise<Evaluation | undefined> {
+    const [evaluation] = await db
+      .select()
+      .from(evaluations)
+      .where(eq(evaluations.id, id));
+    return evaluation;
+  }
+
+  async updateEvaluationCalibration(
+    id: string, 
+    calibration: { 
+      calibratedRating: number | null; 
+      calibrationRemarks: string; 
+      calibratedBy: string; 
+      calibratedAt: Date;
+    }
+  ): Promise<Evaluation> {
+    const [updatedEvaluation] = await db
+      .update(evaluations)
+      .set({
+        calibratedRating: calibration.calibratedRating,
+        calibrationRemarks: calibration.calibrationRemarks,
+        calibratedBy: calibration.calibratedBy,
+        calibratedAt: calibration.calibratedAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(evaluations.id, id))
+      .returning();
+    return updatedEvaluation;
   }
 
   // Email operations

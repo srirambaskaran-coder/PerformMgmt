@@ -1853,6 +1853,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get evaluations for calibration - HR Manager only
+  app.get('/api/evaluations/calibrate', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      
+      // Get requesting user to determine company
+      const requestingUser = await storage.getUser(requestingUserId);
+      if (!requestingUser?.companyId) {
+        return res.status(403).json({ message: "User company not found" });
+      }
+      
+      // Get all evaluations with completed manager ratings
+      const evaluations = await storage.getEvaluationsForCalibration(requestingUser.companyId);
+      
+      res.json(evaluations);
+    } catch (error) {
+      console.error("Error fetching evaluations for calibration:", error);
+      res.status(500).json({ message: "Failed to fetch evaluations for calibration" });
+    }
+  });
+
+  // Update calibrated rating for an evaluation - HR Manager only
+  app.patch('/api/evaluations/:id/calibrate', isAuthenticated, requireRoles(['hr_manager']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { calibratedRating, calibrationRemarks } = req.body;
+      const requestingUserId = req.user.claims.sub;
+      
+      // Get requesting user to verify company access
+      const requestingUser = await storage.getUser(requestingUserId);
+      if (!requestingUser?.companyId) {
+        return res.status(403).json({ message: "User company not found" });
+      }
+      
+      // Get the evaluation
+      const evaluation = await storage.getEvaluationById(id);
+      if (!evaluation) {
+        return res.status(404).json({ message: "Evaluation not found" });
+      }
+      
+      // Verify the employee belongs to the same company
+      const employee = await storage.getUser(evaluation.employeeId);
+      if (employee?.companyId !== requestingUser.companyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Update calibration
+      const updatedEvaluation = await storage.updateEvaluationCalibration(id, {
+        calibratedRating,
+        calibrationRemarks,
+        calibratedBy: requestingUserId,
+        calibratedAt: new Date(),
+      });
+      
+      // Get employee details for response
+      const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown';
+      
+      res.json({
+        ...updatedEvaluation,
+        employeeName,
+      });
+    } catch (error) {
+      console.error("Error updating calibration:", error);
+      res.status(500).json({ message: "Failed to update calibration" });
+    }
+  });
+
   // Get evaluations requiring manager review (submitted by employees) - MUST come before /:id route
   app.get('/api/evaluations/manager-submissions', isAuthenticated, requireRoles(['manager']), async (req: any, res) => {
     try {

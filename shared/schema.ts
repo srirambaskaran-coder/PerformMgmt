@@ -174,6 +174,10 @@ export const evaluations = pgTable("evaluations", {
   managerEvaluationData: jsonb("manager_evaluation_data"), // Manager responses
   managerEvaluationSubmittedAt: timestamp("manager_evaluation_submitted_at"),
   overallRating: integer("overall_rating"),
+  calibratedRating: integer("calibrated_rating"), // HR-adjusted rating
+  calibrationRemarks: text("calibration_remarks"), // Optional remarks from HR for calibration
+  calibratedBy: varchar("calibrated_by"), // User ID of HR manager who calibrated
+  calibratedAt: timestamp("calibrated_at"), // When the calibration was done
   status: varchar("status").default('not_started'), // not_started, in_progress, completed, overdue
   meetingScheduledAt: timestamp("meeting_scheduled_at"),
   meetingNotes: text("meeting_notes"),
