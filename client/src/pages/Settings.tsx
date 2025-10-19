@@ -196,13 +196,22 @@ export default function Settings() {
 
       // Extract the public URL from the upload URL (remove query params)
       const url = uploadURL.split('?')[0];
-      console.log('File uploaded, logo URL:', url);
+      console.log('File uploaded, URL:', url);
 
-      console.log('Making PUT request to update logo...');
+      // Set the logo to be publicly accessible
+      console.log('Making logo public...');
+      const aclResponse = await apiRequest('PUT', '/api/company-logos', {
+        logoURL: url,
+      });
+      
+      const { objectPath } = await aclResponse.json();
+      console.log('Logo is now public, path:', objectPath);
+
+      console.log('Updating company with logo URL...');
       // Update company with new logo URL using dedicated logo endpoint
       // Note: apiRequest already throws on non-ok responses
       const updateResponse = await apiRequest('PUT', `/api/companies/current/logo`, {
-        logoUrl: url,
+        logoUrl: objectPath,
       });
       
       console.log('PUT request successful');
