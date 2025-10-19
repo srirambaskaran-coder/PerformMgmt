@@ -1056,11 +1056,7 @@ export class DatabaseStorage implements IStorage {
           email: sql`manager.email`,
         },
         location: locations,
-        department: departments,
-        level: levels,
-        grade: grades,
         initiatedAppraisal: initiatedAppraisals,
-        appraisalCycle: appraisalCycles,
         appraisalGroup: appraisalGroups,
         frequencyCalendar: frequencyCalendars,
       })
@@ -1068,11 +1064,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(evaluations.employeeId, users.id))
       .leftJoin(sql`users as manager`, sql`${evaluations.managerId} = manager.id`)
       .leftJoin(locations, eq(users.locationId, locations.id))
-      .leftJoin(departments, eq(users.departmentId, departments.id))
-      .leftJoin(levels, eq(users.levelId, levels.id))
-      .leftJoin(grades, eq(users.gradeId, grades.id))
       .leftJoin(initiatedAppraisals, eq(evaluations.initiatedAppraisalId, initiatedAppraisals.id))
-      .leftJoin(appraisalCycles, eq(initiatedAppraisals.appraisalCycleId, appraisalCycles.id))
       .leftJoin(appraisalGroups, eq(initiatedAppraisals.appraisalGroupId, appraisalGroups.id))
       .leftJoin(frequencyCalendars, eq(initiatedAppraisals.frequencyCalendarId, frequencyCalendars.id))
       .where(
@@ -1087,24 +1079,18 @@ export class DatabaseStorage implements IStorage {
       id: result.evaluation.id,
       employeeId: result.evaluation.employeeId,
       employeeName: result.employee ? `${result.employee.firstName} ${result.employee.lastName}` : 'Unknown',
-      employeeCode: result.employee?.employeeCode || 'N/A',
+      employeeCode: result.employee?.code || 'N/A',
       managerId: result.evaluation.managerId,
       managerName: result.manager ? `${result.manager.firstName} ${result.manager.lastName}` : 'Unknown',
       locationId: result.employee?.locationId,
       locationName: result.location?.name || 'N/A',
-      departmentId: result.employee?.departmentId,
-      departmentName: result.department?.name || 'N/A',
-      levelId: result.employee?.levelId,
-      levelName: result.level?.name || 'N/A',
-      gradeId: result.employee?.gradeId,
-      gradeName: result.grade?.name || 'N/A',
+      department: result.employee?.department || 'N/A',
+      level: result.employee?.level || 'N/A',
+      grade: result.employee?.grade || 'N/A',
       appraisalGroupId: result.initiatedAppraisal?.appraisalGroupId,
       appraisalGroupName: result.appraisalGroup?.name || 'N/A',
-      appraisalCycleId: result.initiatedAppraisal?.appraisalCycleId,
-      appraisalCycleName: result.appraisalCycle ? `${result.appraisalCycle.code} - ${result.appraisalCycle.description}` : 'N/A',
       frequencyCalendarId: result.initiatedAppraisal?.frequencyCalendarId,
       frequencyCalendarName: result.frequencyCalendar?.name || 'N/A',
-      frequencyCalendarDetailId: result.initiatedAppraisal?.frequencyCalendarDetailId,
       overallRating: result.evaluation.overallRating,
       calibratedRating: result.evaluation.calibratedRating,
       calibrationRemarks: result.evaluation.calibrationRemarks,
