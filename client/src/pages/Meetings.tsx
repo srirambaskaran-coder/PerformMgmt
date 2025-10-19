@@ -3,16 +3,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
-import { isUnauthorizedError } from "@/lib/authUtils";
 import { 
   Calendar, 
   Plus, 
@@ -22,7 +24,9 @@ import {
   FileText,
   CheckCircle,
   CalendarCheck,
-  CalendarX
+  CalendarX,
+  MessageSquare,
+  Star
 } from "lucide-react";
 import type { Evaluation, User as UserType } from "@shared/schema";
 
@@ -31,10 +35,21 @@ interface EvaluationWithDetails extends Evaluation {
   manager?: UserType;
 }
 
+interface MeetingNotesData {
+  meetingNotes: string;
+  finalRating?: number;
+  showNotesToEmployee: boolean;
+}
+
 export default function Meetings() {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
   const [selectedEvaluation, setSelectedEvaluation] = useState<EvaluationWithDetails | null>(null);
-  const [meetingNotes, setMeetingNotes] = useState("");
+  const [notesData, setNotesData] = useState<MeetingNotesData>({ 
+    meetingNotes: '', 
+    finalRating: undefined,
+    showNotesToEmployee: false 
+  });
 
   const { user } = useAuth();
   const { toast } = useToast();
@@ -71,24 +86,47 @@ export default function Meetings() {
     },
   });
 
-  const completeMeetingMutation = useMutation({
-    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
-      await apiRequest("PUT", `/api/evaluations/${id}`, {
-        meetingNotes: notes,
-        meetingCompletedAt: new Date(),
-      });
+  // Save meeting notes mutation (for managers)
+  const saveNotesMutation = useMutation({
+    mutationFn: async (data: { evaluationId: string; notesData: MeetingNotesData }) => {
+      const response = await apiRequest('PUT', `/api/evaluations/${data.evaluationId}/meeting-notes`, data.notesData);
+      return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/evaluations"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/evaluations'] });
+      setIsNotesDialogOpen(false);
+      setSelectedEvaluation(null);
       toast({
-        title: "Success",
-        description: "Meeting completed successfully",
+        title: "Notes Saved",
+        description: "Meeting notes have been saved successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: "Failed to complete meeting",
+        description: error.message || "Failed to save notes",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Complete evaluation mutation (for managers)
+  const completeEvaluationMutation = useMutation({
+    mutationFn: async (evaluationId: string) => {
+      const response = await apiRequest('POST', `/api/evaluations/${evaluationId}/complete`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/evaluations'] });
+      toast({
+        title: "Evaluation Completed",
+        description: "Evaluation has been completed and notifications have been sent.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to complete evaluation",
         variant: "destructive",
       });
     },
@@ -106,6 +144,16 @@ export default function Meetings() {
     setIsScheduleModalOpen(true);
   };
 
+  const handleAddNotes = (evaluation: EvaluationWithDetails) => {
+    setSelectedEvaluation(evaluation);
+    setNotesData({
+      meetingNotes: evaluation.meetingNotes || '',
+      finalRating: evaluation.overallRating || undefined,
+      showNotesToEmployee: evaluation.showNotesToEmployee ?? false
+    });
+    setIsNotesDialogOpen(true);
+  };
+
   const onSubmitSchedule = (data: any) => {
     if (selectedEvaluation) {
       const meetingDateTime = new Date(`${data.meetingDate}T${data.meetingTime}`);
@@ -114,10 +162,6 @@ export default function Meetings() {
         meetingDate: meetingDateTime 
       });
     }
-  };
-
-  const handleCompleteMeeting = (evaluationId: string, notes: string) => {
-    completeMeetingMutation.mutate({ id: evaluationId, notes });
   };
 
   const getMeetingStatus = (evaluation: EvaluationWithDetails) => {
@@ -139,11 +183,28 @@ export default function Meetings() {
   };
 
   const canScheduleMeeting = (evaluation: EvaluationWithDetails) => {
-    // Only show evaluations that have both self and manager evaluations completed
-    return evaluation.selfEvaluationSubmittedAt && evaluation.managerEvaluationSubmittedAt && !evaluation.meetingCompletedAt;
+    // Can schedule if both evaluations are done and not yet scheduled
+    return !evaluation.meetingScheduledAt && evaluation.selfEvaluationSubmittedAt && evaluation.managerEvaluationSubmittedAt;
   };
 
-  const eligibleEvaluations = evaluations.filter(canScheduleMeeting);
+  const canAddNotes = (evaluation: EvaluationWithDetails) => {
+    // Manager can add notes after meeting is scheduled
+    return user?.id === evaluation.managerId && evaluation.meetingScheduledAt && !evaluation.finalizedAt;
+  };
+
+  const canCompleteEvaluation = (evaluation: EvaluationWithDetails) => {
+    // Manager can complete evaluation after submitting review
+    return user?.id === evaluation.managerId && evaluation.managerEvaluationSubmittedAt && !evaluation.finalizedAt;
+  };
+
+  const isManager = (evaluation: EvaluationWithDetails) => {
+    return user?.id === evaluation.managerId;
+  };
+
+  // Show all evaluations that are ready for meetings (both evaluations submitted)
+  const eligibleEvaluations = evaluations.filter(evaluation => 
+    evaluation.selfEvaluationSubmittedAt && evaluation.managerEvaluationSubmittedAt
+  );
 
   return (
     <RoleGuard allowedRoles={["employee", "manager"]}>
@@ -273,10 +334,12 @@ export default function Meetings() {
                         )}
 
                         {evaluation.meetingCompletedAt && evaluation.meetingNotes && (
-                          <div className="mt-2 p-3 bg-muted/30 rounded-lg">
-                            <p className="text-sm font-medium mb-1">Meeting Notes:</p>
-                            <p className="text-sm text-muted-foreground">{evaluation.meetingNotes}</p>
-                          </div>
+                          (evaluation.showNotesToEmployee || user?.id === evaluation.managerId) && (
+                            <div className="mt-2 p-3 bg-muted/30 rounded-lg">
+                              <p className="text-sm font-medium mb-1">Meeting Notes:</p>
+                              <p className="text-sm text-muted-foreground">{evaluation.meetingNotes}</p>
+                            </div>
+                          )
                         )}
                       </div>
                     </div>
@@ -304,32 +367,54 @@ export default function Meetings() {
                             <Video className="h-4 w-4 mr-2" />
                             Join
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const notes = prompt("Enter meeting notes:");
-                              if (notes) {
-                                handleCompleteMeeting(evaluation.id, notes);
-                              }
-                            }}
-                            data-testid={`complete-meeting-${evaluation.id}`}
-                          >
-                            <FileText className="h-4 w-4 mr-2" />
-                            Complete
-                          </Button>
+                          {isManager(evaluation) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleAddNotes(evaluation)}
+                              data-testid={`add-notes-${evaluation.id}`}
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              {evaluation.meetingNotes ? 'Edit Notes' : 'Add Notes'}
+                            </Button>
+                          )}
                         </div>
                       )}
+
+                      {canAddNotes(evaluation) && evaluation.meetingCompletedAt && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddNotes(evaluation)}
+                          data-testid={`edit-notes-${evaluation.id}`}
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Edit Notes
+                        </Button>
+                      )}
+
+                      {canCompleteEvaluation(evaluation) && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => completeEvaluationMutation.mutate(evaluation.id)}
+                          disabled={completeEvaluationMutation.isPending}
+                          data-testid={`complete-evaluation-${evaluation.id}`}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Complete
+                        </Button>
+                      )}
                       
-                      {evaluation.meetingCompletedAt && (
+                      {evaluation.finalizedAt && (
                         <Button
                           variant="outline"
                           size="sm"
                           disabled
-                          data-testid={`meeting-completed-${evaluation.id}`}
+                          data-testid={`meeting-finalized-${evaluation.id}`}
                         >
                           <CheckCircle className="h-4 w-4 mr-2" />
-                          Completed
+                          Finalized
                         </Button>
                       )}
                     </div>
@@ -408,6 +493,89 @@ export default function Meetings() {
                 </div>
               </form>
             </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Meeting Notes Dialog (Manager Only) */}
+        <Dialog open={isNotesDialogOpen} onOpenChange={setIsNotesDialogOpen}>
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Meeting Notes</DialogTitle>
+              <DialogDescription>
+                Add notes from your one-on-one meeting with {selectedEvaluation?.employee?.firstName} {selectedEvaluation?.employee?.lastName}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="notes">Meeting Notes</Label>
+                <Textarea
+                  id="notes"
+                  rows={8}
+                  placeholder="Enter detailed notes from your meeting..."
+                  value={notesData.meetingNotes}
+                  onChange={(e) => setNotesData(prev => ({ ...prev, meetingNotes: e.target.value }))}
+                  data-testid="textarea-meeting-notes"
+                />
+              </div>
+              <div>
+                <Label htmlFor="updated-rating">Update Final Rating (Optional)</Label>
+                <Select
+                  value={notesData.finalRating ? String(notesData.finalRating) : undefined}
+                  onValueChange={(value) => setNotesData(prev => ({ ...prev, finalRating: value ? parseInt(value) : undefined }))}
+                >
+                  <SelectTrigger data-testid="select-final-rating">
+                    <SelectValue placeholder="Keep current rating or update" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 - Below Expectations</SelectItem>
+                    <SelectItem value="2">2 - Partially Meets Expectations</SelectItem>
+                    <SelectItem value="3">3 - Meets Expectations</SelectItem>
+                    <SelectItem value="4">4 - Exceeds Expectations</SelectItem>
+                    <SelectItem value="5">5 - Outstanding</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Show Meeting Notes to Employee</Label>
+                <RadioGroup
+                  value={notesData.showNotesToEmployee ? "yes" : "no"}
+                  onValueChange={(value) => setNotesData(prev => ({ ...prev, showNotesToEmployee: value === "yes" }))}
+                  className="flex gap-4 mt-2"
+                  data-testid="radio-show-notes"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="yes" id="show-yes" data-testid="radio-show-yes" />
+                    <Label htmlFor="show-yes" className="font-normal cursor-pointer">Yes</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="no" id="show-no" data-testid="radio-show-no" />
+                    <Label htmlFor="show-no" className="font-normal cursor-pointer">No</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsNotesDialogOpen(false)} data-testid="button-cancel-notes">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (selectedEvaluation) {
+                    saveNotesMutation.mutate({
+                      evaluationId: selectedEvaluation.id,
+                      notesData
+                    });
+                  }
+                }}
+                disabled={saveNotesMutation.isPending}
+                data-testid="button-save-notes"
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Save Notes
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
