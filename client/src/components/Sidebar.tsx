@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ import {
   Search,
   CalendarCheck,
 } from "lucide-react";
+import type { Company } from "@shared/schema";
 
 interface NavItem {
   href: string;
@@ -64,6 +66,12 @@ export function Sidebar() {
   // Use active role from session for role switching support
   const activeRole = (user as any)?.activeRole || (user as any)?.role || "employee";
 
+  // Fetch company information to display logo
+  const { data: company } = useQuery<Company>({
+    queryKey: ["/api/companies/current"],
+    enabled: !!user,
+  });
+
   const filteredNavItems = navItems.filter((item) => {
     if (!item.roles) return true;
     return item.roles.includes(activeRole);
@@ -77,25 +85,35 @@ export function Sidebar() {
       )}
       data-testid="sidebar"
     >
-      {/* Logo and Company Info */}
+      {/* Company Logo */}
       <div className="p-6 border-b border-border">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+          {!collapsed && (
+            <div className="flex-1 flex items-center justify-center">
+              {company?.logoUrl ? (
+                <img 
+                  src={company.logoUrl} 
+                  alt={`${company.name} logo`}
+                  className="max-w-[60%] max-h-16 object-contain"
+                  data-testid="company-logo"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                  <Building className="h-6 w-6 text-primary-foreground" />
+                </div>
+              )}
+            </div>
+          )}
+          {collapsed && (
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center mx-auto">
               <Building className="h-6 w-6 text-primary-foreground" />
             </div>
-            {!collapsed && (
-              <div>
-                <h2 className="font-semibold text-foreground">Performance Hub</h2>
-                <p className="text-sm text-muted-foreground">Employee Management</p>
-              </div>
-            )}
-          </div>
+          )}
           {!collapsed && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 flex-shrink-0"
               onClick={() => setCollapsed(!collapsed)}
               data-testid="toggle-sidebar"
             >

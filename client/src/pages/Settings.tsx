@@ -13,8 +13,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { apiRequest } from "@/lib/queryClient";
-import { Settings as SettingsIcon, Key, Mail, User, Shield, ChevronRight } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Settings as SettingsIcon, Key, Mail, User, Shield, ChevronRight, Image, Upload } from "lucide-react";
+import type { Company } from "@shared/schema";
 
 // Schema for password change - current password optional for OIDC accounts
 const passwordChangeSchema = z.object({
@@ -45,6 +46,7 @@ export default function Settings() {
   const { toast } = useToast();
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showEmailServiceForm, setShowEmailServiceForm] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const isSuperAdmin = user?.role === 'super_admin';
   const isAdmin = user?.role === 'admin';
@@ -53,6 +55,7 @@ export default function Settings() {
   const isManager = user?.role === 'manager';
   const canChangePassword = isSuperAdmin || isAdmin || isHRManager || isEmployee || isManager;
   const canConfigureEmail = isAdmin; // Only Administrators can configure email
+  const canUploadLogo = isAdmin; // Only Administrators can upload company logo
 
   // Password change form
   const passwordForm = useForm<PasswordChangeForm>({
@@ -82,6 +85,12 @@ export default function Settings() {
   const { data: emailConfig } = useQuery<EmailServiceForm>({
     queryKey: ["/api/settings/email"],
     enabled: canConfigureEmail,
+  });
+
+  // Fetch current company information
+  const { data: company } = useQuery<Company>({
+    queryKey: ["/api/companies/current"],
+    enabled: !!user && canUploadLogo,
   });
 
   // Password change mutation
@@ -129,6 +138,75 @@ export default function Settings() {
       });
     },
   });
+
+  // Company logo upload handler
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !company) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid File",
+        description: "Please upload an image file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "File Too Large",
+        description: "Logo must be smaller than 2MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingLogo(true);
+
+    try {
+      // Upload to object storage
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'company-logos');
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload logo');
+      }
+
+      const { url } = await uploadResponse.json();
+
+      // Update company with new logo URL
+      await apiRequest('PUT', `/api/companies/${company.id}`, {
+        logoUrl: url,
+      });
+
+      // Invalidate queries to refresh the logo
+      queryClient.invalidateQueries({ queryKey: ['/api/companies/current'] });
+
+      toast({
+        title: "Success",
+        description: "Company logo updated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to upload logo",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingLogo(false);
+      // Reset the file input
+      event.target.value = '';
+    }
+  };
 
   const onPasswordSubmit = (data: PasswordChangeForm) => {
     changePasswordMutation.mutate(data);
@@ -514,6 +592,79 @@ export default function Settings() {
                   </form>
                 </Form>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Company Logo Upload Card - Administrator Only */}
+        {canUploadLogo && company && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Image className="h-5 w-5" />
+                Company Logo
+              </CardTitle>
+              <CardDescription>
+                Upload and manage your company logo (displayed in the sidebar)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Current Logo Preview */}
+                {company.logoUrl && (
+                  <div className="flex items-center gap-4">
+                    <div className="p-4 bg-muted rounded-lg">
+                      <p className="text-sm font-medium mb-2">Current Logo</p>
+                      <img 
+                        src={company.logoUrl} 
+                        alt={`${company.name} logo`}
+                        className="max-w-[150px] max-h-20 object-contain"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Upload Instructions */}
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <h4 className="font-medium mb-2">Upload Guidelines</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Recommended: PNG or SVG format with transparent background</li>
+                    <li>• Maximum file size: 2MB</li>
+                    <li>• Logo will display at 60% of sidebar width</li>
+                    <li>• For best results, use a horizontal logo layout</li>
+                  </ul>
+                </div>
+
+                {/* Upload Button */}
+                <div>
+                  <Label 
+                    htmlFor="logo-upload" 
+                    className="cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        type="button" 
+                        disabled={uploadingLogo}
+                        className="flex items-center gap-2"
+                        onClick={() => document.getElementById('logo-upload')?.click()}
+                        data-testid="button-upload-logo"
+                      >
+                        <Upload className="h-4 w-4" />
+                        {uploadingLogo ? "Uploading..." : company.logoUrl ? "Update Logo" : "Upload Logo"}
+                      </Button>
+                    </div>
+                  </Label>
+                  <Input
+                    id="logo-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                    disabled={uploadingLogo}
+                    data-testid="input-logo-upload"
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}

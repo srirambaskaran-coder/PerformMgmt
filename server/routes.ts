@@ -900,6 +900,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get current user's company
+  app.get('/api/companies/current', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.companyId) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      
+      const company = await storage.getCompany(user.companyId);
+      if (!company) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      
+      res.json(company);
+    } catch (error) {
+      console.error("Error fetching current company:", error);
+      res.status(500).json({ message: "Failed to fetch company" });
+    }
+  });
+
   // Location routes
   app.get('/api/locations', isAuthenticated, async (req, res) => {
     try {
