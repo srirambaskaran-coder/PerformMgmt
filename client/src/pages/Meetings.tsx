@@ -107,27 +107,6 @@ export default function Meetings() {
     },
   });
 
-  // Complete evaluation mutation (for managers)
-  const completeEvaluationMutation = useMutation({
-    mutationFn: async (evaluationId: string) => {
-      const response = await apiRequest('POST', `/api/evaluations/${evaluationId}/complete`);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/evaluations'] });
-      toast({
-        title: "Evaluation Completed",
-        description: "Evaluation has been completed and notifications have been sent.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to complete evaluation",
-        variant: "destructive",
-      });
-    },
-  });
 
   const form = useForm({
     defaultValues: {
@@ -187,11 +166,6 @@ export default function Meetings() {
   const canAddNotes = (evaluation: EvaluationWithDetails) => {
     // Manager can add notes after meeting is scheduled
     return user?.id === evaluation.managerId && evaluation.meetingScheduledAt && !evaluation.finalizedAt;
-  };
-
-  const canCompleteEvaluation = (evaluation: EvaluationWithDetails) => {
-    // Manager can complete evaluation after submitting review
-    return user?.id === evaluation.managerId && evaluation.managerEvaluationSubmittedAt && !evaluation.finalizedAt;
   };
 
   const isManager = (evaluation: EvaluationWithDetails) => {
@@ -375,19 +349,6 @@ export default function Meetings() {
                         >
                           <MessageSquare className="h-4 w-4 mr-2" />
                           Edit Notes
-                        </Button>
-                      )}
-
-                      {canCompleteEvaluation(evaluation) && (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => completeEvaluationMutation.mutate(evaluation.id)}
-                          disabled={completeEvaluationMutation.isPending}
-                          data-testid={`complete-evaluation-${evaluation.id}`}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Complete
                         </Button>
                       )}
                       

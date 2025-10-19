@@ -4213,7 +4213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add or update meeting notes
-  app.put('/api/evaluations/:id/meeting-notes', isAuthenticated, requireRoles(['manager']), async (req: any, res) => {
+  app.put('/api/evaluations/:id/meeting-notes', isAuthenticated, async (req: any, res) => {
     try {
       const evaluationId = req.params.id;
       const managerId = req.user.claims.sub;
@@ -4265,7 +4265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mark evaluation as completed and send notifications
-  app.post('/api/evaluations/:id/complete', isAuthenticated, requireRoles(['manager']), async (req: any, res) => {
+  app.post('/api/evaluations/:id/complete', isAuthenticated, async (req: any, res) => {
     try {
       const evaluationId = req.params.id;
       const managerId = req.user.claims.sub;
