@@ -877,30 +877,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/companies/:id', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req, res) => {
-    try {
-      const { id } = req.params;
-      const companyData = insertCompanySchema.partial().parse(req.body);
-      const company = await storage.updateCompany(id, companyData);
-      res.json(company);
-    } catch (error) {
-      console.error("Error updating company:", error);
-      res.status(500).json({ message: "Failed to update company" });
-    }
-  });
-
-  app.delete('/api/companies/:id', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req, res) => {
-    try {
-      const { id } = req.params;
-      await storage.deleteCompany(id);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting company:", error);
-      res.status(500).json({ message: "Failed to delete company" });
-    }
-  });
-
-  // Get current user's company
+  // Get current user's company (must be before :id routes)
   app.get('/api/companies/current', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -922,7 +899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update company logo (for administrators)
+  // Update company logo (must be before :id routes)
   app.put('/api/companies/current/logo', isAuthenticated, async (req: any, res) => {
     try {
       console.log('Logo update request - User:', req.user?.claims?.sub);
@@ -948,6 +925,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating company logo:", error);
       res.status(500).json({ message: "Failed to update company logo" });
+    }
+  });
+
+  app.put('/api/companies/:id', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const companyData = insertCompanySchema.partial().parse(req.body);
+      const company = await storage.updateCompany(id, companyData);
+      res.json(company);
+    } catch (error) {
+      console.error("Error updating company:", error);
+      res.status(500).json({ message: "Failed to update company" });
+    }
+  });
+
+  app.delete('/api/companies/:id', isAuthenticated, requireRoles(['super_admin', 'admin']), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteCompany(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting company:", error);
+      res.status(500).json({ message: "Failed to delete company" });
     }
   });
 
