@@ -29,7 +29,7 @@ import {
   type SafeUser,
 } from "@shared/schema";
 import { sendEmail, sendReviewInvitation, sendReviewReminder, sendReviewCompletion, generateRegistrationNotificationEmail, sendEmployeeSubmissionNotification } from "./emailService";
-import { ObjectStorageService } from "./objectStorage";
+import { ObjectStorageService, parseObjectPath, signObjectURL } from "./objectStorage";
 import { seedTestUsers, testUsers } from "./seedUsers";
 import * as XLSX from 'xlsx';
 import PDFDocument from 'pdfkit';
@@ -2416,6 +2416,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error setting company logo:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Serve objects from object storage (public access only)
+  app.get('/objects/*', async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const normalizedPath = req.path; // e.g., /objects/uploads/xxx
+      
+      // Get the object file to check permissions
+      const objectFile = await objectStorageService.getObjectEntityFile(normalizedPath);
+      
+      // Verify the object is publicly accessible (visibility === "public")
+      // This prevents unauthorized access to private objects
+      const userId = (req.user as any)?.claims?.sub;
+      const canAccess = await objectStorageService.canAccessObjectEntity({
+        userId,
+        objectFile,
+        requestedPermission: undefined, // READ permission
+      });
+      
+      if (!canAccess) {
+        return res.status(403).send("Access denied");
+      }
+      
+      // Extract the entity ID from the path
+      const entityId = req.path.replace('/objects/', '');
+      
+      // Convert to the full object storage path
+      const privateObjectDir = objectStorageService.getPrivateObjectDir();
+      if (!privateObjectDir) {
+        throw new Error("Object storage not configured");
+      }
+      
+      const fullPath = `${privateObjectDir}/${entityId}`;
+      
+      // Get a signed GET URL for the object
+      const { bucketName, objectName } = parseObjectPath(fullPath);
+      const signedUrl = await signObjectURL({
+        bucketName,
+        objectName,
+        method: "GET",
+        ttlSec: 3600, // 1 hour
+      });
+      
+      // Redirect to the signed URL
+      res.redirect(signedUrl);
+    } catch (error) {
+      console.error("Error serving object:", error);
+      res.status(404).send("Object not found");
     }
   });
 
