@@ -101,9 +101,9 @@ export default function CalibrateRatings() {
   // Filter frequency calendar details based on selected calendar
   const filteredCalendarDetails = useMemo(() => {
     if (!frequencyCalendarDetails || filters.frequencyCalendar === "all") {
-      return frequencyCalendarDetails || [];
+      return (frequencyCalendarDetails as any[]) || [];
     }
-    return frequencyCalendarDetails.filter(
+    return (frequencyCalendarDetails as any[]).filter(
       (detail: any) => detail.frequencyCalendarId === filters.frequencyCalendar
     );
   }, [frequencyCalendarDetails, filters.frequencyCalendar]);
@@ -166,7 +166,7 @@ export default function CalibrateRatings() {
   const filteredEvaluations = useMemo(() => {
     if (!evaluations) return [];
     
-    return evaluations.filter((evaluation: any) => {
+    return (evaluations as any[]).filter((evaluation: any) => {
       // Appraisal group filter
       if (filters.appraisalGroup !== "all" && evaluation.appraisalGroupId !== filters.appraisalGroup) {
         return false;
@@ -288,7 +288,7 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Groups</SelectItem>
-                  {(appraisalGroups || [])?.map((group: any) => (
+                  {((appraisalGroups as any[]) || [])?.map((group: any) => (
                     <SelectItem key={group.id} value={group.id}>
                       {group.name}
                     </SelectItem>
@@ -308,7 +308,7 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Cycles</SelectItem>
-                  {(appraisalCycles || [])?.map((cycle: any) => (
+                  {((appraisalCycles as any[]) || [])?.map((cycle: any) => (
                     <SelectItem key={cycle.id} value={cycle.id}>
                       {cycle.code} - {cycle.description}
                     </SelectItem>
@@ -328,7 +328,7 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Calendars</SelectItem>
-                  {(frequencyCalendars || [])?.map((calendar: any) => (
+                  {((frequencyCalendars as any[]) || [])?.map((calendar: any) => (
                     <SelectItem key={calendar.id} value={calendar.id}>
                       {calendar.name}
                     </SelectItem>
@@ -379,7 +379,7 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Locations</SelectItem>
-                  {(locations || [])?.map((location: any) => (
+                  {((locations as any[]) || [])?.map((location: any) => (
                     <SelectItem key={location.id} value={location.id}>
                       {location.name}
                     </SelectItem>
@@ -399,7 +399,7 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Departments</SelectItem>
-                  {(departments || [])?.map((dept: any) => (
+                  {((departments as any[]) || [])?.map((dept: any) => (
                     <SelectItem key={dept.id} value={dept.id}>
                       {dept.name}
                     </SelectItem>
@@ -419,7 +419,7 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Levels</SelectItem>
-                  {(levels || [])?.map((level: any) => (
+                  {((levels as any[]) || [])?.map((level: any) => (
                     <SelectItem key={level.id} value={level.id}>
                       {level.name}
                     </SelectItem>
@@ -439,7 +439,7 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Grades</SelectItem>
-                  {(grades || [])?.map((grade: any) => (
+                  {((grades as any[]) || [])?.map((grade: any) => (
                     <SelectItem key={grade.id} value={grade.id}>
                       {grade.name}
                     </SelectItem>
@@ -459,7 +459,7 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Managers</SelectItem>
-                  {(managers || [])?.map((manager: any) => (
+                  {((managers as any[]) || [])?.map((manager: any) => (
                     <SelectItem key={manager.id} value={manager.id}>
                       {manager.name}
                     </SelectItem>

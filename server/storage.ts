@@ -76,6 +76,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, like, inArray, or, sql, isNotNull } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import bcrypt from "bcrypt";
 
 // Helper function to sanitize user objects by removing passwordHash
@@ -1045,11 +1046,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEvaluationsForCalibration(companyId: string): Promise<any[]> {
+    const manager = alias(users, 'manager');
+    
     const results = await db
       .select({
         evaluation: evaluations,
         employee: users,
-        manager: sql`manager`,
+        manager: manager,
         location: locations,
         department: departments,
         level: levels,
@@ -1061,7 +1064,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(evaluations)
       .leftJoin(users, eq(evaluations.employeeId, users.id))
-      .leftJoin(sql`users as manager`, sql`${evaluations.managerId} = manager.id`)
+      .leftJoin(manager, eq(evaluations.managerId, manager.id))
       .leftJoin(locations, eq(users.locationId, locations.id))
       .leftJoin(departments, eq(users.departmentId, departments.id))
       .leftJoin(levels, eq(users.levelId, levels.id))
@@ -1084,7 +1087,7 @@ export class DatabaseStorage implements IStorage {
       employeeName: result.employee ? `${result.employee.firstName} ${result.employee.lastName}` : 'Unknown',
       employeeCode: result.employee?.employeeCode || 'N/A',
       managerId: result.evaluation.managerId,
-      managerName: result.manager ? `${result.manager.first_name} ${result.manager.last_name}` : 'Unknown',
+      managerName: result.manager ? `${result.manager.firstName} ${result.manager.lastName}` : 'Unknown',
       locationId: result.employee?.locationId,
       locationName: result.location?.name || 'N/A',
       departmentId: result.employee?.departmentId,
