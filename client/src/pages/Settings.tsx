@@ -183,8 +183,8 @@ export default function Settings() {
 
       const { url } = await uploadResponse.json();
 
-      // Update company with new logo URL
-      await apiRequest('PUT', `/api/companies/${company.id}`, {
+      // Update company with new logo URL using dedicated logo endpoint
+      await apiRequest('PUT', `/api/companies/current/logo`, {
         logoUrl: url,
       });
 

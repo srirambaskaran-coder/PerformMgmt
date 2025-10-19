@@ -922,6 +922,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update company logo (for administrators)
+  app.put('/api/companies/current/logo', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Verify user is admin
+      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+        return res.status(403).json({ message: "Only administrators can update company logo" });
+      }
+      
+      if (!user.companyId) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      
+      const { logoUrl } = req.body;
+      if (!logoUrl || typeof logoUrl !== 'string') {
+        return res.status(400).json({ message: "Logo URL is required" });
+      }
+      
+      const updatedCompany = await storage.updateCompany(user.companyId, { logoUrl });
+      res.json(updatedCompany);
+    } catch (error) {
+      console.error("Error updating company logo:", error);
+      res.status(500).json({ message: "Failed to update company logo" });
+    }
+  });
+
   // Location routes
   app.get('/api/locations', isAuthenticated, async (req, res) => {
     try {
