@@ -226,15 +226,15 @@ export default function CalibrateRatings() {
     });
   }, [evaluations, filters]);
 
-  const getRatingBadgeColor = (rating: number | null) => {
-    if (rating === null) return "secondary";
+  const getRatingBadgeColor = (rating: number | null | undefined) => {
+    if (rating === null || rating === undefined) return "secondary";
     if (rating >= 4) return "default";
     if (rating >= 3) return "secondary";
     return "destructive";
   };
 
-  const getRatingLabel = (rating: number | null) => {
-    if (rating === null) return "Not Rated";
+  const getRatingLabel = (rating: number | null | undefined) => {
+    if (rating === null || rating === undefined) return "Not Rated";
     return `Rating: ${rating.toFixed(1)}`;
   };
 
