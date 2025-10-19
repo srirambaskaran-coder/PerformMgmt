@@ -17,16 +17,13 @@ import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { 
   Calendar, 
-  Plus, 
-  Video, 
   Clock, 
   User, 
   FileText,
   CheckCircle,
   CalendarCheck,
   CalendarX,
-  MessageSquare,
-  Star
+  MessageSquare
 } from "lucide-react";
 import type { Evaluation, User as UserType } from "@shared/schema";
 
@@ -357,28 +354,16 @@ export default function Meetings() {
                         </Button>
                       )}
                       
-                      {evaluation.meetingScheduledAt && !evaluation.meetingCompletedAt && (
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            data-testid={`join-meeting-${evaluation.id}`}
-                          >
-                            <Video className="h-4 w-4 mr-2" />
-                            Join
-                          </Button>
-                          {isManager(evaluation) && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleAddNotes(evaluation)}
-                              data-testid={`add-notes-${evaluation.id}`}
-                            >
-                              <FileText className="h-4 w-4 mr-2" />
-                              {evaluation.meetingNotes ? 'Edit Notes' : 'Add Notes'}
-                            </Button>
-                          )}
-                        </div>
+                      {evaluation.meetingScheduledAt && !evaluation.meetingCompletedAt && isManager(evaluation) && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleAddNotes(evaluation)}
+                          data-testid={`complete-review-${evaluation.id}`}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Complete Review
+                        </Button>
                       )}
 
                       {canAddNotes(evaluation) && evaluation.meetingCompletedAt && (
