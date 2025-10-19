@@ -172,6 +172,7 @@ export default function Settings() {
       formData.append('file', file);
       formData.append('folder', 'company-logos');
 
+      console.log('Starting upload...');
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
@@ -182,21 +183,23 @@ export default function Settings() {
         throw new Error('Failed to upload logo');
       }
 
-      const { url } = await uploadResponse.json();
-      console.log('Uploaded logo URL:', url);
-      console.log('Making PUT request to:', '/api/companies/current/logo');
+      const uploadData = await uploadResponse.json();
+      console.log('Upload response:', uploadData);
+      const { url } = uploadData;
 
+      if (!url) {
+        throw new Error('No URL returned from upload');
+      }
+
+      console.log('Making PUT request to update logo...');
       // Update company with new logo URL using dedicated logo endpoint
+      // Note: apiRequest already throws on non-ok responses
       const updateResponse = await apiRequest('PUT', `/api/companies/current/logo`, {
         logoUrl: url,
       });
-      console.log('PUT response:', updateResponse);
       
-      if (!updateResponse.ok) {
-        const errorText = await updateResponse.text();
-        throw new Error(`Failed to update company logo: ${errorText}`);
-      }
-
+      console.log('PUT request successful');
+      
       // Invalidate queries to refresh the logo
       queryClient.invalidateQueries({ queryKey: ['/api/companies/current'] });
 
@@ -205,6 +208,7 @@ export default function Settings() {
         description: "Company logo updated successfully",
       });
     } catch (error: any) {
+      console.error('Logo upload error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to upload logo",
