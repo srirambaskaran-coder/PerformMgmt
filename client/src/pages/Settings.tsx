@@ -167,29 +167,36 @@ export default function Settings() {
     setUploadingLogo(true);
 
     try {
-      // Upload to object storage
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('folder', 'company-logos');
-
       console.log('Starting upload...');
-      const uploadResponse = await fetch('/api/upload', {
+      // Get signed upload URL
+      const urlResponse = await fetch('/api/objects/upload', {
         method: 'POST',
-        body: formData,
         credentials: 'include',
+      });
+      
+      if (!urlResponse.ok) {
+        throw new Error('Failed to get upload URL');
+      }
+      
+      const { uploadURL } = await urlResponse.json();
+      console.log('Got upload URL, uploading file...');
+      
+      // Upload file to signed URL
+      const uploadResponse = await fetch(uploadURL, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
       });
 
       if (!uploadResponse.ok) {
         throw new Error('Failed to upload logo');
       }
 
-      const uploadData = await uploadResponse.json();
-      console.log('Upload response:', uploadData);
-      const { url } = uploadData;
-
-      if (!url) {
-        throw new Error('No URL returned from upload');
-      }
+      // Extract the public URL from the upload URL (remove query params)
+      const url = uploadURL.split('?')[0];
+      console.log('File uploaded, logo URL:', url);
 
       console.log('Making PUT request to update logo...');
       // Update company with new logo URL using dedicated logo endpoint
