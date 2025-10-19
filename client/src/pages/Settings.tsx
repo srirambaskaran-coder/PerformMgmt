@@ -184,9 +184,14 @@ export default function Settings() {
       const { url } = await uploadResponse.json();
 
       // Update company with new logo URL using dedicated logo endpoint
-      await apiRequest('PUT', `/api/companies/current/logo`, {
+      const updateResponse = await apiRequest('PUT', `/api/companies/current/logo`, {
         logoUrl: url,
       });
+      
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        throw new Error(`Failed to update company logo: ${errorText}`);
+      }
 
       // Invalidate queries to refresh the logo
       queryClient.invalidateQueries({ queryKey: ['/api/companies/current'] });

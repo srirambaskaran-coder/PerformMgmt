@@ -925,6 +925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update company logo (for administrators)
   app.put('/api/companies/current/logo', isAuthenticated, async (req: any, res) => {
     try {
+      console.log('Logo update request - User:', req.user?.claims?.sub);
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
