@@ -481,7 +481,7 @@ export default function CalibrateRatings() {
       ) : filteredEvaluations.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">No evaluations found with the selected filters.</p>
+            <p className="text-muted-foreground" data-testid="no-evaluations-message">No evaluations found with the selected filters.</p>
           </CardContent>
         </Card>
       ) : viewMode === "card" ? (
@@ -494,35 +494,35 @@ export default function CalibrateRatings() {
                     <h3 className="font-semibold text-lg" data-testid={`employee-name-${evaluation.id}`}>
                       {evaluation.employeeName}
                     </h3>
-                    <p className="text-sm text-muted-foreground">Code: {evaluation.employeeCode}</p>
+                    <p className="text-sm text-muted-foreground" data-testid={`employee-code-${evaluation.id}`}>Code: {evaluation.employeeCode}</p>
                   </div>
                   
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Location:</span>
-                      <span>{evaluation.locationName}</span>
+                      <span data-testid={`location-${evaluation.id}`}>{evaluation.locationName}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Department:</span>
-                      <span>{evaluation.departmentName}</span>
+                      <span data-testid={`department-${evaluation.id}`}>{evaluation.departmentName}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Manager:</span>
-                      <span>{evaluation.managerName}</span>
+                      <span data-testid={`manager-${evaluation.id}`}>{evaluation.managerName}</span>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Manager Rating:</span>
-                      <Badge variant={getRatingBadgeColor(evaluation.overallRating)}>
+                      <Badge variant={getRatingBadgeColor(evaluation.overallRating)} data-testid={`manager-rating-${evaluation.id}`}>
                         {getRatingLabel(evaluation.overallRating)}
                       </Badge>
                     </div>
                     {evaluation.calibratedRating !== null && (
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Calibrated Rating:</span>
-                        <Badge variant={getRatingBadgeColor(evaluation.calibratedRating)}>
+                        <Badge variant={getRatingBadgeColor(evaluation.calibratedRating)} data-testid={`calibrated-rating-${evaluation.id}`}>
                           {getRatingLabel(evaluation.calibratedRating)}
                         </Badge>
                       </div>
@@ -561,17 +561,17 @@ export default function CalibrateRatings() {
               <TableBody>
                 {filteredEvaluations.map((evaluation: any) => (
                   <TableRow key={evaluation.id} data-testid={`evaluation-row-${evaluation.id}`}>
-                    <TableCell className="font-medium">{evaluation.employeeName}</TableCell>
-                    <TableCell>{evaluation.employeeCode}</TableCell>
-                    <TableCell>{evaluation.locationName}</TableCell>
-                    <TableCell>{evaluation.departmentName}</TableCell>
-                    <TableCell>{evaluation.managerName}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium" data-testid={`table-employee-name-${evaluation.id}`}>{evaluation.employeeName}</TableCell>
+                    <TableCell data-testid={`table-employee-code-${evaluation.id}`}>{evaluation.employeeCode}</TableCell>
+                    <TableCell data-testid={`table-location-${evaluation.id}`}>{evaluation.locationName}</TableCell>
+                    <TableCell data-testid={`table-department-${evaluation.id}`}>{evaluation.departmentName}</TableCell>
+                    <TableCell data-testid={`table-manager-${evaluation.id}`}>{evaluation.managerName}</TableCell>
+                    <TableCell data-testid={`table-manager-rating-${evaluation.id}`}>
                       <Badge variant={getRatingBadgeColor(evaluation.overallRating)}>
                         {getRatingLabel(evaluation.overallRating)}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-testid={`table-calibrated-rating-${evaluation.id}`}>
                       {evaluation.calibratedRating !== null ? (
                         <Badge variant={getRatingBadgeColor(evaluation.calibratedRating)}>
                           {getRatingLabel(evaluation.calibratedRating)}
