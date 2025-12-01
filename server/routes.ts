@@ -4319,7 +4319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["admin"]),
     async (req: any, res) => {
       try {
-        const createdById = req.user.claims.sub;
+        const createdById = req.user.id;
         const questionnaires = await storage.getPublishQuestionnaires(
           createdById
         );
@@ -4340,7 +4340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.claims.sub;
+        const createdById = req.user.id;
         const questionnaire = await storage.getPublishQuestionnaire(
           id,
           createdById
@@ -4369,7 +4369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const questionnaireData = insertPublishQuestionnaireSchema.parse(
           req.body
         );
-        const createdById = req.user.claims.sub;
+        const createdById = req.user.id;
         const questionnaire = await storage.createPublishQuestionnaire(
           questionnaireData,
           createdById
@@ -4397,7 +4397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.claims.sub;
+        const createdById = req.user.id;
 
         // Check if publish questionnaire exists and belongs to the administrator
         const existingQuestionnaire = await storage.getPublishQuestionnaire(
@@ -4442,7 +4442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.claims.sub;
+        const createdById = req.user.id;
 
         // Check if publish questionnaire exists and belongs to the administrator
         const existingQuestionnaire = await storage.getPublishQuestionnaire(
@@ -4702,7 +4702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["hr_manager"]),
     async (req: any, res) => {
       try {
-        const requestingUserId = req.user.claims.sub;
+        const requestingUserId = req.user.id;
 
         // Handle form data if file upload is present
         let parsedData: any;
@@ -4986,7 +4986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["hr_manager"]),
     async (req: any, res) => {
       try {
-        const requestingUserId = req.user.claims.sub;
+        const requestingUserId = req.user.id;
         const appraisals = await storage.getInitiatedAppraisals(
           requestingUserId
         );
@@ -5270,7 +5270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { appraisalId } = req.params;
-        const requestingUserId = req.user.claims.sub;
+        const requestingUserId = req.user.id;
 
         // Verify initiated appraisal exists and belongs to the HR manager
         const userAppraisals = await storage.getInitiatedAppraisals(
