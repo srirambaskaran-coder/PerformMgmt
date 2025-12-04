@@ -23,6 +23,7 @@ import {
   initiatedAppraisals,
   initiatedAppraisalDetailTimings,
   scheduledAppraisalTasks,
+  developmentGoals,
   type User,
   type SafeUser,
   type UpsertUser,
@@ -73,6 +74,9 @@ import {
   type InsertInitiatedAppraisalDetailTiming,
   type ScheduledAppraisalTask,
   type InsertScheduledAppraisalTask,
+  type DevelopmentGoal,
+  type InsertDevelopmentGoal,
+  type UpdateDevelopmentGoal,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, like, inArray, or, sql, isNotNull } from "drizzle-orm";
@@ -259,6 +263,14 @@ export interface IStorage {
   getPendingScheduledTasks(): Promise<ScheduledAppraisalTask[]>;
   updateScheduledTaskStatus(id: string, status: string, error?: string): Promise<void>;
   getScheduledTasksByAppraisal(appraisalId: string): Promise<ScheduledAppraisalTask[]>;
+  
+  // Development Goal operations
+  getDevelopmentGoals(employeeId: string): Promise<DevelopmentGoal[]>;
+  getDevelopmentGoalsByEvaluation(evaluationId: string): Promise<DevelopmentGoal[]>;
+  getDevelopmentGoal(id: string): Promise<DevelopmentGoal | undefined>;
+  createDevelopmentGoal(goal: InsertDevelopmentGoal): Promise<DevelopmentGoal>;
+  updateDevelopmentGoal(id: string, goal: UpdateDevelopmentGoal): Promise<DevelopmentGoal>;
+  deleteDevelopmentGoal(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2485,6 +2497,100 @@ export class DatabaseStorage implements IStorage {
       .from(scheduledAppraisalTasks)
       .where(eq(scheduledAppraisalTasks.initiatedAppraisalId, appraisalId))
       .orderBy(asc(scheduledAppraisalTasks.scheduledDate));
+  }
+
+  // Development Goal operations
+  async getDevelopmentGoals(employeeId: string): Promise<DevelopmentGoal[]> {
+    return await db
+      .select()
+      .from(developmentGoals)
+      .where(eq(developmentGoals.employeeId, employeeId))
+      .orderBy(desc(developmentGoals.createdAt));
+  }
+
+  async getDevelopmentGoalsByEvaluation(evaluationId: string): Promise<DevelopmentGoal[]> {
+    return await db
+      .select()
+      .from(developmentGoals)
+      .where(eq(developmentGoals.evaluationId, evaluationId))
+      .orderBy(desc(developmentGoals.createdAt));
+  }
+
+  async getDevelopmentGoal(id: string): Promise<DevelopmentGoal | undefined> {
+    const [goal] = await db
+      .select()
+      .from(developmentGoals)
+      .where(eq(developmentGoals.id, id));
+    return goal;
+  }
+
+  async createDevelopmentGoal(goal: InsertDevelopmentGoal): Promise<DevelopmentGoal> {
+    // Calculate initial status based on target date and progress
+    const status = this.calculateGoalStatus(goal.progress || 0, goal.targetDate);
+    
+    const [newGoal] = await db
+      .insert(developmentGoals)
+      .values({
+        ...goal,
+        status,
+      })
+      .returning();
+    return newGoal;
+  }
+
+  async updateDevelopmentGoal(id: string, goal: UpdateDevelopmentGoal): Promise<DevelopmentGoal> {
+    // Get current goal to calculate status if progress is being updated
+    const currentGoal = await this.getDevelopmentGoal(id);
+    if (!currentGoal) {
+      throw new Error('Development goal not found');
+    }
+
+    const progress = goal.progress ?? currentGoal.progress ?? 0;
+    const targetDate = goal.targetDate ?? currentGoal.targetDate;
+    const status = this.calculateGoalStatus(progress, targetDate);
+
+    const [updatedGoal] = await db
+      .update(developmentGoals)
+      .set({
+        ...goal,
+        status,
+        updatedAt: new Date(),
+      })
+      .where(eq(developmentGoals.id, id))
+      .returning();
+    return updatedGoal;
+  }
+
+  async deleteDevelopmentGoal(id: string): Promise<void> {
+    await db.delete(developmentGoals).where(eq(developmentGoals.id, id));
+  }
+
+  // Helper function to calculate goal status based on progress and target date
+  private calculateGoalStatus(progress: number, targetDate: Date): 'on_track' | 'delayed' | 'completed' | 'not_started' {
+    if (progress >= 100) {
+      return 'completed';
+    }
+    
+    if (progress === 0) {
+      return 'not_started';
+    }
+    
+    const today = new Date();
+    const target = new Date(targetDate);
+    const totalDays = Math.ceil((target.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+    
+    // If target date has passed and not completed
+    if (target < today) {
+      return 'delayed';
+    }
+    
+    // Calculate expected progress based on time elapsed
+    // If we're past the target date or significantly behind, mark as delayed
+    if (totalDays < 0 || (totalDays < 30 && progress < 50) || (totalDays < 7 && progress < 80)) {
+      return 'delayed';
+    }
+    
+    return 'on_track';
   }
 }
 
