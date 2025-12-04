@@ -546,33 +546,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const requestingUserId = req.user.claims.sub;
       const users = await storage.getUsers({}, requestingUserId);
-      const evaluations = await storage.getEvaluations();
       
-      // Get direct reports
-      const directReports = users.filter(u => u.managerId === requestingUserId);
+      // Get evaluations where user is the manager
+      const managerEvaluations = await storage.getEvaluations({ managerId: requestingUserId });
+      
+      // Get direct reports (users who report to this manager)
+      const directReports = users.filter(u => u.reportingManagerId === requestingUserId);
       const directReportIds = directReports.map(u => u.id);
       
-      // Get evaluations for direct reports
-      const teamEvaluations = evaluations.filter(e => 
+      // Get evaluations for direct reports (where this user is the manager)
+      const teamEvaluations = managerEvaluations.filter(e => 
         directReportIds.includes(e.employeeId));
       
-      const pendingReviews = teamEvaluations.filter(e => 
-        e.selfEvaluationData && !e.managerEvaluationData);
-      const completedReviews = teamEvaluations.filter(e => 
-        e.managerEvaluationData);
-      const overdueReviews = teamEvaluations.filter(e => 
-        e.status === 'in_progress' && Math.random() < 0.1);
+      const pendingReviews = managerEvaluations.filter(e => 
+        e.selfEvaluationSubmittedAt && !e.managerEvaluationSubmittedAt);
+      const completedReviews = managerEvaluations.filter(e => 
+        e.managerEvaluationSubmittedAt);
+      
+      // Calculate actual scheduled meetings (scheduled but not completed)
+      const scheduledMeetings = managerEvaluations.filter(e => 
+        e.meetingScheduledAt && !e.meetingCompletedAt);
+      
+      // Calculate completed meetings
+      const meetingsCompleted = managerEvaluations.filter(e => 
+        e.meetingCompletedAt);
+      
+      // Calculate average rating from completed evaluations
+      const ratingsWithValues = managerEvaluations
+        .filter(e => e.overallRating !== null && e.overallRating !== undefined)
+        .map(e => e.overallRating as number);
+      const teamAverageRating = ratingsWithValues.length > 0 
+        ? ratingsWithValues.reduce((sum, r) => sum + r, 0) / ratingsWithValues.length 
+        : 0;
       
       const metrics = {
         directReports: directReports.length,
         pendingReviews: pendingReviews.length,
         completedReviews: completedReviews.length,
-        scheduledMeetings: Math.floor(Math.random() * 5) + 2,
-        overdueReviews: overdueReviews.length,
-        teamAverageRating: 4.1,
-        meetingsCompleted: Math.floor(Math.random() * 8) + 3,
-        teamCompletionRate: teamEvaluations.length > 0 ? 
-          Math.round((completedReviews.length / teamEvaluations.length) * 100) : 0,
+        scheduledMeetings: scheduledMeetings.length,
+        overdueReviews: 0,
+        teamAverageRating: Number(teamAverageRating.toFixed(1)),
+        meetingsCompleted: meetingsCompleted.length,
+        teamCompletionRate: managerEvaluations.length > 0 ? 
+          Math.round((completedReviews.length / managerEvaluations.length) * 100) : 0,
       };
 
       res.json(metrics);
