@@ -4583,20 +4583,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   isActiveAppraisalCycle = appraisalCycle?.status === 'active';
                 }
                 
-                // Infer the frequency calendar period by matching evaluation creation date to period dates
-                const calendarDetails = await storage.getFrequencyCalendarDetailsByCalendarId(initiatedAppraisal.frequencyCalendarId);
-                const evalCreatedAt = new Date(evaluation.createdAt || new Date());
-                const matchingDetail = calendarDetails.find(d => {
-                  const startDate = new Date(d.startDate);
-                  const endDate = new Date(d.endDate);
-                  return evalCreatedAt >= startDate && evalCreatedAt <= endDate;
-                });
-                if (matchingDetail) {
-                  frequencyCalendarPeriod = {
-                    displayName: matchingDetail.displayName,
-                    startDate: matchingDetail.startDate,
-                    endDate: matchingDetail.endDate,
-                  };
+                // Get the frequency calendar period from initiated_appraisal_detail_timings
+                const detailTimings = await storage.getInitiatedAppraisalDetailTimings(evaluation.initiatedAppraisalId!);
+                if (detailTimings.length > 0) {
+                  const detailTiming = detailTimings[0]; // Each initiated appraisal typically has one period
+                  const calendarDetails = await storage.getFrequencyCalendarDetailsByCalendarId(initiatedAppraisal.frequencyCalendarId);
+                  const matchingDetail = calendarDetails.find(d => d.id === detailTiming.frequencyCalendarDetailId);
+                  if (matchingDetail) {
+                    frequencyCalendarPeriod = {
+                      displayName: matchingDetail.displayName,
+                      startDate: matchingDetail.startDate,
+                      endDate: matchingDetail.endDate,
+                    };
+                  }
                 }
               }
             }

@@ -446,9 +446,12 @@ export default function DevelopmentGoals() {
                         </FormControl>
                         <SelectContent>
                           {eligibleEvaluations.map((evaluation) => {
-                            const periodInfo = evaluation.frequencyCalendarPeriod 
-                              ? ` | ${evaluation.frequencyCalendarPeriod.displayName}`
-                              : '';
+                            let periodInfo = '';
+                            if (evaluation.frequencyCalendarPeriod) {
+                              const startDate = format(new Date(evaluation.frequencyCalendarPeriod.startDate), "dd/MM/yyyy");
+                              const endDate = format(new Date(evaluation.frequencyCalendarPeriod.endDate), "dd/MM/yyyy");
+                              periodInfo = ` | ${evaluation.frequencyCalendarPeriod.displayName} (${startDate} - ${endDate})`;
+                            }
                             return (
                               <SelectItem 
                                 key={evaluation.id} 
