@@ -4569,6 +4569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         withMeeting
           .map(async (evaluation) => {
             let appraisalCycle = null;
+            let frequencyCalendarPeriod = null;
             let isActiveAppraisalCycle = false;
             
             if (evaluation.initiatedAppraisalId) {
@@ -4580,6 +4581,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 if (frequencyCalendar?.appraisalCycleId) {
                   appraisalCycle = await storage.getAppraisalCycleById(frequencyCalendar.appraisalCycleId);
                   isActiveAppraisalCycle = appraisalCycle?.status === 'active';
+                }
+                
+                // Infer the frequency calendar period by matching evaluation creation date to period dates
+                const calendarDetails = await storage.getFrequencyCalendarDetailsByCalendarId(initiatedAppraisal.frequencyCalendarId);
+                const evalCreatedAt = new Date(evaluation.createdAt || new Date());
+                const matchingDetail = calendarDetails.find(d => {
+                  const startDate = new Date(d.startDate);
+                  const endDate = new Date(d.endDate);
+                  return evalCreatedAt >= startDate && evalCreatedAt <= endDate;
+                });
+                if (matchingDetail) {
+                  frequencyCalendarPeriod = {
+                    displayName: matchingDetail.displayName,
+                    startDate: matchingDetail.startDate,
+                    endDate: matchingDetail.endDate,
+                  };
                 }
               }
             }
@@ -4597,6 +4614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 description: appraisalCycle.description,
                 status: appraisalCycle.status,
               } : null,
+              frequencyCalendarPeriod,
               isActiveAppraisalCycle,
               goalsCount: existingGoals.length,
             };

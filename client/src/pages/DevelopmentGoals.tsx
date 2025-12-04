@@ -57,6 +57,11 @@ interface EligibleEvaluation {
     description: string;
     status: string;
   } | null;
+  frequencyCalendarPeriod: {
+    displayName: string;
+    startDate: string;
+    endDate: string;
+  } | null;
   isActiveAppraisalCycle: boolean;
   goalsCount: number;
 }
@@ -440,16 +445,22 @@ export default function DevelopmentGoals() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {eligibleEvaluations.map((evaluation) => (
-                            <SelectItem 
-                              key={evaluation.id} 
-                              value={evaluation.id}
-                              data-testid={`option-evaluation-${evaluation.id}`}
-                            >
-                              {evaluation.appraisalCycle?.code} - {evaluation.appraisalCycle?.description}
-                              {evaluation.goalsCount > 0 && ` (${evaluation.goalsCount} goals)`}
-                            </SelectItem>
-                          ))}
+                          {eligibleEvaluations.map((evaluation) => {
+                            const periodInfo = evaluation.frequencyCalendarPeriod 
+                              ? ` | ${evaluation.frequencyCalendarPeriod.displayName}`
+                              : '';
+                            return (
+                              <SelectItem 
+                                key={evaluation.id} 
+                                value={evaluation.id}
+                                data-testid={`option-evaluation-${evaluation.id}`}
+                              >
+                                {evaluation.appraisalCycle?.code} - {evaluation.appraisalCycle?.description}
+                                {periodInfo}
+                                {evaluation.goalsCount > 0 && ` (${evaluation.goalsCount} goals)`}
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                       <FormMessage />
