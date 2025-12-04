@@ -358,24 +358,24 @@ export default function DevelopmentGoals() {
                     >
                       <div className="flex justify-between items-start">
                         <div className="space-y-1 flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{goal.description}</h4>
+                          <h4 className="font-medium">{goal.description}</h4>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {goal.frequencyCalendarPeriod && (
+                              <span className="flex items-center gap-1 bg-muted px-2 py-0.5 rounded text-xs text-muted-foreground">
+                                <Clock className="h-3 w-3" />
+                                {goal.frequencyCalendarPeriod.displayName} ({format(new Date(goal.frequencyCalendarPeriod.startDate), "dd/MM/yyyy")} - {format(new Date(goal.frequencyCalendarPeriod.endDate), "dd/MM/yyyy")})
+                              </span>
+                            )}
                             {getStatusBadge(goal.status)}
                           </div>
                           <p className="text-sm text-muted-foreground">
                             <strong>Planned Outcome:</strong> {goal.plannedOutcome}
                           </p>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               Target: {goal.targetDate ? format(new Date(goal.targetDate), "MMM dd, yyyy") : "Not set"}
                             </span>
-                            {goal.frequencyCalendarPeriod && (
-                              <span className="flex items-center gap-1 bg-muted px-2 py-0.5 rounded text-xs">
-                                <Clock className="h-3 w-3" />
-                                {goal.frequencyCalendarPeriod.displayName} ({format(new Date(goal.frequencyCalendarPeriod.startDate), "dd/MM/yyyy")} - {format(new Date(goal.frequencyCalendarPeriod.endDate), "dd/MM/yyyy")})
-                              </span>
-                            )}
                           </div>
                         </div>
                         <div className="flex gap-2">
