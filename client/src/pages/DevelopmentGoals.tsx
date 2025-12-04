@@ -59,9 +59,9 @@ interface EligibleEvaluation {
   } | null;
   frequencyCalendarPeriod: {
     id: string;
-    periodCode: string;
-    periodFromDate: string;
-    periodToDate: string;
+    displayName: string;
+    startDate: string;
+    endDate: string;
   } | null;
   isActiveAppraisalCycle: boolean;
   goalsCount: number;
@@ -469,10 +469,10 @@ export default function DevelopmentGoals() {
                               <span className="font-medium">Frequency Calendar Period:</span>
                             </div>
                             <div className="mt-1 font-medium">
-                              {selectedEvaluation.frequencyCalendarPeriod.periodCode}
+                              {selectedEvaluation.frequencyCalendarPeriod.displayName}
                             </div>
                             <div className="text-muted-foreground">
-                              {format(new Date(selectedEvaluation.frequencyCalendarPeriod.periodFromDate), "MMM dd, yyyy")} - {format(new Date(selectedEvaluation.frequencyCalendarPeriod.periodToDate), "MMM dd, yyyy")}
+                              {format(new Date(selectedEvaluation.frequencyCalendarPeriod.startDate), "MMM dd, yyyy")} - {format(new Date(selectedEvaluation.frequencyCalendarPeriod.endDate), "MMM dd, yyyy")}
                             </div>
                           </div>
                         )}

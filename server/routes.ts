@@ -4584,17 +4584,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
                 
                 // Get the frequency calendar detail (period) for this evaluation
-                if (initiatedAppraisal.frequencyCalendarDetailId) {
-                  const calendarDetails = await storage.getFrequencyCalendarDetailsByCalendarId(initiatedAppraisal.frequencyCalendarId);
-                  const detail = calendarDetails.find(d => d.id === initiatedAppraisal.frequencyCalendarDetailId);
-                  if (detail) {
-                    frequencyCalendarPeriod = {
-                      id: detail.id,
-                      periodCode: detail.periodCode,
-                      periodFromDate: detail.periodFromDate,
-                      periodToDate: detail.periodToDate,
-                    };
-                  }
+                // Infer the period by matching evaluation creation date to period dates
+                const calendarDetails = await storage.getFrequencyCalendarDetailsByCalendarId(initiatedAppraisal.frequencyCalendarId);
+                const evalCreatedAt = new Date(evaluation.createdAt || new Date());
+                const matchingDetail = calendarDetails.find(d => {
+                  const startDate = new Date(d.startDate);
+                  const endDate = new Date(d.endDate);
+                  return evalCreatedAt >= startDate && evalCreatedAt <= endDate;
+                });
+                if (matchingDetail) {
+                  frequencyCalendarPeriod = {
+                    id: matchingDetail.id,
+                    displayName: matchingDetail.displayName,
+                    startDate: matchingDetail.startDate,
+                    endDate: matchingDetail.endDate,
+                  };
                 }
               }
             }
