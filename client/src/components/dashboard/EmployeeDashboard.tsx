@@ -322,8 +322,8 @@ export default function EmployeeDashboard() {
             <CardTitle>Development Goals</CardTitle>
             <CardDescription>Track progress on your professional development objectives</CardDescription>
           </div>
-          <Button variant="outline" size="sm">
-            Add Goal
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/development-goals">Add Goal</Link>
           </Button>
         </CardHeader>
         <CardContent>

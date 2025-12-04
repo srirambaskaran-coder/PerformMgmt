@@ -826,45 +826,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/dashboard/employee/goals', isAuthenticated, requireRoles(['super_admin', 'admin', 'hr_manager', 'manager', 'employee']), async (req: any, res) => {
     try {
-      // Mock goals for now - in a real app these would be stored in database
-      const goals = [
-        {
-          id: '1',
-          title: 'Improve JavaScript Skills',
-          description: 'Complete advanced JavaScript course and build 3 projects',
-          progress: 75,
-          targetDate: '2024-03-31',
-          status: 'on_track',
-          category: 'technical',
-        },
-        {
-          id: '2',
-          title: 'Team Leadership',
-          description: 'Lead 2 cross-functional projects and mentor junior developers',
-          progress: 50,
-          targetDate: '2024-06-30',
-          status: 'on_track',
-          category: 'leadership',
-        },
-        {
-          id: '3',
-          title: 'Communication Skills',
-          description: 'Present at team meetings and improve stakeholder communication',
-          progress: 30,
-          targetDate: '2024-04-30',
-          status: 'at_risk',
-          category: 'communication',
-        },
-        {
-          id: '4',
-          title: 'Productivity Improvement',
-          description: 'Increase sprint velocity by 20% through better planning',
-          progress: 90,
-          targetDate: '2024-02-28',
-          status: 'on_track',
-          category: 'productivity',
-        },
-      ];
+      const employeeId = req.user.claims.sub;
+      
+      // Fetch real development goals from the database
+      const developmentGoals = await storage.getDevelopmentGoals(employeeId);
+      
+      // Transform to match the dashboard format
+      const goals = developmentGoals.map(goal => {
+        // Calculate status based on progress and target date
+        const now = new Date();
+        const targetDate = new Date(goal.targetDate);
+        const daysUntilTarget = Math.ceil((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        let status = 'on_track';
+        if (goal.progressPercentage === 100) {
+          status = 'completed';
+        } else if (daysUntilTarget < 0) {
+          status = 'behind';
+        } else if (daysUntilTarget < 14 && goal.progressPercentage < 75) {
+          status = 'at_risk';
+        } else if (daysUntilTarget < 30 && goal.progressPercentage < 50) {
+          status = 'at_risk';
+        }
+        
+        return {
+          id: goal.id,
+          title: goal.description.substring(0, 50) + (goal.description.length > 50 ? '...' : ''),
+          description: goal.plannedOutcome || goal.description,
+          progress: goal.progressPercentage,
+          targetDate: new Date(goal.targetDate).toISOString().split('T')[0],
+          status: status,
+          category: 'development',
+        };
+      });
 
       res.json(goals);
     } catch (error) {
