@@ -57,12 +57,6 @@ interface EligibleEvaluation {
     description: string;
     status: string;
   } | null;
-  frequencyCalendarPeriod: {
-    id: string;
-    displayName: string;
-    startDate: string;
-    endDate: string;
-  } | null;
   isActiveAppraisalCycle: boolean;
   goalsCount: number;
 }
@@ -436,49 +430,31 @@ export default function DevelopmentGoals() {
                 <FormField
                   control={createForm.control}
                   name="evaluationId"
-                  render={({ field }) => {
-                    const selectedEvaluation = eligibleEvaluations.find(e => e.id === field.value);
-                    return (
-                      <FormItem>
-                        <FormLabel>Evaluation</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-evaluation">
-                              <SelectValue placeholder="Select an evaluation" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {eligibleEvaluations.map((evaluation) => (
-                              <SelectItem 
-                                key={evaluation.id} 
-                                value={evaluation.id}
-                                data-testid={`option-evaluation-${evaluation.id}`}
-                              >
-                                {evaluation.appraisalCycle?.code} - {evaluation.appraisalCycle?.description}
-                                {evaluation.goalsCount > 0 && ` (${evaluation.goalsCount} goals)`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                        
-                        {selectedEvaluation?.frequencyCalendarPeriod && (
-                          <div className="mt-2 p-3 bg-muted rounded-md text-sm">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Calendar className="h-4 w-4" />
-                              <span className="font-medium">Frequency Calendar Period:</span>
-                            </div>
-                            <div className="mt-1 font-medium">
-                              {selectedEvaluation.frequencyCalendarPeriod.displayName}
-                            </div>
-                            <div className="text-muted-foreground">
-                              {format(new Date(selectedEvaluation.frequencyCalendarPeriod.startDate), "MMM dd, yyyy")} - {format(new Date(selectedEvaluation.frequencyCalendarPeriod.endDate), "MMM dd, yyyy")}
-                            </div>
-                          </div>
-                        )}
-                      </FormItem>
-                    );
-                  }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Performance Evaluation</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-evaluation">
+                            <SelectValue placeholder="Select an evaluation" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {eligibleEvaluations.map((evaluation) => (
+                            <SelectItem 
+                              key={evaluation.id} 
+                              value={evaluation.id}
+                              data-testid={`option-evaluation-${evaluation.id}`}
+                            >
+                              {evaluation.appraisalCycle?.code} - {evaluation.appraisalCycle?.description}
+                              {evaluation.goalsCount > 0 && ` (${evaluation.goalsCount} goals)`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
 
                 <FormField
