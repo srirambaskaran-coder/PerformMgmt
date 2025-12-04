@@ -4560,6 +4560,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get completed evaluations eligible for development goals
+  // IMPORTANT: This route must come before parameterized routes like /api/development-goals/:id
+  app.get('/api/development-goals/eligible-evaluations', isAuthenticated, async (req: any, res) => {
+    try {
+      const employeeId = req.user.claims.sub;
+      
+      // Get all evaluations for this employee
+      const evaluations = await storage.getEvaluations({ employeeId });
+      
+      // Filter to only completed evaluations (meeting completed)
+      const eligibleEvaluations = await Promise.all(
+        evaluations
+          .filter(e => e.meetingCompletedAt)
+          .map(async (evaluation) => {
+            let appraisalCycle = null;
+            let isActiveAppraisalCycle = false;
+            
+            if (evaluation.initiatedAppraisalId) {
+              const initiatedAppraisal = await storage.getInitiatedAppraisal(evaluation.initiatedAppraisalId);
+              if (initiatedAppraisal?.frequencyCalendarId) {
+                const frequencyCalendar = await storage.getFrequencyCalendar(initiatedAppraisal.frequencyCalendarId, '');
+                if (frequencyCalendar?.appraisalCycleId) {
+                  appraisalCycle = await storage.getAppraisalCycle(frequencyCalendar.appraisalCycleId, '');
+                  isActiveAppraisalCycle = appraisalCycle?.status === 'active';
+                }
+              }
+            }
+            
+            // Get existing goals count for this evaluation
+            const existingGoals = await storage.getDevelopmentGoalsByEvaluation(evaluation.id);
+            
+            return {
+              id: evaluation.id,
+              meetingCompletedAt: evaluation.meetingCompletedAt,
+              overallRating: evaluation.overallRating,
+              appraisalCycle: appraisalCycle ? {
+                id: appraisalCycle.id,
+                code: appraisalCycle.code,
+                description: appraisalCycle.description,
+                status: appraisalCycle.status,
+              } : null,
+              isActiveAppraisalCycle,
+              goalsCount: existingGoals.length,
+            };
+          })
+      );
+      
+      // Only return evaluations with active appraisal cycles
+      const activeEligibleEvaluations = eligibleEvaluations.filter(e => e.isActiveAppraisalCycle);
+      
+      res.json(activeEligibleEvaluations);
+    } catch (error) {
+      console.error("Error fetching eligible evaluations:", error);
+      res.status(500).json({ message: "Failed to fetch eligible evaluations" });
+    }
+  });
+
   // Create a new development goal
   app.post('/api/development-goals', isAuthenticated, async (req: any, res) => {
     try {
@@ -4655,62 +4712,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting development goal:", error);
       res.status(500).json({ message: "Failed to delete development goal" });
-    }
-  });
-
-  // Get completed evaluations eligible for development goals
-  app.get('/api/development-goals/eligible-evaluations', isAuthenticated, async (req: any, res) => {
-    try {
-      const employeeId = req.user.claims.sub;
-      
-      // Get all evaluations for this employee
-      const evaluations = await storage.getEvaluations({ employeeId });
-      
-      // Filter to only completed evaluations (meeting completed)
-      const eligibleEvaluations = await Promise.all(
-        evaluations
-          .filter(e => e.meetingCompletedAt)
-          .map(async (evaluation) => {
-            let appraisalCycle = null;
-            let isActiveAppraisalCycle = false;
-            
-            if (evaluation.initiatedAppraisalId) {
-              const initiatedAppraisal = await storage.getInitiatedAppraisal(evaluation.initiatedAppraisalId);
-              if (initiatedAppraisal?.frequencyCalendarId) {
-                const frequencyCalendar = await storage.getFrequencyCalendar(initiatedAppraisal.frequencyCalendarId, '');
-                if (frequencyCalendar?.appraisalCycleId) {
-                  appraisalCycle = await storage.getAppraisalCycle(frequencyCalendar.appraisalCycleId, '');
-                  isActiveAppraisalCycle = appraisalCycle?.status === 'active';
-                }
-              }
-            }
-            
-            // Get existing goals count for this evaluation
-            const existingGoals = await storage.getDevelopmentGoalsByEvaluation(evaluation.id);
-            
-            return {
-              id: evaluation.id,
-              meetingCompletedAt: evaluation.meetingCompletedAt,
-              overallRating: evaluation.overallRating,
-              appraisalCycle: appraisalCycle ? {
-                id: appraisalCycle.id,
-                code: appraisalCycle.code,
-                description: appraisalCycle.description,
-                status: appraisalCycle.status,
-              } : null,
-              isActiveAppraisalCycle,
-              goalsCount: existingGoals.length,
-            };
-          })
-      );
-      
-      // Only return evaluations with active appraisal cycles
-      const activeEligibleEvaluations = eligibleEvaluations.filter(e => e.isActiveAppraisalCycle);
-      
-      res.json(activeEligibleEvaluations);
-    } catch (error) {
-      console.error("Error fetching eligible evaluations:", error);
-      res.status(500).json({ message: "Failed to fetch eligible evaluations" });
     }
   });
 
