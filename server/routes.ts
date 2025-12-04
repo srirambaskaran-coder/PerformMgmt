@@ -4569,6 +4569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         withMeeting
           .map(async (evaluation) => {
             let appraisalCycle = null;
+            let frequencyCalendarPeriod = null;
             let isActiveAppraisalCycle = false;
             
             if (evaluation.initiatedAppraisalId) {
@@ -4580,6 +4581,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 if (frequencyCalendar?.appraisalCycleId) {
                   appraisalCycle = await storage.getAppraisalCycleById(frequencyCalendar.appraisalCycleId);
                   isActiveAppraisalCycle = appraisalCycle?.status === 'active';
+                }
+                
+                // Get the frequency calendar detail (period) for this evaluation
+                if (initiatedAppraisal.frequencyCalendarDetailId) {
+                  const calendarDetails = await storage.getFrequencyCalendarDetailsByCalendarId(initiatedAppraisal.frequencyCalendarId);
+                  const detail = calendarDetails.find(d => d.id === initiatedAppraisal.frequencyCalendarDetailId);
+                  if (detail) {
+                    frequencyCalendarPeriod = {
+                      id: detail.id,
+                      periodCode: detail.periodCode,
+                      periodFromDate: detail.periodFromDate,
+                      periodToDate: detail.periodToDate,
+                    };
+                  }
                 }
               }
             }
@@ -4597,6 +4612,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 description: appraisalCycle.description,
                 status: appraisalCycle.status,
               } : null,
+              frequencyCalendarPeriod,
               isActiveAppraisalCycle,
               goalsCount: existingGoals.length,
             };
