@@ -1635,11 +1635,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: status as string,
       };
 
-      // Apply role-based access control
-      if (currentUser.role === 'employee') {
+      // Use active role from session for role switching support
+      const activeRole = req.user.activeRole || currentUser.role;
+
+      // Apply role-based access control based on active role
+      if (activeRole === 'employee') {
         // Employees can only see their own evaluations
         filters.employeeId = currentUser.id;
-      } else if (currentUser.role === 'manager') {
+      } else if (activeRole === 'manager') {
         // Managers can see evaluations they manage or their own
         if (!filters.employeeId && !filters.managerId) {
           // If no specific filter, show evaluations where they are the manager or employee
