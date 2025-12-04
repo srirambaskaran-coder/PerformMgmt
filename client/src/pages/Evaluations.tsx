@@ -25,8 +25,10 @@ import {
   Clock,
   Star,
   FileText,
-  Play
+  Play,
+  Target
 } from "lucide-react";
+import { Link } from "wouter";
 import type { Evaluation, User as UserType, ReviewCycle, AppraisalCycle, FrequencyCalendar, FrequencyCalendarDetails } from "@shared/schema";
 
 interface EvaluationWithDetails extends Evaluation {
@@ -671,6 +673,18 @@ export default function Evaluations() {
                           <Calendar className="h-4 w-4 mr-2" />
                           Schedule 1 on 1
                         </Button>
+                      )}
+                      {evaluation.meetingCompletedAt && (
+                        <Link href="/development-goals">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            data-testid={`add-goal-${evaluation.id}`}
+                          >
+                            <Target className="h-4 w-4 mr-2" />
+                            Add Goal
+                          </Button>
+                        </Link>
                       )}
                     </div>
                   </div>
