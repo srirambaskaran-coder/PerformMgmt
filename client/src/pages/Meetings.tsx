@@ -52,12 +52,23 @@ export default function Meetings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch evaluations where the user is either employee or manager
+  // Get active role for role switching support
+  const activeRole = (user as any)?.activeRole || (user as any)?.role || "employee";
+
+  // Fetch evaluations filtered by active role:
+  // - As Employee: show evaluations where user is the employee
+  // - As Manager: show evaluations where user is the manager (meetings with their reporting members)
   const { data: evaluations = [], isLoading } = useQuery<EvaluationWithDetails[]>({
     queryKey: ["/api/evaluations"],
-    select: (data) => data.filter(evaluation => 
-      evaluation.employeeId === user?.id || evaluation.managerId === user?.id
-    ),
+    select: (data) => data.filter(evaluation => {
+      if (activeRole === 'manager') {
+        // As Manager: show meetings with reporting members (where user is the manager)
+        return evaluation.managerId === user?.id;
+      } else {
+        // As Employee: show meetings where user is the employee
+        return evaluation.employeeId === user?.id;
+      }
+    }),
   });
 
   const scheduleMeetingMutation = useMutation({
