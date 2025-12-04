@@ -56,7 +56,7 @@ const navItems: NavItem[] = [
   { href: "/evaluations", label: "My Evaluations", icon: ClipboardList, roles: ["employee"] },
   { href: "/manager-submissions", label: "Submissions", icon: ClipboardList, roles: ["manager"] },
   { href: "/meetings", label: "Meetings", icon: Calendar, roles: ["employee", "manager"] },
-  { href: "/development-goals", label: "Set Development Goals", icon: Target, roles: ["employee"] },
+  { href: "/development-goals", label: "My Development Goals", icon: Target, roles: ["employee"] },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

@@ -269,7 +269,7 @@ export default function DevelopmentGoals() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Target className="h-6 w-6 text-primary" />
-              Development Goals
+              My Development Goals
             </h1>
             <p className="text-muted-foreground">
               Track your professional development goals linked to your evaluations

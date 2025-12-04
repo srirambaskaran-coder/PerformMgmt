@@ -4499,9 +4499,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (evaluation?.initiatedAppraisalId) {
           const initiatedAppraisal = await storage.getInitiatedAppraisal(evaluation.initiatedAppraisalId);
           if (initiatedAppraisal?.frequencyCalendarId) {
-            const frequencyCalendar = await storage.getFrequencyCalendar(initiatedAppraisal.frequencyCalendarId, '');
+            const frequencyCalendar = await storage.getFrequencyCalendarById(initiatedAppraisal.frequencyCalendarId);
             if (frequencyCalendar?.appraisalCycleId) {
-              appraisalCycle = await storage.getAppraisalCycle(frequencyCalendar.appraisalCycleId, '');
+              appraisalCycle = await storage.getAppraisalCycleById(frequencyCalendar.appraisalCycleId);
             }
           }
         }
