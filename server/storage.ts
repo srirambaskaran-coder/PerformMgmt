@@ -202,6 +202,7 @@ export interface IStorage {
   getAppraisalCycles(createdById: string): Promise<AppraisalCycle[]>;
   getAllAppraisalCycles(companyId: string): Promise<AppraisalCycle[]>; // For HR managers to see all cycles in their company
   getAppraisalCycle(id: string, createdById: string): Promise<AppraisalCycle | undefined>;
+  getAppraisalCycleById(id: string): Promise<AppraisalCycle | undefined>; // For lookups without ownership check
   createAppraisalCycle(cycle: InsertAppraisalCycle, createdById: string): Promise<AppraisalCycle>;
   updateAppraisalCycle(id: string, cycle: Partial<InsertAppraisalCycle>, createdById: string): Promise<AppraisalCycle>;
   deleteAppraisalCycle(id: string, createdById: string): Promise<void>;
@@ -217,6 +218,7 @@ export interface IStorage {
   getFrequencyCalendars(createdById: string): Promise<FrequencyCalendar[]>;
   getAllFrequencyCalendars(): Promise<FrequencyCalendar[]>; // For HR managers to see all calendars
   getFrequencyCalendar(id: string, createdById: string): Promise<FrequencyCalendar | undefined>;
+  getFrequencyCalendarById(id: string): Promise<FrequencyCalendar | undefined>; // For lookups without ownership check
   createFrequencyCalendar(calendar: InsertFrequencyCalendar, createdById: string): Promise<FrequencyCalendar>;
   updateFrequencyCalendar(id: string, calendar: Partial<InsertFrequencyCalendar>, createdById: string): Promise<FrequencyCalendar>;
   deleteFrequencyCalendar(id: string, createdById: string): Promise<void>;
@@ -1595,6 +1597,13 @@ export class DatabaseStorage implements IStorage {
     return cycle;
   }
 
+  async getAppraisalCycleById(id: string): Promise<AppraisalCycle | undefined> {
+    const [cycle] = await db.select().from(appraisalCycles).where(
+      eq(appraisalCycles.id, id)
+    );
+    return cycle;
+  }
+
   async createAppraisalCycle(cycle: InsertAppraisalCycle, createdById: string): Promise<AppraisalCycle> {
     const [newCycle] = await db.insert(appraisalCycles).values({
       ...cycle,
@@ -1730,6 +1739,13 @@ export class DatabaseStorage implements IStorage {
         eq(frequencyCalendars.id, id),
         eq(frequencyCalendars.createdById, createdById)
       )
+    );
+    return calendar;
+  }
+
+  async getFrequencyCalendarById(id: string): Promise<FrequencyCalendar | undefined> {
+    const [calendar] = await db.select().from(frequencyCalendars).where(
+      eq(frequencyCalendars.id, id)
     );
     return calendar;
   }

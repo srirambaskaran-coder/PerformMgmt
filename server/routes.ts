@@ -4590,11 +4590,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log('Initiated appraisal:', initiatedAppraisal?.id, 'frequencyCalendarId:', initiatedAppraisal?.frequencyCalendarId);
               
               if (initiatedAppraisal?.frequencyCalendarId) {
-                const frequencyCalendar = await storage.getFrequencyCalendar(initiatedAppraisal.frequencyCalendarId, '');
+                const frequencyCalendar = await storage.getFrequencyCalendarById(initiatedAppraisal.frequencyCalendarId);
                 console.log('Frequency calendar:', frequencyCalendar?.id, 'appraisalCycleId:', frequencyCalendar?.appraisalCycleId);
                 
                 if (frequencyCalendar?.appraisalCycleId) {
-                  appraisalCycle = await storage.getAppraisalCycle(frequencyCalendar.appraisalCycleId, '');
+                  appraisalCycle = await storage.getAppraisalCycleById(frequencyCalendar.appraisalCycleId);
                   console.log('Appraisal cycle:', appraisalCycle?.id, 'status:', appraisalCycle?.status);
                   isActiveAppraisalCycle = appraisalCycle?.status === 'active';
                 }
