@@ -4565,28 +4565,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/development-goals/eligible-evaluations', isAuthenticated, async (req: any, res) => {
     try {
       const employeeId = req.user.claims.sub;
+      console.log('===== ELIGIBLE EVALUATIONS DEBUG =====');
+      console.log('Employee ID from session:', employeeId);
       
       // Get all evaluations for this employee
       const evaluations = await storage.getEvaluations({ employeeId });
+      console.log('Total evaluations for employee:', evaluations.length);
+      console.log('Evaluations:', evaluations.map(e => ({ id: e.id, employeeId: e.employeeId, meetingCompletedAt: e.meetingCompletedAt })));
       
       // Filter to only completed evaluations (meeting completed)
+      const withMeeting = evaluations.filter(e => e.meetingCompletedAt);
+      console.log('Evaluations with meeting completed:', withMeeting.length);
+      
       const eligibleEvaluations = await Promise.all(
-        evaluations
-          .filter(e => e.meetingCompletedAt)
+        withMeeting
           .map(async (evaluation) => {
             let appraisalCycle = null;
             let isActiveAppraisalCycle = false;
             
+            console.log('Processing evaluation:', evaluation.id, 'initiatedAppraisalId:', evaluation.initiatedAppraisalId);
+            
             if (evaluation.initiatedAppraisalId) {
               const initiatedAppraisal = await storage.getInitiatedAppraisal(evaluation.initiatedAppraisalId);
+              console.log('Initiated appraisal:', initiatedAppraisal?.id, 'frequencyCalendarId:', initiatedAppraisal?.frequencyCalendarId);
+              
               if (initiatedAppraisal?.frequencyCalendarId) {
                 const frequencyCalendar = await storage.getFrequencyCalendar(initiatedAppraisal.frequencyCalendarId, '');
+                console.log('Frequency calendar:', frequencyCalendar?.id, 'appraisalCycleId:', frequencyCalendar?.appraisalCycleId);
+                
                 if (frequencyCalendar?.appraisalCycleId) {
                   appraisalCycle = await storage.getAppraisalCycle(frequencyCalendar.appraisalCycleId, '');
+                  console.log('Appraisal cycle:', appraisalCycle?.id, 'status:', appraisalCycle?.status);
                   isActiveAppraisalCycle = appraisalCycle?.status === 'active';
                 }
               }
             }
+            console.log('isActiveAppraisalCycle:', isActiveAppraisalCycle);
             
             // Get existing goals count for this evaluation
             const existingGoals = await storage.getDevelopmentGoalsByEvaluation(evaluation.id);
