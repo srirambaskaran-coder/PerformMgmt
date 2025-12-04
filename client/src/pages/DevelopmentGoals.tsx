@@ -45,6 +45,11 @@ interface GoalWithDetails extends DevelopmentGoal {
     code: string;
     description: string;
   } | null;
+  frequencyCalendarPeriod?: {
+    displayName: string;
+    startDate: string;
+    endDate: string;
+  } | null;
 }
 
 interface EligibleEvaluation {
@@ -360,11 +365,17 @@ export default function DevelopmentGoals() {
                           <p className="text-sm text-muted-foreground">
                             <strong>Planned Outcome:</strong> {goal.plannedOutcome}
                           </p>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               Target: {goal.targetDate ? format(new Date(goal.targetDate), "MMM dd, yyyy") : "Not set"}
                             </span>
+                            {goal.frequencyCalendarPeriod && (
+                              <span className="flex items-center gap-1 bg-muted px-2 py-0.5 rounded text-xs">
+                                <Clock className="h-3 w-3" />
+                                {goal.frequencyCalendarPeriod.displayName} ({format(new Date(goal.frequencyCalendarPeriod.startDate), "dd/MM/yyyy")} - {format(new Date(goal.frequencyCalendarPeriod.endDate), "dd/MM/yyyy")})
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -556,6 +567,20 @@ export default function DevelopmentGoals() {
             </DialogHeader>
             <Form {...editForm}>
               <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+                {selectedGoal && (
+                  <div className="p-3 bg-muted rounded-md text-sm space-y-1">
+                    <div className="font-medium">
+                      {selectedGoal.appraisalCycle?.code} - {selectedGoal.appraisalCycle?.description}
+                    </div>
+                    {selectedGoal.frequencyCalendarPeriod && (
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Calendar className="h-3 w-3" />
+                        {selectedGoal.frequencyCalendarPeriod.displayName} ({format(new Date(selectedGoal.frequencyCalendarPeriod.startDate), "dd/MM/yyyy")} - {format(new Date(selectedGoal.frequencyCalendarPeriod.endDate), "dd/MM/yyyy")})
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <FormField
                   control={editForm.control}
                   name="description"

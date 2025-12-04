@@ -4495,6 +4495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const goalsWithDetails = await Promise.all(goals.map(async (goal) => {
         const evaluation = await storage.getEvaluation(goal.evaluationId);
         let appraisalCycle = null;
+        let frequencyCalendarPeriod = null;
         
         if (evaluation?.initiatedAppraisalId) {
           const initiatedAppraisal = await storage.getInitiatedAppraisal(evaluation.initiatedAppraisalId);
@@ -4502,6 +4503,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const frequencyCalendar = await storage.getFrequencyCalendarById(initiatedAppraisal.frequencyCalendarId);
             if (frequencyCalendar?.appraisalCycleId) {
               appraisalCycle = await storage.getAppraisalCycleById(frequencyCalendar.appraisalCycleId);
+            }
+            
+            // Get the frequency calendar period from initiated_appraisal_detail_timings
+            const detailTimings = await storage.getInitiatedAppraisalDetailTimings(evaluation.initiatedAppraisalId);
+            if (detailTimings.length > 0) {
+              const detailTiming = detailTimings[0];
+              const calendarDetails = await storage.getFrequencyCalendarDetailsByCalendarId(initiatedAppraisal.frequencyCalendarId);
+              const matchingDetail = calendarDetails.find(d => d.id === detailTiming.frequencyCalendarDetailId);
+              if (matchingDetail) {
+                frequencyCalendarPeriod = {
+                  displayName: matchingDetail.displayName,
+                  startDate: matchingDetail.startDate,
+                  endDate: matchingDetail.endDate,
+                };
+              }
             }
           }
         }
@@ -4519,6 +4535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             code: appraisalCycle.code,
             description: appraisalCycle.description,
           } : null,
+          frequencyCalendarPeriod,
         };
       }));
       
