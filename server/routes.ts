@@ -214,8 +214,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 4. Create session (express-session based)
       try {
-        req.session.userId = user.id;
-        req.session.activeRole = user.role;
+        req.session.id = user.id;
+        req.session.role = user.role;
         // Track company context for subsequent operations
         req.session.companyId = company.id;
       } catch (err) {

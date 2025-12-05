@@ -709,17 +709,6 @@ export interface IStorage {
   ): Promise<QuestionnaireTemplate[]>;
   getScheduledMeetingsForCompany(companyId: string): Promise<any[]>;
 
-  // Many more (levels, grades, etc.)
-  getLevels(createdById: string): Promise<Level[]>;
-  getLevel(id: string, createdById: string): Promise<Level | undefined>;
-  createLevel(level: InsertLevel, createdById: string): Promise<Level>;
-  updateLevel(
-    id: string,
-    level: Partial<InsertLevel>,
-    createdById: string
-  ): Promise<Level>;
-  deleteLevel(id: string, createdById: string): Promise<void>;
-
   // Levels
   getLevels(createdById: string): Promise<Level[]>;
   getLevel(id: string, createdById: string): Promise<Level | undefined>;
@@ -1565,7 +1554,7 @@ export class DatabaseStorage implements IStorage {
       req.input("RequestingUserId", requestingUserId || null);
       const result = await req.execute("dbo.GetQuestionnaireTemplates");
       return (result.recordset || []).map(
-        (raw) =>
+        (raw:any) =>
           ({
             id: raw.Id ?? raw.id,
             name: raw.Name ?? raw.name,
@@ -1702,7 +1691,7 @@ export class DatabaseStorage implements IStorage {
         .input("Year", year)
         .execute("dbo.GetQuestionnaireTemplatesByYear");
       return (result.recordset || []).map(
-        (r) =>
+        (r:any) =>
           ({
             id: r.Id,
             name: r.Name,
@@ -2611,7 +2600,7 @@ export class DatabaseStorage implements IStorage {
         .request()
         .input("CreatedById", createdById)
         .execute("dbo.GetInitiatedAppraisals");
-      return (result.recordset || []).map((r) =>
+      return (result.recordset || []).map((r:any) =>
         mergeInitiatedAppraisal(mapRawInitiatedAppraisal(r))
       );
     } catch {
@@ -2686,7 +2675,7 @@ export class DatabaseStorage implements IStorage {
         .input("CreatedById", createdById)
         .execute("dbo.GetPublishQuestionnaires");
       return (result.recordset || []).map(
-        (raw) =>
+        (raw:any) =>
           ({
             id: raw.Id ?? raw.id,
             code: raw.Code ?? raw.code,

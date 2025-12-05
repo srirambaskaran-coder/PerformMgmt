@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import sql from "mssql";
+import * as sql from 'mssql';
 import { getPool } from "./mssql";
 
 interface EmailOptions {
@@ -9,6 +9,7 @@ interface EmailOptions {
   text?: string;
   cc?: string | string[];
   bcc?: string | string[];
+  attachments?: any[];
 }
 
 class EmailService {

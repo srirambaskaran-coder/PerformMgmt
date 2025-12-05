@@ -9,17 +9,17 @@ import { fileURLToPath } from "url";
 interface InitiatedAppraisalAugmentation {
   id: string;
   appraisalGroupId?: string;
-  appraisalType?: string;
-  questionnaireTemplateIds?: string[];
+  appraisalType?: "questionnaire_based" | "kpi_based" | "mbo_based" | "okr_based";
+  questionnaireTemplateIds?: string[] | null;
   documentUrl?: string | null;
   frequencyCalendarId?: string | null;
-  daysToInitiate?: number;
-  daysToClose?: number;
-  numberOfReminders?: number;
-  excludeTenureLessThanYear?: boolean;
-  excludedEmployeeIds?: string[];
-  makePublic?: boolean;
-  publishType?: string;
+  daysToInitiate?: number | null;
+  daysToClose?: number | null;
+  numberOfReminders?: number | null;
+  excludeTenureLessThanYear?: boolean | null;
+  excludedEmployeeIds?: string[] | null;
+  makePublic?: boolean | null;
+  publishType?: "now" | "as_per_calendar" | null;
 }
 
 // ESM-safe __dirname replacement

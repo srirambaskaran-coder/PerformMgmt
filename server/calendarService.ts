@@ -1,5 +1,5 @@
 import { storage } from "./storage";
-import sql from "mssql";
+import * as sql from 'mssql';
 import { getPool } from "./mssql";
 
 interface CalendarEvent {

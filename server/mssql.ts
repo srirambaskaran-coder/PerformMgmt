@@ -1,5 +1,5 @@
 import "dotenv/config";
-import sql from "mssql";
+import * as sql from 'mssql';
 
 let poolPromise: Promise<sql.ConnectionPool> | null = null;
 
