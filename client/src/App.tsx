@@ -30,6 +30,8 @@ import Evaluations from "@/pages/Evaluations";
 import ManagerSubmissions from "@/pages/ManagerSubmissions";
 import Meetings from "@/pages/Meetings";
 import HRMeetingsView from "@/pages/HRMeetingsView";
+import CalibrateRatings from "@/pages/CalibrateRatings";
+import DevelopmentGoals from "@/pages/DevelopmentGoals";
 import Settings from "@/pages/Settings";
 
 function Router() {
@@ -52,14 +54,32 @@ function Router() {
           <Route path="/locations" component={LocationManagement} />
           <Route path="/departments" component={DepartmentManagement} />
           <Route path="/questionnaires" component={QuestionnaireTemplates} />
-          <Route path="/questionnaire-templates" component={QuestionnaireTemplates} />
-          <Route path="/publish-questionnaires" component={PublishQuestionnaires} />
+          <Route
+            path="/questionnaire-templates"
+            component={QuestionnaireTemplates}
+          />
+          <Route
+            path="/publish-questionnaires"
+            component={PublishQuestionnaires}
+          />
           <Route path="/levels" component={LevelManagement} />
           <Route path="/grades" component={GradeManagement} />
-          <Route path="/appraisal-cycles" component={AppraisalCycleManagement} />
-          <Route path="/review-frequencies" component={ReviewFrequencyManagement} />
-          <Route path="/frequency-calendars" component={FrequencyCalendarManagement} />
-          <Route path="/frequency-calendar-details" component={FrequencyCalendarDetailsManagement} />
+          <Route
+            path="/appraisal-cycles"
+            component={AppraisalCycleManagement}
+          />
+          <Route
+            path="/review-frequencies"
+            component={ReviewFrequencyManagement}
+          />
+          <Route
+            path="/frequency-calendars"
+            component={FrequencyCalendarManagement}
+          />
+          <Route
+            path="/frequency-calendar-details"
+            component={FrequencyCalendarDetailsManagement}
+          />
           <Route path="/performance-reviews" component={PerformanceReviews} />
           <Route path="/review-progress" component={ReviewProgress} />
           <Route path="/appraisal-groups" component={AppraisalGroups} />
@@ -68,7 +88,9 @@ function Router() {
           <Route path="/evaluations" component={Evaluations} />
           <Route path="/manager-submissions" component={ManagerSubmissions} />
           <Route path="/meetings" component={Meetings} />
+          <Route path="/development-goals" component={DevelopmentGoals} />
           <Route path="/hr-meetings" component={HRMeetingsView} />
+          <Route path="/calibrate-ratings" component={CalibrateRatings} />
           <Route path="/settings" component={Settings} />
         </>
       )}

@@ -1,4 +1,4 @@
-import { Bell, LogOut, User, RefreshCw } from "lucide-react";
+import { LogOut, User, RefreshCw, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,11 +12,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useSidebar } from "@/components/SidebarContext";
 
 export function Header() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { toggleSidebar } = useSidebar();
 
   const switchRoleMutation = useMutation({
     mutationFn: async (role: string) => {
@@ -48,12 +50,15 @@ export function Header() {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      window.location.href = "/";
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
     } catch (error) {
       console.error("Logout error:", error);
-      window.location.href = "/";
     }
+    // Redirect to login page
+    window.location.href = "/";
   };
 
   // Get active role and available roles from user object
@@ -76,38 +81,39 @@ export function Header() {
       data-testid="header"
     >
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold" data-testid="page-title">
-            Performance Dashboard
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Monitor and manage employee performance reviews
-          </p>
+        <div className="flex items-center gap-4">
+          {/* Sidebar Toggle Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={toggleSidebar}
+            data-testid="toggle-sidebar"
+          >
+            <PanelLeft className="h-5 w-5" />
+            <span className="sr-only">Toggle Sidebar</span>
+          </Button>
+
+          <div>
+            <h1 className="text-xl font-semibold" data-testid="page-title">
+              Performance Dashboard
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Monitor and manage employee performance reviews
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Notifications */}
-          <div className="relative">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="relative"
-              data-testid="notifications-button"
-            >
-              <Bell className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full"></span>
-            </Button>
-          </div>
-
           {/* User Profile */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="relative h-8 w-8 rounded-full"
+                className="relative h-10 w-10 rounded-full p-0"
                 data-testid="user-profile-button"
               >
-                <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center">
+                <div className="w-10 h-10 bg-accent rounded-full flex items-center justify-center">
                   <span className="text-accent-foreground text-sm font-medium">
                     {(user as any)?.firstName && (user as any)?.lastName ? (
                       `${(user as any).firstName[0]?.toUpperCase()}${(

@@ -58,6 +58,9 @@ import type {
   InsertAccessToken,
   CalendarCredential,
   InsertCalendarCredential,
+  DevelopmentGoal,
+  InsertDevelopmentGoal,
+  UpdateDevelopmentGoal,
 } from "@shared/schema";
 import {
   saveInitiatedAppraisalAugmentation,
@@ -401,6 +404,52 @@ function mapRawAppraisalGroupMember(raw: any): AppraisalGroupMember {
   } as AppraisalGroupMember;
 }
 
+// Map member with embedded user details for UI display
+function mapRawAppraisalGroupMemberWithUser(raw: any): any {
+  return {
+    // Use the user ID as the member ID for the UI (so member.id matches user.id)
+    id: raw.UserId ?? raw.user_id ?? raw.userId,
+    appraisalGroupId:
+      raw.AppraisalGroupId ?? raw.appraisal_group_id ?? raw.appraisalGroupId,
+    userId: raw.UserId ?? raw.user_id ?? raw.userId,
+    addedById: raw.AddedById ?? raw.added_by_id ?? raw.addedById,
+    addedAt: raw.AddedAt ?? raw.added_at ?? raw.addedAt ?? null,
+    // User details from the joined query
+    firstName: raw.FirstName ?? raw.first_name ?? null,
+    lastName: raw.LastName ?? raw.last_name ?? null,
+    email: raw.Email ?? raw.email ?? null,
+    designation: raw.Designation ?? raw.designation ?? null,
+    department: raw.Department ?? raw.department ?? null,
+    code: raw.Code ?? raw.code ?? null,
+  };
+}
+
+// Map member with nested user object for routes that expect member.user
+function mapRawAppraisalGroupMemberWithNestedUser(raw: any): any {
+  const userId = raw.UserId ?? raw.user_id ?? raw.userId;
+  return {
+    id: raw.Id ?? raw.id,
+    appraisalGroupId:
+      raw.AppraisalGroupId ?? raw.appraisal_group_id ?? raw.appraisalGroupId,
+    userId: userId,
+    addedById: raw.AddedById ?? raw.added_by_id ?? raw.addedById,
+    addedAt: raw.AddedAt ?? raw.added_at ?? raw.addedAt ?? null,
+    // Nested user object for routes that expect member.user
+    user: {
+      id: userId,
+      firstName: raw.FirstName ?? raw.first_name ?? null,
+      lastName: raw.LastName ?? raw.last_name ?? null,
+      email: raw.Email ?? raw.email ?? null,
+      designation: raw.Designation ?? raw.designation ?? null,
+      department: raw.Department ?? raw.department ?? null,
+      code: raw.Code ?? raw.code ?? null,
+      status: raw.Status ?? raw.status ?? "active",
+      reportingManagerId:
+        raw.ReportingManagerId ?? raw.reporting_manager_id ?? null,
+    },
+  };
+}
+
 function parseTemplateIds(value: any): string[] | null {
   if (!value) return null;
   if (Array.isArray(value)) return value as string[];
@@ -514,6 +563,26 @@ function mapRawScheduledAppraisalTask(raw: any): ScheduledAppraisalTask {
   } as ScheduledAppraisalTask;
 }
 
+function mapRawDevelopmentGoal(raw: any): DevelopmentGoal {
+  return {
+    id: raw.Id ?? raw.id,
+    evaluationId: raw.EvaluationId ?? raw.evaluation_id ?? raw.evaluationId,
+    employeeId: raw.EmployeeId ?? raw.employee_id ?? raw.employeeId,
+    description: raw.Description ?? raw.description,
+    plannedOutcome:
+      raw.PlannedOutcome ?? raw.planned_outcome ?? raw.plannedOutcome,
+    targetDate: raw.TargetDate
+      ? new Date(raw.TargetDate)
+      : raw.target_date
+      ? new Date(raw.target_date)
+      : null,
+    progress: raw.Progress ?? raw.progress ?? 0,
+    status: raw.Status ?? raw.status ?? "not_started",
+    createdAt: raw.CreatedAt ?? raw.created_at ?? raw.createdAt ?? null,
+    updatedAt: raw.UpdatedAt ?? raw.updated_at ?? raw.updatedAt ?? null,
+  } as DevelopmentGoal;
+}
+
 function mapRawEvaluation(raw: any): Evaluation {
   return {
     id: raw.Id ?? raw.id,
@@ -597,36 +666,39 @@ export interface IStorage {
   updateCompany(id: string, company: Partial<InsertCompany>): Promise<Company>;
   deleteCompany(id: string): Promise<void>;
 
-  // Locations
-  getLocations(): Promise<Location[]>;
+  // Locations - now company-filtered
+  getLocations(companyId?: string): Promise<Location[]>;
   getLocation(id: string): Promise<Location | undefined>;
-  createLocation(location: InsertLocation): Promise<Location>;
+  createLocation(
+    location: InsertLocation,
+    companyId?: string
+  ): Promise<Location>;
   updateLocation(
     id: string,
     location: Partial<InsertLocation>
   ): Promise<Location>;
   deleteLocation(id: string): Promise<void>;
 
-  // Questionnaire Templates (partial)
+  // Questionnaire Templates - now company-filtered
   getQuestionnaireTemplates(
-    requestingUserId?: string
+    companyId?: string
   ): Promise<QuestionnaireTemplate[]>;
+  getAllQuestionnaireTemplates(): Promise<QuestionnaireTemplate[]>;
   getQuestionnaireTemplate(
     id: string,
-    requestingUserId?: string
+    companyId?: string
   ): Promise<QuestionnaireTemplate | undefined>;
   createQuestionnaireTemplate(
-    template: InsertQuestionnaireTemplate
+    template: InsertQuestionnaireTemplate,
+    companyId?: string,
+    createdById?: string
   ): Promise<QuestionnaireTemplate>;
   updateQuestionnaireTemplate(
     id: string,
     template: Partial<InsertQuestionnaireTemplate>,
-    requestingUserId?: string
+    companyId?: string
   ): Promise<QuestionnaireTemplate>;
-  deleteQuestionnaireTemplate(
-    id: string,
-    requestingUserId?: string
-  ): Promise<void>;
+  deleteQuestionnaireTemplate(id: string, companyId?: string): Promise<void>;
 
   // Email Templates
   getEmailTemplates(): Promise<EmailTemplate[]>;
@@ -690,6 +762,12 @@ export interface IStorage {
     reviewCycleId?: string;
     status?: string;
   }): Promise<Evaluation[]>;
+  getEvaluationsWithQuestionnaires(filters?: {
+    employeeId?: string;
+    managerId?: string;
+    reviewCycleId?: string;
+    status?: string;
+  }): Promise<any[]>;
   getEvaluation(id: string): Promise<Evaluation | undefined>;
   createEvaluation(e: InsertEvaluation): Promise<Evaluation>;
   updateEvaluation(
@@ -704,117 +782,140 @@ export interface IStorage {
   getEvaluationsByInitiatedAppraisal(
     initiatedAppraisalId: string
   ): Promise<Evaluation[]>;
+  getEvaluationsForCalibration(companyId: string): Promise<any[]>;
+  updateEvaluationCalibration(
+    id: string,
+    calibratedRating: number | null,
+    calibrationRemarks: string,
+    calibratedBy: string
+  ): Promise<Evaluation>;
   getQuestionnaireTemplatesByYear(
     year: number
   ): Promise<QuestionnaireTemplate[]>;
   getScheduledMeetingsForCompany(companyId: string): Promise<any[]>;
 
-  // Many more (levels, grades, etc.)
-  getLevels(createdById: string): Promise<Level[]>;
-  getLevel(id: string, createdById: string): Promise<Level | undefined>;
-  createLevel(level: InsertLevel, createdById: string): Promise<Level>;
+  // Many more (levels, grades, etc.) - now company-filtered
+  getLevels(companyId: string): Promise<Level[]>;
+  getLevel(id: string, companyId?: string): Promise<Level | undefined>;
+  createLevel(
+    level: InsertLevel,
+    companyId: string,
+    createdById: string
+  ): Promise<Level>;
   updateLevel(
     id: string,
     level: Partial<InsertLevel>,
+    companyId: string
+  ): Promise<Level>;
+  deleteLevel(id: string, companyId: string): Promise<void>;
+
+  // Levels - company-filtered
+  getLevels(companyId: string): Promise<Level[]>;
+  getLevel(id: string, companyId?: string): Promise<Level | undefined>;
+  createLevel(
+    level: InsertLevel,
+    companyId: string,
     createdById: string
   ): Promise<Level>;
-  deleteLevel(id: string, createdById: string): Promise<void>;
-
-  // Levels
-  getLevels(createdById: string): Promise<Level[]>;
-  getLevel(id: string, createdById: string): Promise<Level | undefined>;
-  createLevel(level: InsertLevel, createdById: string): Promise<Level>;
   updateLevel(
     id: string,
     level: Partial<InsertLevel>,
-    createdById: string
+    companyId: string
   ): Promise<Level>;
-  deleteLevel(id: string, createdById: string): Promise<void>;
+  deleteLevel(id: string, companyId: string): Promise<void>;
 
-  // Grades
-  getGrades(createdById: string): Promise<Grade[]>;
-  getGrade(id: string, createdById: string): Promise<Grade | undefined>;
-  createGrade(grade: InsertGrade, createdById: string): Promise<Grade>;
+  // Grades - company-filtered
+  getGrades(companyId: string): Promise<Grade[]>;
+  getGrade(id: string, companyId?: string): Promise<Grade | undefined>;
+  createGrade(
+    grade: InsertGrade,
+    companyId: string,
+    createdById: string
+  ): Promise<Grade>;
   updateGrade(
     id: string,
     grade: Partial<InsertGrade>,
-    createdById: string
+    companyId: string
   ): Promise<Grade>;
-  deleteGrade(id: string, createdById: string): Promise<void>;
+  deleteGrade(id: string, companyId: string): Promise<void>;
 
-  // Departments
-  getDepartments(createdById: string): Promise<Department[]>;
+  // Departments - company-filtered
+  getDepartments(companyId: string): Promise<Department[]>;
   getDepartment(
     id: string,
-    createdById: string
+    companyId?: string
   ): Promise<Department | undefined>;
   createDepartment(
     department: InsertDepartment,
+    companyId: string,
     createdById: string
   ): Promise<Department>;
   updateDepartment(
     id: string,
     department: Partial<InsertDepartment>,
-    createdById: string
+    companyId: string
   ): Promise<Department>;
-  deleteDepartment(id: string, createdById: string): Promise<void>;
+  deleteDepartment(id: string, companyId: string): Promise<void>;
 
-  // Appraisal Cycles
-  getAppraisalCycles(createdById: string): Promise<AppraisalCycle[]>;
+  // Appraisal Cycles - company-filtered
+  getAppraisalCycles(companyId: string): Promise<AppraisalCycle[]>;
   getAllAppraisalCycles(companyId: string): Promise<AppraisalCycle[]>;
   getAppraisalCycle(
     id: string,
-    createdById?: string
+    companyId?: string
   ): Promise<AppraisalCycle | undefined>;
   createAppraisalCycle(
     cycle: InsertAppraisalCycle,
+    companyId: string,
     createdById: string
   ): Promise<AppraisalCycle>;
   updateAppraisalCycle(
     id: string,
     cycle: Partial<InsertAppraisalCycle>,
-    createdById: string
+    companyId: string
   ): Promise<AppraisalCycle>;
-  deleteAppraisalCycle(id: string, createdById: string): Promise<void>;
+  deleteAppraisalCycle(id: string, companyId: string): Promise<void>;
 
-  // Review Frequencies
-  getReviewFrequencies(createdById: string): Promise<ReviewFrequency[]>;
+  // Review Frequencies - company-filtered
+  getReviewFrequencies(companyId: string): Promise<ReviewFrequency[]>;
   getReviewFrequency(
     id: string,
-    createdById: string
+    companyId?: string
   ): Promise<ReviewFrequency | undefined>;
   createReviewFrequency(
     freq: InsertReviewFrequency,
+    companyId: string,
     createdById: string
   ): Promise<ReviewFrequency>;
   updateReviewFrequency(
     id: string,
     freq: Partial<InsertReviewFrequency>,
-    createdById: string
+    companyId: string
   ): Promise<ReviewFrequency>;
-  deleteReviewFrequency(id: string, createdById: string): Promise<void>;
+  deleteReviewFrequency(id: string, companyId: string): Promise<void>;
 
-  // Frequency Calendars
-  getFrequencyCalendars(createdById: string): Promise<FrequencyCalendar[]>;
-  getAllFrequencyCalendars(): Promise<FrequencyCalendar[]>;
+  // Frequency Calendars - company-filtered
+  getFrequencyCalendars(companyId: string): Promise<FrequencyCalendar[]>;
+  getAllFrequencyCalendars(companyId?: string): Promise<FrequencyCalendar[]>;
   getFrequencyCalendar(
     id: string,
-    createdById?: string
+    companyId?: string
   ): Promise<FrequencyCalendar | undefined>;
   createFrequencyCalendar(
     calendar: InsertFrequencyCalendar,
+    companyId: string,
     createdById: string
   ): Promise<FrequencyCalendar>;
   updateFrequencyCalendar(
     id: string,
     calendar: Partial<InsertFrequencyCalendar>,
-    createdById: string
+    companyId: string
   ): Promise<FrequencyCalendar>;
-  deleteFrequencyCalendar(id: string, createdById: string): Promise<void>;
+  deleteFrequencyCalendar(id: string, companyId: string): Promise<void>;
 
-  // Frequency Calendar Details
+  // Frequency Calendar Details - company-filtered
   getFrequencyCalendarDetails(
-    createdById: string
+    companyId: string
   ): Promise<FrequencyCalendarDetails[]>;
   getAllFrequencyCalendarDetails(
     companyId: string
@@ -824,10 +925,11 @@ export interface IStorage {
   ): Promise<FrequencyCalendarDetails[]>;
   getFrequencyCalendarDetail(
     id: string,
-    createdById?: string
+    companyId?: string
   ): Promise<FrequencyCalendarDetails | undefined>;
   createFrequencyCalendarDetails(
     details: InsertFrequencyCalendarDetails,
+    companyId: string,
     createdById: string
   ): Promise<FrequencyCalendarDetails>;
   updateFrequencyCalendarDetails(
@@ -836,30 +938,29 @@ export interface IStorage {
   ): Promise<FrequencyCalendarDetails>;
   deleteFrequencyCalendarDetails(id: string): Promise<void>;
 
-  // Appraisal Groups & Members
-  getAppraisalGroups(createdById: string): Promise<AppraisalGroup[]>;
+  // Appraisal Groups & Members - company-filtered
+  getAppraisalGroups(companyId: string): Promise<AppraisalGroup[]>;
   getAppraisalGroupsWithMembers(
-    createdById: string
+    companyId: string
   ): Promise<(AppraisalGroup & { members: AppraisalGroupMember[] })[]>;
   getAppraisalGroup(
     id: string,
-    createdById: string
+    companyId: string
   ): Promise<AppraisalGroup | undefined>;
   createAppraisalGroup(
     group: InsertAppraisalGroup,
-    createdById: string,
-    companyId?: string
+    companyId: string
   ): Promise<AppraisalGroup>;
   updateAppraisalGroup(
     id: string,
     group: Partial<InsertAppraisalGroup>,
-    createdById: string
+    companyId: string
   ): Promise<AppraisalGroup>;
-  deleteAppraisalGroup(id: string, createdById: string): Promise<void>;
+  deleteAppraisalGroup(id: string, companyId: string): Promise<void>;
   getAppraisalGroupMembers(
     appraisalGroupId: string,
     createdById: string
-  ): Promise<AppraisalGroupMember[]>;
+  ): Promise<any[]>;
   addAppraisalGroupMember(
     member: InsertAppraisalGroupMember,
     createdById: string
@@ -876,7 +977,13 @@ export interface IStorage {
     createdById: string
   ): Promise<InitiatedAppraisal>;
   getInitiatedAppraisal(id: string): Promise<InitiatedAppraisal | undefined>;
-  getInitiatedAppraisals(createdById: string): Promise<InitiatedAppraisal[]>;
+  getInitiatedAppraisals(
+    companyId: string
+  ): Promise<(InitiatedAppraisal & { appraisalGroup?: any; progress?: any })[]>;
+  getAppraisalProgress(
+    appraisalId: string,
+    appraisalGroupId: string
+  ): Promise<any>;
   updateInitiatedAppraisalStatus(id: string, status: string): Promise<void>;
   createInitiatedAppraisalDetailTiming(
     timing: InsertInitiatedAppraisalDetailTiming
@@ -912,7 +1019,23 @@ export interface IStorage {
   createScheduledAppraisalTask(
     task: InsertScheduledAppraisalTask
   ): Promise<ScheduledAppraisalTask>;
-  // (Future: retrieval or execution endpoints)
+
+  // Helper methods for lookups without ownership check
+  getAppraisalCycleById(id: string): Promise<AppraisalCycle | undefined>;
+  getFrequencyCalendarById(id: string): Promise<FrequencyCalendar | undefined>;
+
+  // Development Goals
+  getDevelopmentGoals(employeeId: string): Promise<DevelopmentGoal[]>;
+  getDevelopmentGoalsByEvaluation(
+    evaluationId: string
+  ): Promise<DevelopmentGoal[]>;
+  getDevelopmentGoal(id: string): Promise<DevelopmentGoal | undefined>;
+  createDevelopmentGoal(goal: InsertDevelopmentGoal): Promise<DevelopmentGoal>;
+  updateDevelopmentGoal(
+    id: string,
+    goal: UpdateDevelopmentGoal
+  ): Promise<DevelopmentGoal>;
+  deleteDevelopmentGoal(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1208,9 +1331,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ---------- Location Operations ----------
-  async getLocations(): Promise<Location[]> {
+  async getLocations(companyId?: string): Promise<Location[]> {
     const pool = await getPool();
-    const result = await pool.request().execute("dbo.GetLocations");
+    const request = pool.request();
+    if (companyId) {
+      request.input("CompanyId", companyId);
+    }
+    const result = await request.execute("dbo.GetLocations");
     return (result.recordset || []).map(mapRawLocation);
   }
 
@@ -1224,7 +1351,10 @@ export class DatabaseStorage implements IStorage {
     return raw ? mapRawLocation(raw) : undefined;
   }
 
-  async createLocation(location: InsertLocation): Promise<Location> {
+  async createLocation(
+    location: InsertLocation,
+    companyId?: string
+  ): Promise<Location> {
     const pool = await getPool();
     const req = pool
       .request()
@@ -1232,6 +1362,7 @@ export class DatabaseStorage implements IStorage {
       .input("Name", location.name)
       .input("State", location.state || null)
       .input("Country", location.country || null)
+      .input("CompanyId", companyId || null)
       .input("Status", location.status || "active");
     const result = await req.execute("dbo.CreateLocation");
     return mapRawLocation(result.recordset[0]);
@@ -1557,12 +1688,12 @@ export class DatabaseStorage implements IStorage {
 
   // ---------- Questionnaire Templates ----------
   async getQuestionnaireTemplates(
-    requestingUserId?: string
+    companyId?: string
   ): Promise<QuestionnaireTemplate[]> {
     const pool = await getPool();
     try {
       const req = pool.request();
-      req.input("RequestingUserId", requestingUserId || null);
+      req.input("CompanyId", companyId || null);
       const result = await req.execute("dbo.GetQuestionnaireTemplates");
       return (result.recordset || []).map(
         (raw) =>
@@ -1574,6 +1705,7 @@ export class DatabaseStorage implements IStorage {
               raw.TargetRole ?? raw.target_role ?? raw.targetRole ?? null,
             questions: raw.Questions ? safeParseJson(raw.Questions) : null,
             year: raw.Year ?? raw.year ?? null,
+            companyId: raw.CompanyId ?? raw.company_id ?? raw.companyId ?? null,
             status: raw.Status ?? raw.status ?? "active",
             createdAt: raw.CreatedAt ? new Date(raw.CreatedAt) : null,
             updatedAt: raw.UpdatedAt ? new Date(raw.UpdatedAt) : null,
@@ -1594,15 +1726,52 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
   }
+
+  async getAllQuestionnaireTemplates(): Promise<QuestionnaireTemplate[]> {
+    const pool = await getPool();
+    try {
+      const result = await pool.request().query(`
+        SELECT * FROM dbo.questionnaire_templates
+        ORDER BY created_at DESC
+      `);
+      return (result.recordset || []).map(
+        (raw) =>
+          ({
+            id: raw.id,
+            name: raw.name,
+            description: raw.description ?? null,
+            targetRole: raw.target_role ?? null,
+            questions: raw.questions ? safeParseJson(raw.questions) : null,
+            year: raw.year ?? null,
+            companyId: raw.company_id ?? null,
+            status: raw.status ?? "active",
+            createdAt: raw.created_at ? new Date(raw.created_at) : null,
+            updatedAt: raw.updated_at ? new Date(raw.updated_at) : null,
+            createdById: raw.created_by_id ?? null,
+            applicableCategory: raw.applicable_category ?? null,
+            applicableLevelId: raw.applicable_level_id ?? null,
+            applicableGradeId: raw.applicable_grade_id ?? null,
+            applicableLocationId: raw.applicable_location_id ?? null,
+            sendOnMail: raw.send_on_mail ?? false,
+          } as QuestionnaireTemplate)
+      );
+    } catch (error) {
+      console.error("[getAllQuestionnaireTemplates] Error:", error);
+      return [];
+    }
+  }
+
   async getQuestionnaireTemplate(
-    id: string
+    id: string,
+    companyId?: string
   ): Promise<QuestionnaireTemplate | undefined> {
     const pool = await getPool();
     try {
-      const result = await pool
-        .request()
-        .input("Id", id)
-        .execute("dbo.GetQuestionnaireTemplate");
+      const request = pool.request().input("Id", id);
+      if (companyId) {
+        request.input("CompanyId", companyId);
+      }
+      const result = await request.execute("dbo.GetQuestionnaireTemplate");
       const raw = result.recordset[0];
       if (!raw) return undefined;
       return {
@@ -1612,6 +1781,7 @@ export class DatabaseStorage implements IStorage {
         targetRole: raw.TargetRole ?? raw.target_role ?? raw.targetRole ?? null,
         questions: raw.Questions ? safeParseJson(raw.Questions) : null,
         year: raw.Year ?? raw.year ?? null,
+        companyId: raw.CompanyId ?? raw.company_id ?? raw.companyId ?? null,
         status: raw.Status ?? raw.status ?? "active",
         createdAt: raw.CreatedAt ? new Date(raw.CreatedAt) : null,
         updatedAt: raw.UpdatedAt ? new Date(raw.UpdatedAt) : null,
@@ -1632,7 +1802,9 @@ export class DatabaseStorage implements IStorage {
     }
   }
   async createQuestionnaireTemplate(
-    template: InsertQuestionnaireTemplate
+    template: InsertQuestionnaireTemplate,
+    companyId?: string,
+    createdById?: string
   ): Promise<QuestionnaireTemplate> {
     const pool = await getPool();
     const req = pool
@@ -1642,6 +1814,7 @@ export class DatabaseStorage implements IStorage {
       .input("TargetRole", (template as any).targetRole || null)
       .input("Questions", JSON.stringify((template as any).questions || []))
       .input("Year", (template as any).year || null)
+      .input("CompanyId", companyId || (template as any).companyId || null)
       .input("Status", template.status || "active")
       .input("ApplicableCategory", (template as any).applicableCategory || null)
       .input("ApplicableLevelId", (template as any).applicableLevelId || null)
@@ -1651,13 +1824,17 @@ export class DatabaseStorage implements IStorage {
         (template as any).applicableLocationId || null
       )
       .input("SendOnMail", (template as any).sendOnMail || false)
-      .input("CreatedById", (template as any).createdById || null);
+      .input(
+        "CreatedById",
+        createdById || (template as any).createdById || null
+      );
     const result = await req.execute("dbo.CreateQuestionnaireTemplate");
     return (await this.getQuestionnaireTemplate(result.recordset[0].Id))!;
   }
   async updateQuestionnaireTemplate(
     id: string,
-    template: Partial<InsertQuestionnaireTemplate>
+    template: Partial<InsertQuestionnaireTemplate>,
+    companyId?: string
   ): Promise<QuestionnaireTemplate> {
     const pool = await getPool();
     const req = pool
@@ -1671,6 +1848,7 @@ export class DatabaseStorage implements IStorage {
         template.questions ? JSON.stringify(template.questions) : null
       )
       .input("Year", (template as any).year || null)
+      .input("CompanyId", companyId || null)
       .input("Status", template.status || null)
       .input("ApplicableCategory", (template as any).applicableCategory || null)
       .input("ApplicableLevelId", (template as any).applicableLevelId || null)
@@ -1683,12 +1861,16 @@ export class DatabaseStorage implements IStorage {
     const result = await req.execute("dbo.UpdateQuestionnaireTemplate");
     return (await this.getQuestionnaireTemplate(result.recordset[0].Id))!;
   }
-  async deleteQuestionnaireTemplate(id: string): Promise<void> {
+  async deleteQuestionnaireTemplate(
+    id: string,
+    companyId?: string
+  ): Promise<void> {
     const pool = await getPool();
     try {
       await pool
         .request()
         .input("Id", id)
+        .input("CompanyId", companyId || null)
         .execute("dbo.DeleteQuestionnaireTemplate");
     } catch {}
   }
@@ -1747,6 +1929,125 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
   }
+
+  async getEvaluationsWithQuestionnaires(filters?: {
+    employeeId?: string;
+    managerId?: string;
+    reviewCycleId?: string;
+    status?: string;
+  }): Promise<any[]> {
+    const pool = await getPool();
+    try {
+      // Get base evaluations
+      const evaluations = await this.getEvaluations(filters);
+
+      // Enrich each evaluation with additional data
+      const evaluationsWithData = await Promise.all(
+        evaluations.map(async (evaluation) => {
+          let questionnaires: any[] = [];
+          let initiatedAppraisal = null;
+
+          // Get initiated appraisal details if linked
+          if (evaluation.initiatedAppraisalId) {
+            try {
+              const appraisalResult = await pool
+                .request()
+                .input("Id", evaluation.initiatedAppraisalId)
+                .execute("dbo.GetInitiatedAppraisal");
+
+              if (
+                appraisalResult.recordset &&
+                appraisalResult.recordset.length > 0
+              ) {
+                const rawAppraisal = appraisalResult.recordset[0];
+                initiatedAppraisal = mergeInitiatedAppraisal(
+                  mapRawInitiatedAppraisal(rawAppraisal)
+                );
+
+                // Get questionnaire templates if they exist
+                if (
+                  initiatedAppraisal.questionnaireTemplateIds &&
+                  initiatedAppraisal.questionnaireTemplateIds.length > 0
+                ) {
+                  const questionnairePromises =
+                    initiatedAppraisal.questionnaireTemplateIds.map(
+                      async (templateId: string) => {
+                        try {
+                          const templateResult = await pool
+                            .request()
+                            .input("Id", templateId)
+                            .execute("dbo.GetQuestionnaireTemplate");
+
+                          if (
+                            templateResult.recordset &&
+                            templateResult.recordset.length > 0
+                          ) {
+                            return mapRawQuestionnaireTemplate(
+                              templateResult.recordset[0]
+                            );
+                          }
+                        } catch (error) {
+                          console.error(
+                            `Error fetching questionnaire template ${templateId}:`,
+                            error
+                          );
+                          return null;
+                        }
+                      }
+                    );
+
+                  const templates = await Promise.all(questionnairePromises);
+                  questionnaires = templates.filter((t) => t !== null);
+                }
+              }
+            } catch (error) {
+              console.error(
+                `Error fetching initiated appraisal ${evaluation.initiatedAppraisalId}:`,
+                error
+              );
+            }
+          }
+
+          // Get employee and manager details
+          const [employee, manager] = await Promise.all([
+            evaluation.employeeId ? this.getUser(evaluation.employeeId) : null,
+            evaluation.managerId ? this.getUser(evaluation.managerId) : null,
+          ]);
+
+          return {
+            ...evaluation,
+            employee: employee
+              ? {
+                  id: employee.id,
+                  firstName: employee.firstName,
+                  lastName: employee.lastName,
+                  email: employee.email,
+                  code: employee.code,
+                  designation: employee.designation,
+                  department: employee.department,
+                }
+              : null,
+            manager: manager
+              ? {
+                  id: manager.id,
+                  firstName: manager.firstName,
+                  lastName: manager.lastName,
+                  email: manager.email,
+                }
+              : null,
+            questionnaires,
+            initiatedAppraisal,
+          };
+        })
+      );
+
+      return evaluationsWithData;
+    } catch (error) {
+      console.error("Error getting evaluations with questionnaires:", error);
+      return [];
+    }
+  }
+
   async getEvaluation(id: string): Promise<Evaluation | undefined> {
     const pool = await getPool();
     try {
@@ -1847,43 +2148,99 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
   }
+
+  async getEvaluationsForCalibration(companyId: string): Promise<any[]> {
+    const pool = await getPool();
+    try {
+      const result = await pool
+        .request()
+        .input("CompanyId", companyId)
+        .execute("dbo.GetEvaluationsForCalibration");
+
+      // SP returns flattened fields for UI - just map to camelCase
+      return (result.recordset || []).map((raw: any) => {
+        const mapped = mapRawEvaluation(raw);
+        return {
+          ...mapped,
+          // Add the flattened fields from SP
+          employeeName: raw.EmployeeName,
+          employeeCode: raw.EmployeeCode,
+          employeeDesignation: raw.EmployeeDesignation,
+          departmentName: raw.DepartmentName,
+          managerName: raw.ManagerName,
+          // Keep IDs for filtering
+          locationId: raw.LocationId,
+          levelId: raw.LevelId,
+          gradeId: raw.GradeId,
+        };
+      });
+    } catch (error) {
+      console.error("[getEvaluationsForCalibration] Error:", error);
+      return [];
+    }
+  }
+
+  async updateEvaluationCalibration(
+    id: string,
+    calibratedRating: number | null,
+    calibrationRemarks: string,
+    calibratedBy: string
+  ): Promise<Evaluation> {
+    const pool = await getPool();
+    const result = await pool
+      .request()
+      .input("Id", id)
+      .input("CalibratedRating", calibratedRating)
+      .input("CalibrationRemarks", calibrationRemarks)
+      .input("CalibratedBy", calibratedBy)
+      .input("CalibratedAt", new Date())
+      .execute("dbo.UpdateEvaluationCalibration");
+
+    return mapRawEvaluation(result.recordset[0]);
+  }
+
   async getScheduledMeetingsForCompany(companyId: string): Promise<any[]> {
     return [];
   }
 
   // ---------- Levels ----------
-  async getLevels(createdById: string): Promise<Level[]> {
+  async getLevels(companyId: string): Promise<Level[]> {
     const pool = await getPool();
     try {
       const result = await pool
         .request()
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.GetLevels");
       return (result.recordset || []).map(mapRawLevel);
     } catch {
       return [];
     }
   }
-  async getLevel(id: string, createdById: string): Promise<Level | undefined> {
+  async getLevel(id: string, companyId?: string): Promise<Level | undefined> {
     const pool = await getPool();
     try {
-      const result = await pool
-        .request()
-        .input("Id", id)
-        .input("CreatedById", createdById)
-        .execute("dbo.GetLevel");
+      const request = pool.request().input("Id", id);
+      if (companyId) {
+        request.input("CompanyId", companyId);
+      }
+      const result = await request.execute("dbo.GetLevel");
       const raw = result.recordset[0];
       return raw ? mapRawLevel(raw) : undefined;
     } catch {
       return undefined;
     }
   }
-  async createLevel(level: InsertLevel, createdById: string): Promise<Level> {
+  async createLevel(
+    level: InsertLevel,
+    companyId: string,
+    createdById: string
+  ): Promise<Level> {
     const pool = await getPool();
     const req = pool
       .request()
       .input("Code", level.code)
       .input("Description", level.description)
+      .input("CompanyId", companyId)
       .input("CreatedById", createdById)
       .input("Status", level.status || "active");
     const result = await req.execute("dbo.CreateLevel");
@@ -1892,7 +2249,7 @@ export class DatabaseStorage implements IStorage {
   async updateLevel(
     id: string,
     level: Partial<InsertLevel>,
-    createdById: string
+    companyId: string
   ): Promise<Level> {
     const pool = await getPool();
     const req = pool
@@ -1901,54 +2258,59 @@ export class DatabaseStorage implements IStorage {
       .input("Code", level.code || null)
       .input("Description", level.description || null)
       .input("Status", level.status || null)
-      .input("CreatedById", createdById);
+      .input("CompanyId", companyId);
     const result = await req.execute("dbo.UpdateLevel");
     return mapRawLevel(result.recordset[0]);
   }
-  async deleteLevel(id: string, createdById: string): Promise<void> {
+  async deleteLevel(id: string, companyId: string): Promise<void> {
     const pool = await getPool();
     try {
       await pool
         .request()
         .input("Id", id)
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.DeleteLevel");
     } catch {}
   }
 
   // ---------- Grades ----------
-  async getGrades(createdById: string): Promise<Grade[]> {
+  async getGrades(companyId: string): Promise<Grade[]> {
     const pool = await getPool();
     try {
       const result = await pool
         .request()
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.GetGrades");
       return (result.recordset || []).map(mapRawGrade);
     } catch {
       return [];
     }
   }
-  async getGrade(id: string, createdById: string): Promise<Grade | undefined> {
+  async getGrade(id: string, companyId?: string): Promise<Grade | undefined> {
     const pool = await getPool();
     try {
-      const result = await pool
-        .request()
-        .input("Id", id)
-        .input("CreatedById", createdById)
-        .execute("dbo.GetGrade");
+      const request = pool.request().input("Id", id);
+      if (companyId) {
+        request.input("CompanyId", companyId);
+      }
+      const result = await request.execute("dbo.GetGrade");
       const raw = result.recordset[0];
       return raw ? mapRawGrade(raw) : undefined;
     } catch {
       return undefined;
     }
   }
-  async createGrade(grade: InsertGrade, createdById: string): Promise<Grade> {
+  async createGrade(
+    grade: InsertGrade,
+    companyId: string,
+    createdById: string
+  ): Promise<Grade> {
     const pool = await getPool();
     const req = pool
       .request()
       .input("Code", grade.code)
       .input("Description", grade.description)
+      .input("CompanyId", companyId)
       .input("CreatedById", createdById)
       .input("Status", grade.status || "active");
     const result = await req.execute("dbo.CreateGrade");
@@ -1957,7 +2319,7 @@ export class DatabaseStorage implements IStorage {
   async updateGrade(
     id: string,
     grade: Partial<InsertGrade>,
-    createdById: string
+    companyId: string
   ): Promise<Grade> {
     const pool = await getPool();
     const req = pool
@@ -1966,28 +2328,28 @@ export class DatabaseStorage implements IStorage {
       .input("Code", grade.code || null)
       .input("Description", grade.description || null)
       .input("Status", grade.status || null)
-      .input("CreatedById", createdById);
+      .input("CompanyId", companyId);
     const result = await req.execute("dbo.UpdateGrade");
     return mapRawGrade(result.recordset[0]);
   }
-  async deleteGrade(id: string, createdById: string): Promise<void> {
+  async deleteGrade(id: string, companyId: string): Promise<void> {
     const pool = await getPool();
     try {
       await pool
         .request()
         .input("Id", id)
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.DeleteGrade");
     } catch {}
   }
 
   // ---------- Departments ----------
-  async getDepartments(createdById: string): Promise<Department[]> {
+  async getDepartments(companyId: string): Promise<Department[]> {
     const pool = await getPool();
     try {
       const result = await pool
         .request()
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.GetDepartments");
       return (result.recordset || []).map(mapRawDepartment);
     } catch {
@@ -1996,15 +2358,15 @@ export class DatabaseStorage implements IStorage {
   }
   async getDepartment(
     id: string,
-    createdById: string
+    companyId?: string
   ): Promise<Department | undefined> {
     const pool = await getPool();
     try {
-      const result = await pool
-        .request()
-        .input("Id", id)
-        .input("CreatedById", createdById)
-        .execute("dbo.GetDepartment");
+      const request = pool.request().input("Id", id);
+      if (companyId) {
+        request.input("CompanyId", companyId);
+      }
+      const result = await request.execute("dbo.GetDepartment");
       const raw = result.recordset[0];
       return raw ? mapRawDepartment(raw) : undefined;
     } catch {
@@ -2013,6 +2375,7 @@ export class DatabaseStorage implements IStorage {
   }
   async createDepartment(
     department: InsertDepartment,
+    companyId: string,
     createdById: string
   ): Promise<Department> {
     const pool = await getPool();
@@ -2020,6 +2383,7 @@ export class DatabaseStorage implements IStorage {
       .request()
       .input("Code", department.code)
       .input("Description", department.description)
+      .input("CompanyId", companyId)
       .input("CreatedById", createdById)
       .input("Status", department.status || "active");
     const result = await req.execute("dbo.CreateDepartment");
@@ -2028,7 +2392,7 @@ export class DatabaseStorage implements IStorage {
   async updateDepartment(
     id: string,
     department: Partial<InsertDepartment>,
-    createdById: string
+    companyId: string
   ): Promise<Department> {
     const pool = await getPool();
     const req = pool
@@ -2037,28 +2401,28 @@ export class DatabaseStorage implements IStorage {
       .input("Code", department.code || null)
       .input("Description", department.description || null)
       .input("Status", department.status || null)
-      .input("CreatedById", createdById);
+      .input("CompanyId", companyId);
     const result = await req.execute("dbo.UpdateDepartment");
     return mapRawDepartment(result.recordset[0]);
   }
-  async deleteDepartment(id: string, createdById: string): Promise<void> {
+  async deleteDepartment(id: string, companyId: string): Promise<void> {
     const pool = await getPool();
     try {
       await pool
         .request()
         .input("Id", id)
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.DeleteDepartment");
     } catch {}
   }
 
   // ---------- Appraisal Cycles ----------
-  async getAppraisalCycles(createdById: string): Promise<AppraisalCycle[]> {
+  async getAppraisalCycles(companyId: string): Promise<AppraisalCycle[]> {
     const pool = await getPool();
     try {
       const result = await pool
         .request()
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.GetAppraisalCycles");
       return (result.recordset || []).map(mapRawAppraisalCycle);
     } catch {
@@ -2079,12 +2443,12 @@ export class DatabaseStorage implements IStorage {
   }
   async getAppraisalCycle(
     id: string,
-    createdById?: string
+    companyId?: string
   ): Promise<AppraisalCycle | undefined> {
     const pool = await getPool();
     try {
       const req = pool.request().input("Id", id);
-      if (createdById) req.input("CreatedById", createdById);
+      if (companyId) req.input("CompanyId", companyId);
       const result = await req.execute("dbo.GetAppraisalCycle");
       const raw = result.recordset[0];
       return raw ? mapRawAppraisalCycle(raw) : undefined;
@@ -2094,6 +2458,7 @@ export class DatabaseStorage implements IStorage {
   }
   async createAppraisalCycle(
     cycle: InsertAppraisalCycle,
+    companyId: string,
     createdById: string
   ): Promise<AppraisalCycle> {
     const pool = await getPool();
@@ -2103,6 +2468,7 @@ export class DatabaseStorage implements IStorage {
       .input("Description", cycle.description)
       .input("FromDate", cycle.fromDate)
       .input("ToDate", cycle.toDate)
+      .input("CompanyId", companyId)
       .input("CreatedById", createdById)
       .input("Status", cycle.status || "active");
     const result = await req.execute("dbo.CreateAppraisalCycle");
@@ -2111,7 +2477,7 @@ export class DatabaseStorage implements IStorage {
   async updateAppraisalCycle(
     id: string,
     cycle: Partial<InsertAppraisalCycle>,
-    createdById: string
+    companyId: string
   ): Promise<AppraisalCycle> {
     const pool = await getPool();
     const req = pool
@@ -2122,28 +2488,28 @@ export class DatabaseStorage implements IStorage {
       .input("FromDate", cycle.fromDate || null)
       .input("ToDate", cycle.toDate || null)
       .input("Status", cycle.status || null)
-      .input("CreatedById", createdById);
+      .input("CompanyId", companyId);
     const result = await req.execute("dbo.UpdateAppraisalCycle");
     return mapRawAppraisalCycle(result.recordset[0]);
   }
-  async deleteAppraisalCycle(id: string, createdById: string): Promise<void> {
+  async deleteAppraisalCycle(id: string, companyId: string): Promise<void> {
     const pool = await getPool();
     try {
       await pool
         .request()
         .input("Id", id)
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.DeleteAppraisalCycle");
     } catch {}
   }
 
   // ---------- Review Frequencies ----------
-  async getReviewFrequencies(createdById: string): Promise<ReviewFrequency[]> {
+  async getReviewFrequencies(companyId: string): Promise<ReviewFrequency[]> {
     const pool = await getPool();
     try {
       const result = await pool
         .request()
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.GetReviewFrequencies");
       return (result.recordset || []).map(mapRawReviewFrequency);
     } catch {
@@ -2152,15 +2518,15 @@ export class DatabaseStorage implements IStorage {
   }
   async getReviewFrequency(
     id: string,
-    createdById: string
+    companyId?: string
   ): Promise<ReviewFrequency | undefined> {
     const pool = await getPool();
     try {
-      const result = await pool
-        .request()
-        .input("Id", id)
-        .input("CreatedById", createdById)
-        .execute("dbo.GetReviewFrequency");
+      const request = pool.request().input("Id", id);
+      if (companyId) {
+        request.input("CompanyId", companyId);
+      }
+      const result = await request.execute("dbo.GetReviewFrequency");
       const raw = result.recordset[0];
       return raw ? mapRawReviewFrequency(raw) : undefined;
     } catch {
@@ -2169,6 +2535,7 @@ export class DatabaseStorage implements IStorage {
   }
   async createReviewFrequency(
     freq: InsertReviewFrequency,
+    companyId: string,
     createdById: string
   ): Promise<ReviewFrequency> {
     const pool = await getPool();
@@ -2176,6 +2543,7 @@ export class DatabaseStorage implements IStorage {
       .request()
       .input("Code", freq.code)
       .input("Description", freq.description)
+      .input("CompanyId", companyId)
       .input("CreatedById", createdById)
       .input("Status", freq.status || "active");
     const result = await req.execute("dbo.CreateReviewFrequency");
@@ -2184,7 +2552,7 @@ export class DatabaseStorage implements IStorage {
   async updateReviewFrequency(
     id: string,
     freq: Partial<InsertReviewFrequency>,
-    createdById: string
+    companyId: string
   ): Promise<ReviewFrequency> {
     const pool = await getPool();
     const req = pool
@@ -2193,42 +2561,44 @@ export class DatabaseStorage implements IStorage {
       .input("Code", freq.code || null)
       .input("Description", freq.description || null)
       .input("Status", freq.status || null)
-      .input("CreatedById", createdById);
+      .input("CompanyId", companyId);
     const result = await req.execute("dbo.UpdateReviewFrequency");
     return mapRawReviewFrequency(result.recordset[0]);
   }
-  async deleteReviewFrequency(id: string, createdById: string): Promise<void> {
+  async deleteReviewFrequency(id: string, companyId: string): Promise<void> {
     const pool = await getPool();
     try {
       await pool
         .request()
         .input("Id", id)
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.DeleteReviewFrequency");
     } catch {}
   }
 
   // ---------- Frequency Calendars ----------
-  async getFrequencyCalendars(
-    createdById: string
-  ): Promise<FrequencyCalendar[]> {
+  async getFrequencyCalendars(companyId: string): Promise<FrequencyCalendar[]> {
     const pool = await getPool();
     try {
       const result = await pool
         .request()
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.GetFrequencyCalendars");
       return (result.recordset || []).map(mapRawFrequencyCalendar);
     } catch {
       return [];
     }
   }
-  async getAllFrequencyCalendars(): Promise<FrequencyCalendar[]> {
+  async getAllFrequencyCalendars(
+    companyId?: string
+  ): Promise<FrequencyCalendar[]> {
     const pool = await getPool();
     try {
-      const result = await pool
-        .request()
-        .execute("dbo.GetAllFrequencyCalendars");
+      const request = pool.request();
+      if (companyId) {
+        request.input("CompanyId", companyId);
+      }
+      const result = await request.execute("dbo.GetAllFrequencyCalendars");
       return (result.recordset || []).map(mapRawFrequencyCalendar);
     } catch {
       return [];
@@ -2236,12 +2606,12 @@ export class DatabaseStorage implements IStorage {
   }
   async getFrequencyCalendar(
     id: string,
-    createdById?: string
+    companyId?: string
   ): Promise<FrequencyCalendar | undefined> {
     const pool = await getPool();
     try {
       const req = pool.request().input("Id", id);
-      if (createdById) req.input("CreatedById", createdById);
+      if (companyId) req.input("CompanyId", companyId);
       const result = await req.execute("dbo.GetFrequencyCalendar");
       const raw = result.recordset[0];
       return raw ? mapRawFrequencyCalendar(raw) : undefined;
@@ -2251,6 +2621,7 @@ export class DatabaseStorage implements IStorage {
   }
   async createFrequencyCalendar(
     calendar: InsertFrequencyCalendar,
+    companyId: string,
     createdById: string
   ): Promise<FrequencyCalendar> {
     const pool = await getPool();
@@ -2260,6 +2631,7 @@ export class DatabaseStorage implements IStorage {
       .input("Description", calendar.description)
       .input("AppraisalCycleId", calendar.appraisalCycleId)
       .input("ReviewFrequencyId", calendar.reviewFrequencyId)
+      .input("CompanyId", companyId)
       .input("CreatedById", createdById)
       .input("Status", calendar.status || "active");
     const result = await req.execute("dbo.CreateFrequencyCalendar");
@@ -2268,7 +2640,7 @@ export class DatabaseStorage implements IStorage {
   async updateFrequencyCalendar(
     id: string,
     calendar: Partial<InsertFrequencyCalendar>,
-    createdById: string
+    companyId: string
   ): Promise<FrequencyCalendar> {
     const pool = await getPool();
     const req = pool
@@ -2279,33 +2651,30 @@ export class DatabaseStorage implements IStorage {
       .input("AppraisalCycleId", calendar.appraisalCycleId || null)
       .input("ReviewFrequencyId", calendar.reviewFrequencyId || null)
       .input("Status", calendar.status || null)
-      .input("CreatedById", createdById);
+      .input("CompanyId", companyId);
     const result = await req.execute("dbo.UpdateFrequencyCalendar");
     return mapRawFrequencyCalendar(result.recordset[0]);
   }
-  async deleteFrequencyCalendar(
-    id: string,
-    createdById: string
-  ): Promise<void> {
+  async deleteFrequencyCalendar(id: string, companyId: string): Promise<void> {
     const pool = await getPool();
     try {
       await pool
         .request()
         .input("Id", id)
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.DeleteFrequencyCalendar");
     } catch {}
   }
 
   // ---------- Frequency Calendar Details ----------
   async getFrequencyCalendarDetails(
-    createdById: string
+    companyId: string
   ): Promise<FrequencyCalendarDetails[]> {
     const pool = await getPool();
     try {
       const result = await pool
         .request()
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.GetFrequencyCalendarDetails");
       return (result.recordset || []).map(mapRawFrequencyCalendarDetails);
     } catch {
@@ -2342,12 +2711,12 @@ export class DatabaseStorage implements IStorage {
   }
   async getFrequencyCalendarDetail(
     id: string,
-    createdById?: string
+    companyId?: string
   ): Promise<FrequencyCalendarDetails | undefined> {
     const pool = await getPool();
     try {
       const req = pool.request().input("Id", id);
-      if (createdById) req.input("CreatedById", createdById);
+      if (companyId) req.input("CompanyId", companyId);
       const result = await req.execute("dbo.GetFrequencyCalendarDetail");
       const raw = result.recordset[0];
       return raw ? mapRawFrequencyCalendarDetails(raw) : undefined;
@@ -2357,6 +2726,7 @@ export class DatabaseStorage implements IStorage {
   }
   async createFrequencyCalendarDetails(
     details: InsertFrequencyCalendarDetails,
+    companyId: string,
     createdById: string
   ): Promise<FrequencyCalendarDetails> {
     const pool = await getPool();
@@ -2366,6 +2736,7 @@ export class DatabaseStorage implements IStorage {
       .input("DisplayName", details.displayName)
       .input("StartDate", details.startDate)
       .input("EndDate", details.endDate)
+      .input("CompanyId", companyId)
       .input("CreatedById", createdById)
       .input("Status", details.status || "active");
     const result = await req.execute("dbo.CreateFrequencyCalendarDetails");
@@ -2398,12 +2769,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ---------- Appraisal Groups ----------
-  async getAppraisalGroups(createdById: string): Promise<AppraisalGroup[]> {
+  async getAppraisalGroups(companyId: string): Promise<AppraisalGroup[]> {
     const pool = await getPool();
     try {
       const result = await pool
         .request()
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.GetAppraisalGroups");
       return (result.recordset || []).map(mapRawAppraisalGroup);
     } catch {
@@ -2412,14 +2783,14 @@ export class DatabaseStorage implements IStorage {
   }
   async getAppraisalGroup(
     id: string,
-    createdById: string
+    companyId: string
   ): Promise<AppraisalGroup | undefined> {
     const pool = await getPool();
     try {
       const result = await pool
         .request()
         .input("Id", id)
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.GetAppraisalGroup");
       const raw = result.recordset[0];
       return raw ? mapRawAppraisalGroup(raw) : undefined;
@@ -2429,16 +2800,15 @@ export class DatabaseStorage implements IStorage {
   }
   async createAppraisalGroup(
     group: InsertAppraisalGroup,
-    createdById: string,
-    companyId?: string
+    companyId: string
   ): Promise<AppraisalGroup> {
     const pool = await getPool();
     const req = pool
       .request()
       .input("Name", group.name)
       .input("Description", group.description || null)
-      .input("CreatedById", createdById)
-      .input("CompanyId", companyId || null)
+      .input("CreatedById", group.createdById)
+      .input("CompanyId", companyId)
       .input("Status", (group as any).status || "active");
     const result = await req.execute("dbo.CreateAppraisalGroup");
     return mapRawAppraisalGroup(result.recordset[0]);
@@ -2446,7 +2816,7 @@ export class DatabaseStorage implements IStorage {
   async updateAppraisalGroup(
     id: string,
     group: Partial<InsertAppraisalGroup>,
-    createdById: string
+    companyId: string
   ): Promise<AppraisalGroup> {
     const pool = await getPool();
     const req = pool
@@ -2455,44 +2825,74 @@ export class DatabaseStorage implements IStorage {
       .input("Name", group.name || null)
       .input("Description", group.description || null)
       .input("Status", (group as any).status || null)
-      .input("CreatedById", createdById);
+      .input("CompanyId", companyId);
     const result = await req.execute("dbo.UpdateAppraisalGroup");
     return mapRawAppraisalGroup(result.recordset[0]);
   }
-  async deleteAppraisalGroup(id: string, createdById: string): Promise<void> {
+  async deleteAppraisalGroup(id: string, companyId: string): Promise<void> {
     const pool = await getPool();
     try {
       await pool
         .request()
         .input("Id", id)
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.DeleteAppraisalGroup");
     } catch {}
   }
   async getAppraisalGroupsWithMembers(
-    createdById: string
-  ): Promise<(AppraisalGroup & { members: AppraisalGroupMember[] })[]> {
-    const groups = await this.getAppraisalGroups(createdById);
+    companyId: string
+  ): Promise<(AppraisalGroup & { members: any[] })[]> {
+    const groups = await this.getAppraisalGroups(companyId);
     const withMembers = await Promise.all(
       groups.map(async (g) => {
-        const members = await this.getAppraisalGroupMembers(g.id, createdById);
+        const members = await this.getAppraisalGroupMembersWithUserDetails(
+          g.id
+        );
         return { ...g, members };
       })
     );
     return withMembers;
   }
-  async getAppraisalGroupMembers(
-    appraisalGroupId: string,
-    _createdById: string
-  ): Promise<AppraisalGroupMember[]> {
+
+  // Get members with user details for UI display
+  async getAppraisalGroupMembersWithUserDetails(
+    appraisalGroupId: string
+  ): Promise<any[]> {
     const pool = await getPool();
     try {
       const result = await pool
         .request()
         .input("AppraisalGroupId", appraisalGroupId)
         .execute("dbo.GetAppraisalGroupMembers");
-      return (result.recordset || []).map(mapRawAppraisalGroupMember);
+      return (result.recordset || []).map(mapRawAppraisalGroupMemberWithUser);
     } catch {
+      return [];
+    }
+  }
+
+  async getAppraisalGroupMembers(
+    appraisalGroupId: string,
+    _companyId: string
+  ): Promise<any[]> {
+    const pool = await getPool();
+    try {
+      const result = await pool
+        .request()
+        .input("AppraisalGroupId", appraisalGroupId)
+        .execute("dbo.GetAppraisalGroupMembers");
+      // Return members with nested user object for routes that expect member.user
+      const mapped = (result.recordset || []).map(
+        mapRawAppraisalGroupMemberWithNestedUser
+      );
+      console.log(
+        `[getAppraisalGroupMembers] Found ${mapped.length} members for group ${appraisalGroupId}`
+      );
+      return mapped;
+    } catch (error) {
+      console.error(
+        `[getAppraisalGroupMembers] Error fetching members for group ${appraisalGroupId}:`,
+        error
+      );
       return [];
     }
   }
@@ -2530,59 +2930,74 @@ export class DatabaseStorage implements IStorage {
     createdById: string
   ): Promise<InitiatedAppraisal> {
     const pool = await getPool();
-    // Align with current SP signature (FrequencyCalendarDetailId, AppraisalCycleId, QuestionnaireTemplateId, InitiatedById, Status)
-    // We persist extended fields only in memory for now until SP/table evolves.
+
+    // Get the first questionnaire template ID if array is provided
     const questionnaireTemplateId =
       (appraisal.questionnaireTemplateIds &&
         appraisal.questionnaireTemplateIds[0]) ||
       (appraisal as any).questionnaireTemplateId ||
       null;
+
+    // Convert arrays to JSON strings for storage
+    const questionnaireTemplateIdsJson = appraisal.questionnaireTemplateIds
+      ? JSON.stringify(appraisal.questionnaireTemplateIds)
+      : null;
+    const excludedEmployeeIdsJson = appraisal.excludedEmployeeIds
+      ? JSON.stringify(appraisal.excludedEmployeeIds)
+      : null;
+
     const req = pool
       .request()
-      .input(
-        "FrequencyCalendarDetailId",
-        (appraisal as any).frequencyCalendarDetailId || null
-      )
-      .input("AppraisalCycleId", (appraisal as any).appraisalCycleId || null)
+      .input("AppraisalGroupId", appraisal.appraisalGroupId)
+      .input("AppraisalType", appraisal.appraisalType)
       .input("QuestionnaireTemplateId", questionnaireTemplateId)
-      .input("InitiatedById", createdById)
-      .input("Status", appraisal.status || "initiated");
+      .input("QuestionnaireTemplateIds", questionnaireTemplateIdsJson)
+      .input("DocumentUrl", appraisal.documentUrl || null)
+      .input("FrequencyCalendarId", appraisal.frequencyCalendarId || null)
+      .input("DaysToInitiate", appraisal.daysToInitiate || 0)
+      .input("DaysToClose", appraisal.daysToClose || 30)
+      .input("NumberOfReminders", appraisal.numberOfReminders || 3)
+      .input(
+        "ExcludeTenureLessThanYear",
+        appraisal.excludeTenureLessThanYear || false
+      )
+      .input("ExcludedEmployeeIds", excludedEmployeeIdsJson)
+      .input("Status", appraisal.status || "draft")
+      .input("MakePublic", appraisal.makePublic || false)
+      .input("PublishType", appraisal.publishType || "now")
+      .input("CreatedById", createdById);
+
     const result = await req.execute("dbo.CreateInitiatedAppraisal");
     const raw = result.recordset[0];
-    const mapped = mapRawInitiatedAppraisal(raw);
-    const augmented: InitiatedAppraisal = {
-      ...mapped,
-      appraisalGroupId: appraisal.appraisalGroupId,
-      appraisalType: appraisal.appraisalType,
-      questionnaireTemplateIds:
-        appraisal.questionnaireTemplateIds ||
-        (questionnaireTemplateId ? [questionnaireTemplateId] : []),
-      documentUrl: appraisal.documentUrl || null,
-      frequencyCalendarId: appraisal.frequencyCalendarId || null,
-      daysToInitiate: appraisal.daysToInitiate || 0,
-      daysToClose: appraisal.daysToClose || 30,
-      numberOfReminders: appraisal.numberOfReminders || 3,
-      excludeTenureLessThanYear: appraisal.excludeTenureLessThanYear || false,
-      excludedEmployeeIds: appraisal.excludedEmployeeIds || [],
-      makePublic: appraisal.makePublic || false,
-      publishType: appraisal.publishType || "now",
-    } as InitiatedAppraisal;
-    saveInitiatedAppraisalAugmentation({
-      id: augmented.id,
-      appraisalGroupId: augmented.appraisalGroupId,
-      appraisalType: augmented.appraisalType,
-      questionnaireTemplateIds: augmented.questionnaireTemplateIds,
-      documentUrl: augmented.documentUrl,
-      frequencyCalendarId: augmented.frequencyCalendarId,
-      daysToInitiate: augmented.daysToInitiate,
-      daysToClose: augmented.daysToClose,
-      numberOfReminders: augmented.numberOfReminders,
-      excludeTenureLessThanYear: augmented.excludeTenureLessThanYear,
-      excludedEmployeeIds: augmented.excludedEmployeeIds,
-      makePublic: augmented.makePublic,
-      publishType: augmented.publishType,
-    });
-    return augmented;
+
+    // Map the result - SP now returns all fields
+    const mapped: InitiatedAppraisal = {
+      id: raw.Id,
+      appraisalGroupId: raw.AppraisalGroupId,
+      appraisalType: raw.AppraisalType,
+      questionnaireTemplateIds: raw.QuestionnaireTemplateIds
+        ? JSON.parse(raw.QuestionnaireTemplateIds)
+        : questionnaireTemplateId
+        ? [questionnaireTemplateId]
+        : [],
+      documentUrl: raw.DocumentUrl || null,
+      frequencyCalendarId: raw.FrequencyCalendarId || null,
+      daysToInitiate: raw.DaysToInitiate || 0,
+      daysToClose: raw.DaysToClose || 30,
+      numberOfReminders: raw.NumberOfReminders || 3,
+      excludeTenureLessThanYear: raw.ExcludeTenureLessThanYear || false,
+      excludedEmployeeIds: raw.ExcludedEmployeeIds
+        ? JSON.parse(raw.ExcludedEmployeeIds)
+        : [],
+      status: raw.Status,
+      makePublic: raw.MakePublic || false,
+      publishType: raw.PublishType || "now",
+      createdById: raw.CreatedById,
+      createdAt: raw.CreatedAt,
+      updatedAt: raw.UpdatedAt,
+    };
+
+    return mapped;
   }
   async getInitiatedAppraisal(
     id: string
@@ -2602,19 +3017,183 @@ export class DatabaseStorage implements IStorage {
       return undefined;
     }
   }
+  async getAppraisalProgress(
+    appraisalId: string,
+    appraisalGroupId: string
+  ): Promise<any> {
+    const pool = await getPool();
+    try {
+      // Get all members of the appraisal group with their details
+      const membersResult = await pool
+        .request()
+        .input("AppraisalGroupId", appraisalGroupId)
+        .execute("dbo.GetAppraisalGroupMembers");
+
+      const members = (membersResult.recordset || []).map(
+        mapRawAppraisalGroupMemberWithNestedUser
+      );
+      const activeMembers = members.filter(
+        (m) => m.user && m.user.status === "active"
+      );
+
+      if (activeMembers.length === 0) {
+        return {
+          totalEmployees: 0,
+          completedEvaluations: 0,
+          percentage: 0,
+          employeeProgress: [],
+        };
+      }
+
+      // Get evaluations for this initiated appraisal
+      const employeeIds = activeMembers.map((m) => m.user.id);
+      const evaluationsResult = await pool
+        .request()
+        .execute("dbo.GetEvaluations");
+
+      const allEvaluations = (evaluationsResult.recordset || []).map(
+        mapRawEvaluation
+      );
+
+      // Filter evaluations for this initiated appraisal and these employees
+      const relevantEvaluations = allEvaluations.filter(
+        (e) =>
+          e.initiatedAppraisalId === appraisalId &&
+          employeeIds.includes(e.employeeId)
+      );
+
+      // Get manager details for evaluations
+      const managerIds = [
+        ...new Set(relevantEvaluations.map((e) => e.managerId).filter(Boolean)),
+      ];
+      const managers = new Map();
+
+      for (const managerId of managerIds) {
+        const manager = await this.getUser(managerId as string);
+        if (manager) {
+          managers.set(managerId, {
+            id: manager.id,
+            firstName: manager.firstName,
+            lastName: manager.lastName,
+            email: manager.email,
+          });
+        }
+      }
+
+      // Group evaluations by employee
+      const evaluationsByEmployee = new Map();
+      relevantEvaluations.forEach((evaluation) => {
+        if (!evaluationsByEmployee.has(evaluation.employeeId)) {
+          evaluationsByEmployee.set(evaluation.employeeId, []);
+        }
+        evaluationsByEmployee.get(evaluation.employeeId).push({
+          ...evaluation,
+          manager: managers.get(evaluation.managerId) || null,
+        });
+      });
+
+      // Build employee progress
+      const employeeProgress = activeMembers.map((member) => {
+        const user = member.user;
+        const userEvaluations = evaluationsByEmployee.get(user.id) || [];
+        const latestEvaluation = userEvaluations.sort(
+          (a: any, b: any) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )[0];
+
+        return {
+          employee: {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            designation: user.designation,
+            department: user.department,
+            locationId: user.locationId || null,
+            levelId: user.levelId || null,
+            gradeId: user.gradeId || null,
+            reportingManagerId: user.reportingManagerId || null,
+          },
+          evaluation: latestEvaluation || null,
+          status: latestEvaluation?.status || "not_started",
+          isCompleted: latestEvaluation?.status === "completed",
+        };
+      });
+
+      const completedCount = employeeProgress.filter(
+        (ep) => ep.isCompleted
+      ).length;
+      const percentage =
+        activeMembers.length > 0
+          ? Math.round((completedCount / activeMembers.length) * 100)
+          : 0;
+
+      return {
+        totalEmployees: activeMembers.length,
+        completedEvaluations: completedCount,
+        percentage,
+        employeeProgress,
+      };
+    } catch (error) {
+      console.error("Error getting appraisal progress:", error);
+      return {
+        totalEmployees: 0,
+        completedEvaluations: 0,
+        percentage: 0,
+        employeeProgress: [],
+      };
+    }
+  }
+
   async getInitiatedAppraisals(
-    createdById: string
-  ): Promise<InitiatedAppraisal[]> {
+    companyId: string
+  ): Promise<
+    (InitiatedAppraisal & { appraisalGroup?: any; progress?: any })[]
+  > {
     const pool = await getPool();
     try {
       const result = await pool
         .request()
-        .input("CreatedById", createdById)
+        .input("CompanyId", companyId)
         .execute("dbo.GetInitiatedAppraisals");
-      return (result.recordset || []).map((r) =>
+
+      const appraisals = (result.recordset || []).map((r) =>
         mergeInitiatedAppraisal(mapRawInitiatedAppraisal(r))
       );
-    } catch {
+
+      // Attach appraisal group and progress data for each appraisal
+      const appraisalsWithProgress = await Promise.all(
+        appraisals.map(async (appraisal) => {
+          // Get appraisal group details
+          let appraisalGroup = null;
+          try {
+            appraisalGroup = await this.getAppraisalGroup(
+              appraisal.appraisalGroupId,
+              companyId
+            );
+          } catch (error) {
+            console.error(
+              `Error fetching appraisal group ${appraisal.appraisalGroupId}:`,
+              error
+            );
+          }
+
+          // Get progress data
+          const progress = await this.getAppraisalProgress(
+            appraisal.id,
+            appraisal.appraisalGroupId
+          );
+
+          return {
+            ...appraisal,
+            appraisalGroup,
+            progress,
+          };
+        })
+      );
+
+      return appraisalsWithProgress;
+    } catch (error) {
+      console.error("Error getting initiated appraisals:", error);
       return [];
     }
   }
@@ -2824,6 +3403,159 @@ export class DatabaseStorage implements IStorage {
       .input("Status", task.status || "pending");
     const result = await req.execute("dbo.CreateScheduledAppraisalTask");
     return mapRawScheduledAppraisalTask(result.recordset[0]);
+  }
+
+  // ---------- Helper Methods (lookups without ownership check) ----------
+  async getAppraisalCycleById(id: string): Promise<AppraisalCycle | undefined> {
+    const pool = await getPool();
+    try {
+      const result = await pool
+        .request()
+        .input("Id", id)
+        .execute("dbo.GetAppraisalCycleById");
+      const raw = result.recordset[0];
+      return raw ? mapRawAppraisalCycle(raw) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async getFrequencyCalendarById(
+    id: string
+  ): Promise<FrequencyCalendar | undefined> {
+    const pool = await getPool();
+    try {
+      const result = await pool
+        .request()
+        .input("Id", id)
+        .execute("dbo.GetFrequencyCalendarById");
+      const raw = result.recordset[0];
+      return raw ? mapRawFrequencyCalendar(raw) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  // ---------- Development Goals ----------
+  private calculateGoalStatus(
+    progress: number,
+    targetDate: Date | null
+  ): string {
+    if (progress >= 100) return "completed";
+    if (!targetDate) return "not_started";
+
+    const now = new Date();
+    const target = new Date(targetDate);
+    const daysUntilTarget = Math.ceil(
+      (target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    // If past target date and not complete, it's delayed
+    if (daysUntilTarget < 0 && progress < 100) return "delayed";
+
+    // If progress is 0, not started
+    if (progress === 0) return "not_started";
+
+    return "on_track";
+  }
+
+  async getDevelopmentGoals(employeeId: string): Promise<DevelopmentGoal[]> {
+    const pool = await getPool();
+    try {
+      const result = await pool
+        .request()
+        .input("EmployeeId", employeeId)
+        .execute("dbo.GetDevelopmentGoals");
+      return (result.recordset || []).map(mapRawDevelopmentGoal);
+    } catch {
+      return [];
+    }
+  }
+
+  async getDevelopmentGoalsByEvaluation(
+    evaluationId: string
+  ): Promise<DevelopmentGoal[]> {
+    const pool = await getPool();
+    try {
+      const result = await pool
+        .request()
+        .input("EvaluationId", evaluationId)
+        .execute("dbo.GetDevelopmentGoalsByEvaluation");
+      return (result.recordset || []).map(mapRawDevelopmentGoal);
+    } catch {
+      return [];
+    }
+  }
+
+  async getDevelopmentGoal(id: string): Promise<DevelopmentGoal | undefined> {
+    const pool = await getPool();
+    try {
+      const result = await pool
+        .request()
+        .input("Id", id)
+        .execute("dbo.GetDevelopmentGoal");
+      const raw = result.recordset[0];
+      return raw ? mapRawDevelopmentGoal(raw) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async createDevelopmentGoal(
+    goal: InsertDevelopmentGoal
+  ): Promise<DevelopmentGoal> {
+    const pool = await getPool();
+    const status = this.calculateGoalStatus(
+      goal.progress || 0,
+      goal.targetDate
+    );
+    const req = pool
+      .request()
+      .input("EvaluationId", goal.evaluationId)
+      .input("EmployeeId", goal.employeeId)
+      .input("Description", goal.description)
+      .input("PlannedOutcome", goal.plannedOutcome)
+      .input("TargetDate", goal.targetDate)
+      .input("Progress", goal.progress || 0)
+      .input("Status", status);
+    const result = await req.execute("dbo.CreateDevelopmentGoal");
+    return mapRawDevelopmentGoal(result.recordset[0]);
+  }
+
+  async updateDevelopmentGoal(
+    id: string,
+    goal: UpdateDevelopmentGoal
+  ): Promise<DevelopmentGoal> {
+    // Get current goal to calculate status if progress is being updated
+    const currentGoal = await this.getDevelopmentGoal(id);
+    if (!currentGoal) {
+      throw new Error("Development goal not found");
+    }
+
+    const newProgress =
+      goal.progress !== undefined ? goal.progress : currentGoal.progress;
+    const newTargetDate =
+      goal.targetDate !== undefined ? goal.targetDate : currentGoal.targetDate;
+    const status = this.calculateGoalStatus(newProgress || 0, newTargetDate);
+
+    const pool = await getPool();
+    const req = pool
+      .request()
+      .input("Id", id)
+      .input("Description", goal.description || null)
+      .input("PlannedOutcome", goal.plannedOutcome || null)
+      .input("TargetDate", goal.targetDate || null)
+      .input("Progress", goal.progress !== undefined ? goal.progress : null)
+      .input("Status", status);
+    const result = await req.execute("dbo.UpdateDevelopmentGoal");
+    return mapRawDevelopmentGoal(result.recordset[0]);
+  }
+
+  async deleteDevelopmentGoal(id: string): Promise<void> {
+    const pool = await getPool();
+    try {
+      await pool.request().input("Id", id).execute("dbo.DeleteDevelopmentGoal");
+    } catch {}
   }
 }
 

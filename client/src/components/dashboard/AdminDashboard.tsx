@@ -1,10 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Users, 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Users,
   Building2,
   MapPin,
   Award,
@@ -14,7 +21,10 @@ import {
   Plus,
   CheckCircle,
   AlertCircle,
-  Clock
+  Clock,
+  CalendarCheck,
+  Mail,
+  ChevronRight,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -27,14 +37,16 @@ interface AdminMetrics {
   pendingSetups: number;
   activeUsers: number;
   systemIntegrations: number;
+  appraisalCycles: number;
 }
 
 interface SetupItem {
   id: string;
   name: string;
-  status: 'completed' | 'pending' | 'in_progress';
+  status: "completed" | "pending" | "in_progress";
   description: string;
-  priority: 'high' | 'medium' | 'low';
+  priority: "high" | "medium" | "low";
+  route?: string;
 }
 
 interface DepartmentStats {
@@ -45,18 +57,51 @@ interface DepartmentStats {
   completionRate: number;
 }
 
+interface CompanyUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  department?: string;
+  profileImageUrl?: string;
+}
+
+// Route mapping for setup items
+const setupItemRoutes: Record<string, string> = {
+  "1": "/departments", // Configure Departments
+  "2": "/locations", // Add Locations
+  "3": "/questionnaires", // Create Questionnaire Templates
+  "4": "/settings", // Email Service Configuration
+};
+
 export default function AdminDashboard() {
   const { data: metrics, isLoading: metricsLoading } = useQuery<AdminMetrics>({
     queryKey: ["/api/dashboard/admin/metrics"],
   });
 
-  const { data: setupItems = [], isLoading: setupLoading } = useQuery<SetupItem[]>({
+  const { data: setupItems = [], isLoading: setupLoading } = useQuery<
+    SetupItem[]
+  >({
     queryKey: ["/api/dashboard/admin/setup-items"],
   });
 
-  const { data: departments = [], isLoading: departmentsLoading } = useQuery<DepartmentStats[]>({
+  const { data: departments = [], isLoading: departmentsLoading } = useQuery<
+    DepartmentStats[]
+  >({
     queryKey: ["/api/dashboard/admin/departments"],
   });
+
+  const { data: companyUsers = [], isLoading: usersLoading } = useQuery<
+    CompanyUser[]
+  >({
+    queryKey: ["/api/users"],
+  });
+
+  // Check if all setup tasks are completed
+  const allSetupComplete =
+    setupItems.length > 0 &&
+    setupItems.every((item) => item.status === "completed");
 
   if (metricsLoading) {
     return (
@@ -79,7 +124,9 @@ export default function AdminDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Administration Dashboard</h1>
-          <p className="text-muted-foreground">Manage company structure and system configuration</p>
+          <p className="text-muted-foreground">
+            Manage company structure and system configuration
+          </p>
         </div>
         <div className="flex gap-2">
           <Button asChild>
@@ -103,16 +150,24 @@ export default function AdminDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Employees</p>
-                <p className="text-2xl font-bold">{metrics?.totalEmployees || 0}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Employees
+                </p>
+                <p className="text-2xl font-bold">
+                  {metrics?.totalEmployees || 0}
+                </p>
               </div>
               <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                 <Users className="h-5 w-5 text-primary" />
               </div>
             </div>
             <div className="mt-4 flex items-center gap-2">
-              <span className="text-xs text-green-600">{metrics?.activeUsers || 0} active</span>
-              <span className="text-xs text-muted-foreground">users this week</span>
+              <span className="text-xs text-green-600">
+                {metrics?.activeUsers || 0} active
+              </span>
+              <span className="text-xs text-muted-foreground">
+                users this week
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -121,15 +176,21 @@ export default function AdminDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Departments</p>
-                <p className="text-2xl font-bold">{metrics?.departments || 0}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Departments
+                </p>
+                <p className="text-2xl font-bold">
+                  {metrics?.departments || 0}
+                </p>
               </div>
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                 <Building2 className="h-5 w-5 text-blue-600" />
               </div>
             </div>
             <div className="mt-4 flex items-center gap-2">
-              <span className="text-xs text-blue-600">{metrics?.locations || 0} locations</span>
+              <span className="text-xs text-blue-600">
+                {metrics?.locations || 0} locations
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -138,8 +199,12 @@ export default function AdminDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Templates</p>
-                <p className="text-2xl font-bold">{metrics?.questionnaireTemplates || 0}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Templates
+                </p>
+                <p className="text-2xl font-bold">
+                  {metrics?.questionnaireTemplates || 0}
+                </p>
               </div>
               <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
                 <FileText className="h-5 w-5 text-green-600" />
@@ -151,80 +216,192 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card data-testid="system-config-card">
+        <Card data-testid="appraisal-cycles-card">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">System Setup</p>
-                <p className="text-2xl font-bold">{metrics?.configurationComplete || 0}%</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Appraisal Cycles
+                </p>
+                <p className="text-2xl font-bold">
+                  {metrics?.appraisalCycles || 0}
+                </p>
               </div>
-              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                <Settings className="h-5 w-5 text-orange-600" />
+              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                <CalendarCheck className="h-5 w-5 text-purple-600" />
               </div>
             </div>
             <div className="mt-4">
-              <Progress value={metrics?.configurationComplete || 0} className="h-2" />
+              <Link href="/appraisal-cycles">
+                <span className="text-xs text-purple-600 hover:underline cursor-pointer">
+                  Manage cycles →
+                </span>
+              </Link>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Setup Tasks and Department Overview */}
+      {/* Setup Tasks / User Overview and Department Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Setup Tasks</CardTitle>
-              <CardDescription>Complete system configuration</CardDescription>
-            </div>
-            <Badge variant="outline">{setupItems.filter(item => item.status === 'pending').length} pending</Badge>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {setupLoading ? (
-              <div className="animate-pulse space-y-3">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-12 bg-muted rounded-lg"></div>
-                ))}
+        {allSetupComplete ? (
+          /* User Overview - shown when all setup tasks are complete */
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>User Overview</CardTitle>
+                <CardDescription>
+                  Company employees and team members
+                </CardDescription>
               </div>
-            ) : setupItems.length > 0 ? (
-              setupItems.slice(0, 6).map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                      item.status === 'completed' ? 'bg-green-100' :
-                      item.status === 'in_progress' ? 'bg-yellow-100' : 'bg-gray-100'
-                    }`}>
-                      {item.status === 'completed' ? (
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                      ) : item.status === 'in_progress' ? (
-                        <Clock className="h-4 w-4 text-yellow-600" />
-                      ) : (
-                        <AlertCircle className="h-4 w-4 text-gray-600" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">{item.description}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={item.priority === 'high' ? 'destructive' : item.priority === 'medium' ? 'default' : 'secondary'} className="text-xs">
-                      {item.priority}
-                    </Badge>
-                  </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/users">View All</Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {usersLoading ? (
+                <div className="animate-pulse space-y-3">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="h-14 bg-muted rounded-lg"></div>
+                  ))}
                 </div>
-              ))
-            ) : (
-              <p className="text-center text-muted-foreground py-4">All setup tasks completed</p>
-            )}
-          </CardContent>
-        </Card>
+              ) : companyUsers.length > 0 ? (
+                companyUsers.slice(0, 6).map((user) => (
+                  <Link key={user.id} href={`/users/${user.id}`}>
+                    <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage
+                            src={user.profileImageUrl}
+                            alt={`${user.firstName} ${user.lastName}`}
+                          />
+                          <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                            {user.firstName?.charAt(0)}
+                            {user.lastName?.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-sm">
+                            {user.firstName} {user.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {user.email}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {user.role?.replace("_", " ")}
+                        </Badge>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <p className="text-center text-muted-foreground py-4">
+                  No users found
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          /* Setup Tasks - shown when setup is incomplete */
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Setup Tasks</CardTitle>
+                <CardDescription>Complete system configuration</CardDescription>
+              </div>
+              <Badge variant="outline">
+                {setupItems.filter((item) => item.status === "pending").length}{" "}
+                pending
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {setupLoading ? (
+                <div className="animate-pulse space-y-3">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="h-12 bg-muted rounded-lg"></div>
+                  ))}
+                </div>
+              ) : setupItems.length > 0 ? (
+                setupItems.slice(0, 6).map((item) => {
+                  const route = setupItemRoutes[item.id];
+                  const ItemWrapper = route ? Link : "div";
+                  const itemProps = route ? { href: route } : {};
+
+                  return (
+                    <ItemWrapper key={item.id} {...(itemProps as any)}>
+                      <div
+                        className={`flex items-center justify-between p-3 bg-muted/30 rounded-lg ${
+                          route
+                            ? "hover:bg-muted/50 transition-colors cursor-pointer"
+                            : ""
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                              item.status === "completed"
+                                ? "bg-green-100"
+                                : item.status === "in_progress"
+                                ? "bg-yellow-100"
+                                : "bg-gray-100"
+                            }`}
+                          >
+                            {item.status === "completed" ? (
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            ) : item.status === "in_progress" ? (
+                              <Clock className="h-4 w-4 text-yellow-600" />
+                            ) : (
+                              <AlertCircle className="h-4 w-4 text-gray-600" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{item.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.description}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              item.priority === "high"
+                                ? "destructive"
+                                : item.priority === "medium"
+                                ? "default"
+                                : "secondary"
+                            }
+                            className="text-xs"
+                          >
+                            {item.priority}
+                          </Badge>
+                          {route && (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                      </div>
+                    </ItemWrapper>
+                  );
+                })
+              ) : (
+                <p className="text-center text-muted-foreground py-4">
+                  All setup tasks completed
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Department Overview</CardTitle>
-              <CardDescription>Employee distribution and management</CardDescription>
+              <CardDescription>
+                Employee distribution and management
+              </CardDescription>
             </div>
             <Button variant="outline" size="sm" asChild>
               <Link href="/departments">Manage</Link>
@@ -239,24 +416,35 @@ export default function AdminDashboard() {
               </div>
             ) : departments.length > 0 ? (
               departments.slice(0, 5).map((dept) => (
-                <div key={dept.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <div
+                  key={dept.id}
+                  className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground">
                       {dept.name.charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <p className="font-medium">{dept.name}</p>
-                      <p className="text-sm text-muted-foreground">{dept.employeeCount} employees • {dept.managersCount} managers</p>
+                      <p className="text-sm text-muted-foreground">
+                        {dept.employeeCount} employees • {dept.managersCount}{" "}
+                        managers
+                      </p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="font-medium">{dept.completionRate}%</p>
-                    <Progress value={dept.completionRate} className="w-20 h-2 mt-1" />
+                    <Progress
+                      value={dept.completionRate}
+                      className="w-20 h-2 mt-1"
+                    />
                   </div>
                 </div>
               ))
             ) : (
-              <p className="text-center text-muted-foreground py-4">No departments configured</p>
+              <p className="text-center text-muted-foreground py-4">
+                No departments configured
+              </p>
             )}
           </CardContent>
         </Card>
@@ -276,13 +464,21 @@ export default function AdminDashboard() {
                 Manage Users
               </Link>
             </Button>
-            <Button variant="outline" asChild data-testid="manage-departments-button">
+            <Button
+              variant="outline"
+              asChild
+              data-testid="manage-departments-button"
+            >
               <Link href="/departments">
                 <Building2 className="h-4 w-4 mr-2" />
                 Departments
               </Link>
             </Button>
-            <Button variant="outline" asChild data-testid="manage-locations-button">
+            <Button
+              variant="outline"
+              asChild
+              data-testid="manage-locations-button"
+            >
               <Link href="/locations">
                 <MapPin className="h-4 w-4 mr-2" />
                 Locations

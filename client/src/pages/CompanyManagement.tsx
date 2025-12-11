@@ -1,21 +1,50 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertCompanySchema, type Company, type InsertCompany } from "@shared/schema";
+import {
+  insertCompanySchema,
+  type Company,
+  type InsertCompany,
+} from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
-import { ObjectUploader } from "@/components/ObjectUploader";
-import type { UploadResult } from "@uppy/core";
+import { FileDropzone } from "@/components/FileDropzone";
 import { Plus, Edit, Trash2, Building } from "lucide-react";
 
 export default function CompanyManagement() {
@@ -51,7 +80,13 @@ export default function CompanyManagement() {
   });
 
   const updateCompanyMutation = useMutation({
-    mutationFn: async ({ id, companyData }: { id: string; companyData: Partial<InsertCompany> }) => {
+    mutationFn: async ({
+      id,
+      companyData,
+    }: {
+      id: string;
+      companyData: Partial<InsertCompany>;
+    }) => {
       await apiRequest("PUT", `/api/companies/${id}`, companyData);
     },
     onSuccess: () => {
@@ -109,7 +144,10 @@ export default function CompanyManagement() {
 
   const onSubmit = (data: InsertCompany) => {
     if (editingCompany) {
-      updateCompanyMutation.mutate({ id: editingCompany.id, companyData: data });
+      updateCompanyMutation.mutate({
+        id: editingCompany.id,
+        companyData: data,
+      });
     } else {
       createCompanyMutation.mutate(data);
     }
@@ -153,34 +191,40 @@ export default function CompanyManagement() {
     });
   };
 
-  const handleGetUploadParameters = async () => {
-    const response = await apiRequest("POST", "/api/objects/upload");
-    const data = await response.json();
-    return {
-      method: "PUT" as const,
-      url: data.uploadURL,
-    };
-  };
+  const handleFileUpload = async (file: File) => {
+    try {
+      // Get presigned URL
+      const response = await apiRequest("POST", "/api/objects/upload");
+      const data = await response.json();
+      const uploadURL = data.uploadURL;
 
-  const handleUploadComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    const successful = result.successful ?? [];
-    if (successful.length > 0) {
-      const uploadURL = successful[0].uploadURL;
-      try {
-        const response = await apiRequest("PUT", "/api/company-logos", { logoURL: uploadURL });
-        const data = await response.json();
-        form.setValue("logoUrl", data.objectPath);
-        toast({
-          title: "Success",
-          description: "Logo uploaded successfully",
-        });
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to process logo upload",
-          variant: "destructive",
-        });
-      }
+      // Upload file directly to S3
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": file.type,
+        },
+      });
+
+      // Update the logo URL in the backend
+      const logoResponse = await apiRequest("PUT", "/api/company-logos", {
+        logoURL: uploadURL,
+      });
+      const logoData = await logoResponse.json();
+      form.setValue("logoUrl", logoData.objectPath);
+
+      toast({
+        title: "Success",
+        description: "Logo uploaded successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to upload logo",
+        variant: "destructive",
+      });
+      throw error;
     }
   };
 
@@ -190,29 +234,44 @@ export default function CompanyManagement() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Company Management</h1>
-            <p className="text-muted-foreground">Manage company profiles and information</p>
+            <p className="text-muted-foreground">
+              Manage company profiles and information
+            </p>
           </div>
-          <Dialog open={isCreateModalOpen || !!editingCompany} onOpenChange={(open) => {
-            if (!open) {
-              setIsCreateModalOpen(false);
-              resetForm();
-            }
-          }}>
+          <Dialog
+            open={isCreateModalOpen || !!editingCompany}
+            onOpenChange={(open) => {
+              if (!open) {
+                setIsCreateModalOpen(false);
+                resetForm();
+              }
+            }}
+          >
             <DialogTrigger asChild>
-              <Button onClick={() => setIsCreateModalOpen(true)} data-testid="add-company-button">
+              <Button
+                onClick={() => setIsCreateModalOpen(true)}
+                data-testid="add-company-button"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Company
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>{editingCompany ? "Edit Company" : "Add New Company"}</DialogTitle>
+                <DialogTitle>
+                  {editingCompany ? "Edit Company" : "Add New Company"}
+                </DialogTitle>
                 <DialogDescription>
-                  {editingCompany ? "Update company information" : "Create a new company profile"}
+                  {editingCompany
+                    ? "Update company information"
+                    : "Create a new company profile"}
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="space-y-4"
+                >
                   <FormField
                     control={form.control}
                     name="name"
@@ -234,7 +293,11 @@ export default function CompanyManagement() {
                       <FormItem>
                         <FormLabel>Address</FormLabel>
                         <FormControl>
-                          <Textarea {...field} value={field.value ?? ""} data-testid="input-address" />
+                          <Textarea
+                            {...field}
+                            value={field.value ?? ""}
+                            data-testid="input-address"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -248,7 +311,13 @@ export default function CompanyManagement() {
                       <FormItem>
                         <FormLabel>Website URL</FormLabel>
                         <FormControl>
-                          <Input type="url" {...field} value={field.value ?? ""} placeholder="https://company.example.com" data-testid="input-website-url" />
+                          <Input
+                            type="url"
+                            {...field}
+                            value={field.value ?? ""}
+                            placeholder="https://company.example.com"
+                            data-testid="input-website-url"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -262,11 +331,17 @@ export default function CompanyManagement() {
                       <FormItem>
                         <FormLabel>Company Login Slug</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value ?? ""} placeholder="hfactor" data-testid="input-company-url-slug" />
+                          <Input
+                            {...field}
+                            value={field.value ?? ""}
+                            placeholder="hfactor"
+                            data-testid="input-company-url-slug"
+                          />
                         </FormControl>
                         <FormMessage />
                         <p className="text-xs text-muted-foreground">
-                          Unique identifier for company login (e.g., 'hfactor' for hfactor.com login)
+                          Unique identifier for company login (e.g., 'hfactor'
+                          for hfactor.com login)
                         </p>
                       </FormItem>
                     )}
@@ -280,7 +355,11 @@ export default function CompanyManagement() {
                         <FormItem>
                           <FormLabel>Client Contact</FormLabel>
                           <FormControl>
-                            <Input {...field} value={field.value ?? ""} data-testid="input-client-contact" />
+                            <Input
+                              {...field}
+                              value={field.value ?? ""}
+                              data-testid="input-client-contact"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -293,7 +372,12 @@ export default function CompanyManagement() {
                         <FormItem>
                           <FormLabel>Email</FormLabel>
                           <FormControl>
-                            <Input type="email" {...field} value={field.value ?? ""} data-testid="input-email" />
+                            <Input
+                              type="email"
+                              {...field}
+                              value={field.value ?? ""}
+                              data-testid="input-email"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -309,7 +393,11 @@ export default function CompanyManagement() {
                         <FormItem>
                           <FormLabel>Contact Number</FormLabel>
                           <FormControl>
-                            <Input {...field} value={field.value ?? ""} data-testid="input-contact-number" />
+                            <Input
+                              {...field}
+                              value={field.value ?? ""}
+                              data-testid="input-contact-number"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -322,7 +410,11 @@ export default function CompanyManagement() {
                         <FormItem>
                           <FormLabel>GST Number</FormLabel>
                           <FormControl>
-                            <Input {...field} value={field.value ?? ""} data-testid="input-gst-number" />
+                            <Input
+                              {...field}
+                              value={field.value ?? ""}
+                              data-testid="input-gst-number"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -330,53 +422,77 @@ export default function CompanyManagement() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="logoUrl"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Company Logo</FormLabel>
-                          <FormControl>
-                            <div className="space-y-2">
-                              <Input {...field} value={field.value ?? ""} placeholder="Logo URL" data-testid="input-logo-url" />
-                              <ObjectUploader
-                                maxNumberOfFiles={1}
-                                maxFileSize={5242880} // 5MB
-                                onGetUploadParameters={handleGetUploadParameters}
-                                onComplete={handleUploadComplete}
-                                buttonClassName="w-full"
-                              >
-                                <span>Upload Logo</span>
-                              </ObjectUploader>
+                  <FormField
+                    control={form.control}
+                    name="logoUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company Logo</FormLabel>
+                        <FormControl>
+                          <div className="border rounded-lg p-4 space-y-4">
+                            {/* Option 1: Upload File */}
+                            <FileDropzone
+                              maxFileSize={5242880}
+                              acceptedFileTypes={[
+                                "image/png",
+                                "image/jpeg",
+                                "image/gif",
+                                "image/webp",
+                                "image/svg+xml",
+                              ]}
+                              onFileSelect={() => {}}
+                              onUpload={handleFileUpload}
+                            />
+
+                            {/* OR Divider */}
+                            <div className="relative">
+                              <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t" />
+                              </div>
+                              <div className="relative flex justify-center text-xs uppercase">
+                                <span className="bg-background px-2 text-muted-foreground">
+                                  Or paste URL
+                                </span>
+                              </div>
                             </div>
+
+                            {/* Option 2: Paste URL */}
+                            <Input
+                              {...field}
+                              value={field.value ?? ""}
+                              placeholder="https://example.com/logo.png"
+                              data-testid="input-logo-url"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value ?? "active"}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-status">
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? "active"}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-status">
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="inactive">Inactive</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                          <SelectContent>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <div className="flex gap-3 pt-4">
                     <Button
@@ -393,7 +509,10 @@ export default function CompanyManagement() {
                     <Button
                       type="submit"
                       className="flex-1"
-                      disabled={createCompanyMutation.isPending || updateCompanyMutation.isPending}
+                      disabled={
+                        createCompanyMutation.isPending ||
+                        updateCompanyMutation.isPending
+                      }
                       data-testid="submit-company"
                     >
                       {editingCompany ? "Update Company" : "Create Company"}
@@ -420,8 +539,12 @@ export default function CompanyManagement() {
           ) : companies.length === 0 ? (
             <div className="col-span-full text-center py-12">
               <Building className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground text-lg mb-2">No companies found</p>
-              <p className="text-muted-foreground text-sm">Add your first company to get started</p>
+              <p className="text-muted-foreground text-lg mb-2">
+                No companies found
+              </p>
+              <p className="text-muted-foreground text-sm">
+                Add your first company to get started
+              </p>
             </div>
           ) : (
             companies.map((company) => (
@@ -441,10 +564,19 @@ export default function CompanyManagement() {
                         </div>
                       )}
                       <div>
-                        <h3 className="font-semibold" data-testid={`company-name-${company.id}`}>
+                        <h3
+                          className="font-semibold"
+                          data-testid={`company-name-${company.id}`}
+                        >
                           {company.name}
                         </h3>
-                        <Badge variant={company.status === 'active' ? 'default' : 'secondary'}>
+                        <Badge
+                          variant={
+                            company.status === "active"
+                              ? "default"
+                              : "secondary"
+                          }
+                        >
                           {company.status}
                         </Badge>
                       </div>
@@ -468,7 +600,7 @@ export default function CompanyManagement() {
                       </Button>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2 text-sm text-muted-foreground">
                     {company.address && <p>{company.address}</p>}
                     {company.email && <p>{company.email}</p>}

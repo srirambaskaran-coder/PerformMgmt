@@ -43,6 +43,12 @@ import PDFDocument from "pdfkit";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 
+// Helper function to get companyId from requesting user
+async function getUserCompanyId(userId: string): Promise<string | undefined> {
+  const user = await storage.getUser(userId);
+  return user?.companyId || undefined;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup session-based authentication
   setupAuth(app);
@@ -489,12 +495,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const requestingUserId = req.user.id;
-        const users = await storage.getUsers({}, requestingUserId);
-        const departments = await storage.getDepartments(requestingUserId);
+
+        // Get user's company ID for filtering
+        const user = await storage.getUser(requestingUserId);
+        const companyId = user?.companyId;
+
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+
+        // Filter by companyId
+        const users = await storage.getUsers({ companyId }, requestingUserId);
+        const departments = await storage.getDepartments(companyId);
         const locations = await storage.getLocations();
-        const templates = await storage.getQuestionnaireTemplates(
-          requestingUserId
-        );
+        const templates = await storage.getQuestionnaireTemplates(companyId);
+
+        // Get appraisal cycles count
+        let appraisalCyclesCount = 0;
+        try {
+          const cycles = await storage.getAllAppraisalCycles(companyId);
+          appraisalCyclesCount = cycles?.length || 0;
+        } catch (e) {
+          console.log("Could not fetch appraisal cycles count");
+        }
 
         const metrics = {
           totalEmployees: users.length,
@@ -505,6 +530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pendingSetups: 3, // Placeholder
           activeUsers: users.filter((u) => u.status === "active").length,
           systemIntegrations: 5, // Placeholder
+          appraisalCycles: appraisalCyclesCount,
         };
 
         res.json(metrics);
@@ -522,11 +548,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const requestingUserId = req.user.id;
-        const departments = await storage.getDepartments(requestingUserId);
+
+        // Get user's company ID for filtering
+        const user = await storage.getUser(requestingUserId);
+        const companyId = user?.companyId;
+
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+
+        const departments = await storage.getDepartments(companyId);
         const locations = await storage.getLocations();
-        const templates = await storage.getQuestionnaireTemplates(
-          requestingUserId
-        );
+        const templates = await storage.getQuestionnaireTemplates(companyId);
+        const emailConfig = await storage.getEmailConfig();
 
         const setupItems = [
           {
@@ -553,7 +589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           {
             id: "4",
             name: "Email Service Configuration",
-            status: "pending",
+            status: emailConfig ? "completed" : "pending",
             description: "Configure SMTP settings",
             priority: "medium",
           },
@@ -574,8 +610,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const requestingUserId = req.user.id;
-        const departments = await storage.getDepartments(requestingUserId);
-        const users = await storage.getUsers({}, requestingUserId);
+
+        // Get user's company ID for filtering
+        const user = await storage.getUser(requestingUserId);
+        const companyId = user?.companyId;
+
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+
+        const departments = await storage.getDepartments(companyId);
+        const users = await storage.getUsers({ companyId }, requestingUserId);
 
         const departmentStats = departments.map((dept) => {
           const deptUsers = users.filter((u) => u.department === dept.code);
@@ -1244,25 +1291,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Location routes
-  app.get("/api/locations", isAuthenticated, async (req, res) => {
-    try {
-      const locations = await storage.getLocations();
-      res.json(locations);
-    } catch (error: unknown) {
-      console.error("Error fetching locations:", error);
-      res.status(500).json({ message: "Failed to fetch locations" });
+  // Location routes - Company-isolated
+  app.get(
+    "/api/locations",
+    isAuthenticated,
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
+    async (req: any, res) => {
+      try {
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const locations = await storage.getLocations(companyId);
+        res.json(locations);
+      } catch (error: unknown) {
+        console.error("Error fetching locations:", error);
+        res.status(500).json({ message: "Failed to fetch locations" });
+      }
     }
-  });
+  );
 
   app.post(
     "/api/locations",
     isAuthenticated,
     requireRoles(["super_admin", "admin"]),
-    async (req, res) => {
+    async (req: any, res) => {
       try {
         const locationData = insertLocationSchema.parse(req.body);
-        const location = await storage.createLocation(locationData);
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const location = await storage.createLocation(locationData, companyId);
         res.status(201).json(location);
       } catch (error: unknown) {
         console.error("Error creating location:", error);
@@ -1275,7 +1339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     "/api/locations/:id",
     isAuthenticated,
     requireRoles(["super_admin", "admin"]),
-    async (req, res) => {
+    async (req: any, res) => {
       try {
         const { id } = req.params;
         const locationData = insertLocationSchema.partial().parse(req.body);
@@ -1292,7 +1356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     "/api/locations/:id",
     isAuthenticated,
     requireRoles(["super_admin", "admin"]),
-    async (req, res) => {
+    async (req: any, res) => {
       try {
         const { id } = req.params;
         await storage.deleteLocation(id);
@@ -1783,8 +1847,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               levelId: row["Level ID"] || null,
               gradeId: row["Grade ID"] || null,
               reportingManagerId: row["Reporting Manager ID"] || null,
-              role: row["Role"] || "employee",
-              status: row["Status"] || "active",
+              role: row["Role"]
+                ? String(row["Role"]).toLowerCase().replace(/\s+/g, "_")
+                : "employee",
+              status: row["Status"]
+                ? String(row["Status"]).toLowerCase()
+                : "active",
               createdById: creatorId,
             };
 
@@ -1902,16 +1970,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Questionnaire template routes
+  // Questionnaire template routes - Company-isolated
   app.get(
     "/api/questionnaire-templates",
     isAuthenticated,
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
-        const requestingUserId = req.user.id;
-        const templates = await storage.getQuestionnaireTemplates(
-          requestingUserId
-        );
+        // Super admin can see all templates across all companies
+        if (req.user.role === "super_admin") {
+          const templates = await storage.getAllQuestionnaireTemplates();
+          return res.json(templates);
+        }
+
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const templates = await storage.getQuestionnaireTemplates(companyId);
         res.json(templates);
       } catch (error: unknown) {
         console.error("Error fetching questionnaire templates:", error);
@@ -1928,14 +2006,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["super_admin", "admin", "hr_manager"]),
     async (req: any, res) => {
       try {
-        const requestingUserId = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const createdById = req.user.id;
         const templateData = insertQuestionnaireTemplateSchema.parse(req.body);
 
         // Automatically set the createdById field to the requesting user
-        templateData.createdById = requestingUserId;
+        templateData.createdById = createdById;
 
         const template = await storage.createQuestionnaireTemplate(
-          templateData
+          templateData,
+          companyId,
+          createdById
         );
         res.status(201).json(template);
       } catch (error: unknown) {
@@ -1950,14 +2036,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/questionnaire-templates/:id",
     isAuthenticated,
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const requestingUserId = req.user.id;
-        const template = await storage.getQuestionnaireTemplate(
-          id,
-          requestingUserId
-        );
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const template = await storage.getQuestionnaireTemplate(id, companyId);
         if (!template) {
           return res
             .status(404)
@@ -1980,7 +2069,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const requestingUserId = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
         const templateData = insertQuestionnaireTemplateSchema
           .partial()
@@ -1988,7 +2082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const template = await storage.updateQuestionnaireTemplate(
           id,
           templateData,
-          requestingUserId
+          companyId
         );
         res.json(template);
       } catch (error: unknown) {
@@ -2016,9 +2110,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const requestingUserId = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        await storage.deleteQuestionnaireTemplate(id, requestingUserId);
+        await storage.deleteQuestionnaireTemplate(id, companyId);
         res.status(204).send();
       } catch (error: unknown) {
         console.error("Error deleting questionnaire template:", error);
@@ -2045,11 +2144,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const requestingUserId = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const createdById = req.user.id;
 
         const copiedTemplate = await storage.copyQuestionnaireTemplate(
           id,
-          requestingUserId
+          createdById
         );
         res.status(201).json(copiedTemplate);
       } catch (error: unknown) {
@@ -2190,25 +2295,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Managers can see evaluations they manage or their own
         if (!filters.employeeId && !filters.managerId) {
           // If no specific filter, show evaluations where they are the manager or employee
-          const getEvaluationsMethod =
-            includeQuestionnaires === "true"
-              ? storage.getEvaluationsWithQuestionnaires
-              : storage.getEvaluations;
+          console.log(
+            "[GET /api/evaluations] Manager role detected, userId:",
+            currentUser.id,
+            "includeQuestionnaires:",
+            includeQuestionnaires
+          );
 
-          const userManagedEvaluations = await getEvaluationsMethod({
-            managerId: currentUser.id,
-          });
-          const userOwnEvaluations = await getEvaluationsMethod({
-            employeeId: currentUser.id,
-          });
+          console.log(
+            "[GET /api/evaluations] Fetching managed evaluations for managerId:",
+            currentUser.id
+          );
+          const userManagedEvaluations =
+            includeQuestionnaires === "true"
+              ? await storage.getEvaluationsWithQuestionnaires({
+                  managerId: currentUser.id,
+                })
+              : await storage.getEvaluations({ managerId: currentUser.id });
+          console.log(
+            "[GET /api/evaluations] Managed evaluations count:",
+            userManagedEvaluations.length
+          );
+
+          console.log(
+            "[GET /api/evaluations] Fetching own evaluations for employeeId:",
+            currentUser.id
+          );
+          const userOwnEvaluations =
+            includeQuestionnaires === "true"
+              ? await storage.getEvaluationsWithQuestionnaires({
+                  employeeId: currentUser.id,
+                })
+              : await storage.getEvaluations({ employeeId: currentUser.id });
+          console.log(
+            "[GET /api/evaluations] Own evaluations count:",
+            userOwnEvaluations.length
+          );
+
           const combinedEvaluations = [
             ...userManagedEvaluations,
             ...userOwnEvaluations,
           ];
+          console.log(
+            "[GET /api/evaluations] Combined evaluations count:",
+            combinedEvaluations.length
+          );
           // Remove duplicates by id
           const uniqueEvaluations = combinedEvaluations.filter(
             (evaluation, index, self) =>
               index === self.findIndex((e) => e.id === evaluation.id)
+          );
+          console.log(
+            "[GET /api/evaluations] Unique evaluations count:",
+            uniqueEvaluations.length
           );
           return res.json(uniqueEvaluations);
         }
@@ -2642,6 +2781,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res
           .status(500)
           .json({ message: "Failed to fetch submissions for review" });
+      }
+    }
+  );
+
+  // Calibrate ratings routes (must come before :id route)
+  // GET /api/evaluations/calibrate - Get all evaluations for calibration (HR manager only)
+  app.get(
+    "/api/evaluations/calibrate",
+    isAuthenticated,
+    requireRoles(["hr_manager"]),
+    async (req: any, res) => {
+      try {
+        const requestingUserId = req.user.id;
+        const user = await storage.getUser(requestingUserId);
+
+        if (!user || !user.companyId) {
+          return res.status(404).json({ message: "User or company not found" });
+        }
+
+        // Use the new stored procedure
+        const evaluations = await storage.getEvaluationsForCalibration(
+          user.companyId
+        );
+
+        res.json(evaluations);
+      } catch (error: unknown) {
+        console.error("Error fetching evaluations for calibration:", error);
+        res.status(500).json({ message: "Failed to fetch evaluations" });
+      }
+    }
+  );
+
+  // PATCH /api/evaluations/:id/calibrate - Update calibration for a specific evaluation
+  app.patch(
+    "/api/evaluations/:id/calibrate",
+    isAuthenticated,
+    requireRoles(["hr_manager"]),
+    async (req: any, res) => {
+      try {
+        const { id } = req.params;
+        const { calibratedRating, calibrationRemarks } = req.body;
+        const requestingUserId = req.user.id;
+
+        // Get the evaluation to check it exists
+        const evaluation = await storage.getEvaluation(id);
+        if (!evaluation) {
+          return res.status(404).json({ message: "Evaluation not found" });
+        }
+
+        // Use the new stored procedure
+        const updatedEvaluation = await storage.updateEvaluationCalibration(
+          id,
+          calibratedRating,
+          calibrationRemarks || "",
+          requestingUserId
+        );
+
+        // Get employee details for response
+        const employee = await storage.getUser(evaluation.employeeId);
+        const employeeName = employee
+          ? `${employee.firstName} ${employee.lastName}`
+          : "Unknown";
+
+        res.json({
+          ...updatedEvaluation,
+          employeeName,
+        });
+      } catch (error: unknown) {
+        console.error("Error updating calibration:", error);
+        res.status(500).json({ message: "Failed to update calibration" });
       }
     }
   );
@@ -3295,33 +3504,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Level management routes - Administrator isolated (GET endpoints accessible by HR Manager too)
+  // Level management routes - Company-isolated (GET endpoints accessible by all org users)
   app.get(
     "/api/levels",
     isAuthenticated,
-    requireRoles(["super_admin", "admin", "hr_manager"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
         const requestingUserId = req.user.id;
-        const requestingUser = await storage.getUser(requestingUserId);
+        const companyId = await getUserCompanyId(requestingUserId);
 
-        if (!requestingUser) {
-          return res.status(404).json({ message: "User not found" });
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
         }
 
-        // For HR Managers, find the admin of their company to access company's levels
-        let adminId = requestingUserId;
-        if (requestingUser.role === "hr_manager" && requestingUser.companyId) {
-          const companyAdmins = await storage.getUsers({
-            role: "admin",
-            companyId: requestingUser.companyId,
-          });
-          if (companyAdmins && companyAdmins.length > 0) {
-            adminId = companyAdmins[0].id;
-          }
-        }
-
-        const levels = await storage.getLevels(adminId);
+        const levels = await storage.getLevels(companyId);
         res.json(levels);
       } catch (error: unknown) {
         console.error("Error fetching levels:", error);
@@ -3333,12 +3532,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/levels/:id",
     isAuthenticated,
-    requireRoles(["super_admin", "admin", "hr_manager"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
-        const level = await storage.getLevel(id, createdById);
+        const companyId = await getUserCompanyId(req.user.id);
+        const level = await storage.getLevel(id, companyId);
         if (!level) {
           return res.status(404).json({ message: "Level not found" });
         }
@@ -3358,7 +3557,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const levelData = insertLevelSchema.parse(req.body);
         const createdById = req.user.id;
-        const level = await storage.createLevel(levelData, createdById);
+        const companyId = await getUserCompanyId(createdById);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const level = await storage.createLevel(
+          levelData,
+          companyId,
+          createdById
+        );
         res.status(201).json(level);
       } catch (error: unknown) {
         console.error("Error creating level:", error);
@@ -3379,17 +3588,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if level exists and belongs to the administrator
-        const existingLevel = await storage.getLevel(id, createdById);
+        // Check if level exists and belongs to the company
+        const existingLevel = await storage.getLevel(id, companyId);
         if (!existingLevel) {
           return res.status(404).json({ message: "Level not found" });
         }
 
         // Parse and sanitize the request body to prevent ownership changes
         const safeLevelData = insertLevelSchema.partial().parse(req.body);
-        const level = await storage.updateLevel(id, safeLevelData, createdById);
+        const level = await storage.updateLevel(id, safeLevelData, companyId);
         res.json(level);
       } catch (error: unknown) {
         console.error("Error updating level:", error);
@@ -3410,15 +3624,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if level exists and belongs to the administrator
-        const existingLevel = await storage.getLevel(id, createdById);
+        // Check if level exists and belongs to the company
+        const existingLevel = await storage.getLevel(id, companyId);
         if (!existingLevel) {
           return res.status(404).json({ message: "Level not found" });
         }
 
-        await storage.deleteLevel(id, createdById);
+        await storage.deleteLevel(id, companyId);
         res.status(204).send();
       } catch (error: unknown) {
         console.error("Error deleting level:", error);
@@ -3427,33 +3646,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Grade management routes - Administrator isolated (GET endpoints accessible by HR Manager too)
+  // Grade management routes - Company-isolated (GET endpoints accessible by all org users)
   app.get(
     "/api/grades",
     isAuthenticated,
-    requireRoles(["super_admin", "admin", "hr_manager"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
-        const requestingUserId = req.user.id;
-        const requestingUser = await storage.getUser(requestingUserId);
-
-        if (!requestingUser) {
-          return res.status(404).json({ message: "User not found" });
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
         }
 
-        // For HR Managers, find the admin of their company to access company's grades
-        let adminId = requestingUserId;
-        if (requestingUser.role === "hr_manager" && requestingUser.companyId) {
-          const companyAdmins = await storage.getUsers({
-            role: "admin",
-            companyId: requestingUser.companyId,
-          });
-          if (companyAdmins && companyAdmins.length > 0) {
-            adminId = companyAdmins[0].id;
-          }
-        }
-
-        const grades = await storage.getGrades(adminId);
+        const grades = await storage.getGrades(companyId);
         res.json(grades);
       } catch (error: unknown) {
         console.error("Error fetching grades:", error);
@@ -3465,12 +3672,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/grades/:id",
     isAuthenticated,
-    requireRoles(["super_admin", "admin", "hr_manager"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
-        const grade = await storage.getGrade(id, createdById);
+        const companyId = await getUserCompanyId(req.user.id);
+        const grade = await storage.getGrade(id, companyId);
         if (!grade) {
           return res.status(404).json({ message: "Grade not found" });
         }
@@ -3489,8 +3696,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const gradeData = insertGradeSchema.parse(req.body);
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
         const createdById = req.user.id;
-        const grade = await storage.createGrade(gradeData, createdById);
+        const grade = await storage.createGrade(
+          gradeData,
+          companyId,
+          createdById
+        );
         res.status(201).json(grade);
       } catch (error: unknown) {
         console.error("Error creating grade:", error);
@@ -3511,17 +3728,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if grade exists and belongs to the administrator
-        const existingGrade = await storage.getGrade(id, createdById);
+        // Check if grade exists and belongs to the company
+        const existingGrade = await storage.getGrade(id, companyId);
         if (!existingGrade) {
           return res.status(404).json({ message: "Grade not found" });
         }
 
         // Parse and sanitize the request body to prevent ownership changes
         const safeGradeData = insertGradeSchema.partial().parse(req.body);
-        const grade = await storage.updateGrade(id, safeGradeData, createdById);
+        const grade = await storage.updateGrade(id, safeGradeData, companyId);
         res.json(grade);
       } catch (error: unknown) {
         console.error("Error updating grade:", error);
@@ -3542,15 +3764,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if grade exists and belongs to the administrator
-        const existingGrade = await storage.getGrade(id, createdById);
+        // Check if grade exists and belongs to the company
+        const existingGrade = await storage.getGrade(id, companyId);
         if (!existingGrade) {
           return res.status(404).json({ message: "Grade not found" });
         }
 
-        await storage.deleteGrade(id, createdById);
+        await storage.deleteGrade(id, companyId);
         res.status(204).send();
       } catch (error: unknown) {
         console.error("Error deleting grade:", error);
@@ -3559,15 +3786,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Department management routes - Administrator and HR Manager access for filtering
+  // Department management routes - Company-isolated (GET endpoints accessible by all org users)
   app.get(
     "/api/departments",
     isAuthenticated,
-    requireRoles(["admin", "hr_manager"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
-        const createdById = req.user.id;
-        const departments = await storage.getDepartments(createdById);
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const departments = await storage.getDepartments(companyId);
         res.json(departments);
       } catch (error: unknown) {
         console.error("Error fetching departments:", error);
@@ -3579,12 +3811,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/departments/:id",
     isAuthenticated,
-    requireRoles(["admin"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
-        const department = await storage.getDepartment(id, createdById);
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const department = await storage.getDepartment(id, companyId);
         if (!department) {
           return res.status(404).json({ message: "Department not found" });
         }
@@ -3603,9 +3840,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const departmentData = insertDepartmentSchema.parse(req.body);
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
         const createdById = req.user.id;
         const department = await storage.createDepartment(
           departmentData,
+          companyId,
           createdById
         );
         res.status(201).json(department);
@@ -3628,10 +3872,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if department exists and belongs to the administrator
-        const existingDepartment = await storage.getDepartment(id, createdById);
+        // Check if department exists and belongs to the company
+        const existingDepartment = await storage.getDepartment(id, companyId);
         if (!existingDepartment) {
           return res.status(404).json({ message: "Department not found" });
         }
@@ -3643,7 +3892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const department = await storage.updateDepartment(
           id,
           safeDepartmentData,
-          createdById
+          companyId
         );
         res.json(department);
       } catch (error: unknown) {
@@ -3665,15 +3914,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if department exists and belongs to the administrator
-        const existingDepartment = await storage.getDepartment(id, createdById);
+        // Check if department exists and belongs to the company
+        const existingDepartment = await storage.getDepartment(id, companyId);
         if (!existingDepartment) {
           return res.status(404).json({ message: "Department not found" });
         }
 
-        await storage.deleteDepartment(id, createdById);
+        await storage.deleteDepartment(id, companyId);
         res.status(204).send();
       } catch (error: unknown) {
         console.error("Error deleting department:", error);
@@ -3682,30 +3936,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Appraisal Cycle management routes - Administrator isolated
+  // Appraisal Cycle management routes - Company-isolated
   app.get(
     "/api/appraisal-cycles",
     isAuthenticated,
-    requireRoles(["admin", "hr_manager"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
-        const userId = req.user.id;
-        const user = await storage.getUser(userId);
-
-        if (!user) {
-          return res.status(404).json({ message: "User not found" });
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
         }
 
-        // HR managers can see all active appraisal cycles in their company, admins see only theirs
-        const activeRole = req.user.activeRole || user.role;
-        let cycles;
-        if (activeRole === "hr_manager") {
-          if (!user.companyId) throw new Error("User company ID not found");
-          cycles = await storage.getAllAppraisalCycles(user.companyId);
-        } else {
-          cycles = await storage.getAppraisalCycles(userId);
-        }
-
+        const cycles = await storage.getAppraisalCycles(companyId);
         res.json(cycles);
       } catch (error: unknown) {
         console.error("Error fetching appraisal cycles:", error);
@@ -3717,12 +3962,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/appraisal-cycles/:id",
     isAuthenticated,
-    requireRoles(["admin"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
-        const cycle = await storage.getAppraisalCycle(id, createdById);
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const cycle = await storage.getAppraisalCycle(id, companyId);
         if (!cycle) {
           return res.status(404).json({ message: "Appraisal cycle not found" });
         }
@@ -3741,9 +3991,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const cycleData = insertAppraisalCycleSchema.parse(req.body);
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
         const createdById = req.user.id;
         const cycle = await storage.createAppraisalCycle(
           cycleData,
+          companyId,
           createdById
         );
         res.status(201).json(cycle);
@@ -3767,10 +4024,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if appraisal cycle exists and belongs to the administrator
-        const existingCycle = await storage.getAppraisalCycle(id, createdById);
+        // Check if appraisal cycle exists and belongs to the company
+        const existingCycle = await storage.getAppraisalCycle(id, companyId);
         if (!existingCycle) {
           return res.status(404).json({ message: "Appraisal cycle not found" });
         }
@@ -3782,7 +4044,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const cycle = await storage.updateAppraisalCycle(
           id,
           safeCycleData,
-          createdById
+          companyId
         );
         res.json(cycle);
       } catch (error: unknown) {
@@ -3805,15 +4067,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if appraisal cycle exists and belongs to the administrator
-        const existingCycle = await storage.getAppraisalCycle(id, createdById);
+        // Check if appraisal cycle exists and belongs to the company
+        const existingCycle = await storage.getAppraisalCycle(id, companyId);
         if (!existingCycle) {
           return res.status(404).json({ message: "Appraisal cycle not found" });
         }
 
-        await storage.deleteAppraisalCycle(id, createdById);
+        await storage.deleteAppraisalCycle(id, companyId);
         res.status(204).send();
       } catch (error: unknown) {
         console.error("Error deleting appraisal cycle:", error);
@@ -3822,15 +4089,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Review Frequency management routes - Administrator isolated
+  // Review Frequency management routes - Company-isolated
   app.get(
     "/api/review-frequencies",
     isAuthenticated,
-    requireRoles(["admin"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
-        const createdById = req.user.id;
-        const frequencies = await storage.getReviewFrequencies(createdById);
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const frequencies = await storage.getReviewFrequencies(companyId);
         res.json(frequencies);
       } catch (error: unknown) {
         console.error("Error fetching review frequencies:", error);
@@ -3842,12 +4114,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/review-frequencies/:id",
     isAuthenticated,
-    requireRoles(["admin"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
-        const frequency = await storage.getReviewFrequency(id, createdById);
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const frequency = await storage.getReviewFrequency(id, companyId);
         if (!frequency) {
           return res
             .status(404)
@@ -3868,9 +4145,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const frequencyData = insertReviewFrequencySchema.parse(req.body);
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
         const createdById = req.user.id;
         const frequency = await storage.createReviewFrequency(
           frequencyData,
+          companyId,
           createdById
         );
         res.status(201).json(frequency);
@@ -3894,12 +4178,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if review frequency exists and belongs to the administrator
+        // Check if review frequency exists and belongs to the company
         const existingFrequency = await storage.getReviewFrequency(
           id,
-          createdById
+          companyId
         );
         if (!existingFrequency) {
           return res
@@ -3914,7 +4203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const frequency = await storage.updateReviewFrequency(
           id,
           safeFrequencyData,
-          createdById
+          companyId
         );
         res.json(frequency);
       } catch (error: unknown) {
@@ -3937,12 +4226,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if review frequency exists and belongs to the administrator
+        // Check if review frequency exists and belongs to the company
         const existingFrequency = await storage.getReviewFrequency(
           id,
-          createdById
+          companyId
         );
         if (!existingFrequency) {
           return res
@@ -3950,7 +4244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .json({ message: "Review frequency not found" });
         }
 
-        await storage.deleteReviewFrequency(id, createdById);
+        await storage.deleteReviewFrequency(id, companyId);
         res.status(204).send();
       } catch (error: unknown) {
         console.error("Error deleting review frequency:", error);
@@ -3959,30 +4253,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Frequency Calendar management routes - Administrator isolated
+  // Frequency Calendar management routes - Company-isolated
   app.get(
     "/api/frequency-calendars",
     isAuthenticated,
-    requireRoles(["admin", "hr_manager"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
-        const userId = req.user.id;
-        const user = await storage.getUser(userId);
-
-        if (!user) {
-          return res.status(404).json({ message: "User not found" });
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
         }
 
-        // HR managers can see all calendars, admins see only theirs
-        // Use active role from session if available, otherwise fall back to database role
-        const activeRole = req.user.activeRole || user.role;
-        let calendars;
-        if (activeRole === "hr_manager") {
-          calendars = await storage.getAllFrequencyCalendars();
-        } else {
-          calendars = await storage.getFrequencyCalendars(userId);
-        }
-
+        const calendars = await storage.getFrequencyCalendars(companyId);
         res.json(calendars);
       } catch (error: unknown) {
         console.error("Error fetching frequency calendars:", error);
@@ -3996,12 +4281,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/frequency-calendars/:id",
     isAuthenticated,
-    requireRoles(["admin"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
-        const calendar = await storage.getFrequencyCalendar(id, createdById);
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const calendar = await storage.getFrequencyCalendar(id, companyId);
         if (!calendar) {
           return res
             .status(404)
@@ -4022,9 +4312,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const calendarData = insertFrequencyCalendarSchema.parse(req.body);
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
         const createdById = req.user.id;
         const calendar = await storage.createFrequencyCalendar(
           calendarData,
+          companyId,
           createdById
         );
         res.status(201).json(calendar);
@@ -4050,12 +4347,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if frequency calendar exists and belongs to the administrator
+        // Check if frequency calendar exists and belongs to the company
         const existingCalendar = await storage.getFrequencyCalendar(
           id,
-          createdById
+          companyId
         );
         if (!existingCalendar) {
           return res
@@ -4070,7 +4372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const calendar = await storage.updateFrequencyCalendar(
           id,
           safeCalendarData,
-          createdById
+          companyId
         );
         res.json(calendar);
       } catch (error: unknown) {
@@ -4095,12 +4397,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if frequency calendar exists and belongs to the administrator
+        // Check if frequency calendar exists and belongs to the company
         const existingCalendar = await storage.getFrequencyCalendar(
           id,
-          createdById
+          companyId
         );
         if (!existingCalendar) {
           return res
@@ -4108,7 +4415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .json({ message: "Frequency calendar not found" });
         }
 
-        await storage.deleteFrequencyCalendar(id, createdById);
+        await storage.deleteFrequencyCalendar(id, companyId);
         res.status(204).send();
       } catch (error: unknown) {
         console.error("Error deleting frequency calendar:", error);
@@ -4119,32 +4426,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Frequency Calendar Details management routes - Administrator isolated through parent calendar
+  // Frequency Calendar Details management routes - Company-isolated
   app.get(
     "/api/frequency-calendar-details",
     isAuthenticated,
-    requireRoles(["admin", "hr_manager"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
-        const userId = req.user.id;
-        const user = await storage.getUser(userId);
-
-        if (!user) {
-          return res.status(404).json({ message: "User not found" });
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
         }
 
-        // HR managers can see all active frequency calendar details in their company, admins see only theirs
-        const activeRole = req.user.activeRole || user.role;
-        let details;
-        if (activeRole === "hr_manager") {
-          if (!user.companyId) throw new Error("User company ID not found");
-          details = await storage.getAllFrequencyCalendarDetails(
-            user.companyId
-          );
-        } else {
-          details = await storage.getFrequencyCalendarDetails(userId);
-        }
-
+        const details = await storage.getFrequencyCalendarDetails(companyId);
         res.json(details);
       } catch (error: unknown) {
         console.error("Error fetching frequency calendar details:", error);
@@ -4158,15 +4454,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/frequency-calendar-details/:id",
     isAuthenticated,
-    requireRoles(["admin"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
-        const detail = await storage.getFrequencyCalendarDetail(
-          id,
-          createdById
-        );
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const detail = await storage.getFrequencyCalendarDetail(id, companyId);
         if (!detail) {
           return res
             .status(404)
@@ -4191,9 +4489,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const detailsData = insertFrequencyCalendarDetailsSchema.parse(
           req.body
         );
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
         const createdById = req.user.id;
         const details = await storage.createFrequencyCalendarDetails(
           detailsData,
+          companyId,
           createdById
         );
         res.status(201).json(details);
@@ -4219,12 +4524,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if frequency calendar details exist and belong to the administrator through parent calendar
+        // Check if frequency calendar details exist and belong to the company
         const existingDetails = await storage.getFrequencyCalendarDetail(
           id,
-          createdById
+          companyId
         );
         if (!existingDetails) {
           return res
@@ -4238,8 +4548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .parse(req.body);
         const details = await storage.updateFrequencyCalendarDetails(
           id,
-          safeDetailsData,
-          createdById
+          safeDetailsData
         );
         res.json(details);
       } catch (error: unknown) {
@@ -4264,12 +4573,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
 
-        // Check if frequency calendar details exist and belong to the administrator through parent calendar
+        // Check if frequency calendar details exist and belong to the company
         const existingDetails = await storage.getFrequencyCalendarDetail(
           id,
-          createdById
+          companyId
         );
         if (!existingDetails) {
           return res
@@ -4277,7 +4591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .json({ message: "Frequency calendar details not found" });
         }
 
-        await storage.deleteFrequencyCalendarDetails(id, createdById);
+        await storage.deleteFrequencyCalendarDetails(id);
         res.status(204).send();
       } catch (error: unknown) {
         console.error("Error deleting frequency calendar details:", error);
@@ -4292,7 +4606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/frequency-calendars/:calendarId/details",
     isAuthenticated,
-    requireRoles(["admin", "hr_manager"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
         const { calendarId } = req.params;
@@ -4312,16 +4626,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Publish Questionnaire management routes - Administrator isolated
+  // Publish Questionnaire management routes - Company-isolated
   app.get(
     "/api/publish-questionnaires",
     isAuthenticated,
-    requireRoles(["admin"]),
+    requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
-        const createdById = req.user.claims.sub;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
         const questionnaires = await storage.getPublishQuestionnaires(
-          createdById
+          companyId
         );
         res.json(questionnaires);
       } catch (error: unknown) {
@@ -4340,7 +4659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.claims.sub;
+        const createdById = req.user.id;
         const questionnaire = await storage.getPublishQuestionnaire(
           id,
           createdById
@@ -4369,7 +4688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const questionnaireData = insertPublishQuestionnaireSchema.parse(
           req.body
         );
-        const createdById = req.user.claims.sub;
+        const createdById = req.user.id;
         const questionnaire = await storage.createPublishQuestionnaire(
           questionnaireData,
           createdById
@@ -4397,7 +4716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.claims.sub;
+        const createdById = req.user.id;
 
         // Check if publish questionnaire exists and belongs to the administrator
         const existingQuestionnaire = await storage.getPublishQuestionnaire(
@@ -4442,7 +4761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { id } = req.params;
-        const createdById = req.user.claims.sub;
+        const createdById = req.user.id;
 
         // Check if publish questionnaire exists and belongs to the administrator
         const existingQuestionnaire = await storage.getPublishQuestionnaire(
@@ -4473,10 +4792,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["hr_manager"]),
     async (req: any, res) => {
       try {
-        const requestingUserId = req.user.id;
-        const groups = await storage.getAppraisalGroupsWithMembers(
-          requestingUserId
-        );
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const groups = await storage.getAppraisalGroupsWithMembers(companyId);
         res.json(groups);
       } catch (error: unknown) {
         console.error("Error fetching appraisal groups:", error);
@@ -4491,9 +4813,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["hr_manager"]),
     async (req: any, res) => {
       try {
-        const requestingUserId = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
         const { id } = req.params;
-        const group = await storage.getAppraisalGroup(id, requestingUserId);
+        const group = await storage.getAppraisalGroup(id, companyId);
         if (!group) {
           return res.status(404).json({ message: "Appraisal group not found" });
         }
@@ -4512,6 +4839,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const requestingUserId = req.user.id;
+        const companyId = await getUserCompanyId(requestingUserId);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
         // Validate request body and add createdById from session
         const validatedData = insertAppraisalGroupSchema
           .omit({ createdById: true })
@@ -4520,10 +4853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...validatedData,
           createdById: requestingUserId,
         };
-        const group = await storage.createAppraisalGroup(
-          groupData,
-          requestingUserId
-        );
+        const group = await storage.createAppraisalGroup(groupData, companyId);
         res.status(201).json(group);
       } catch (error: unknown) {
         console.error("Error creating appraisal group:", error);
@@ -4544,7 +4874,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["hr_manager"]),
     async (req: any, res) => {
       try {
-        const requestingUserId = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
         const { id } = req.params;
         const validatedData = insertAppraisalGroupSchema
           .partial()
@@ -4552,7 +4887,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const group = await storage.updateAppraisalGroup(
           id,
           validatedData,
-          requestingUserId
+          companyId
         );
         res.json(group);
       } catch (error: unknown) {
@@ -4577,9 +4912,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["hr_manager"]),
     async (req: any, res) => {
       try {
-        const requestingUserId = req.user.id;
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
         const { id } = req.params;
-        await storage.deleteAppraisalGroup(id, requestingUserId);
+        await storage.deleteAppraisalGroup(id, companyId);
         res.status(204).send();
       } catch (error: unknown) {
         console.error("Error deleting appraisal group:", error);
@@ -4702,7 +5042,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["hr_manager"]),
     async (req: any, res) => {
       try {
-        const requestingUserId = req.user.claims.sub;
+        const requestingUserId = req.user.id;
 
         // Handle form data if file upload is present
         let parsedData: any;
@@ -4792,14 +5132,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // If publish type is "now", automatically generate evaluations and send notifications
         if (validatedData.publishType === "now") {
+          console.log(
+            `[Initiate Appraisal] PublishType is 'now', creating evaluations...`
+          );
           try {
             // Get all members of the appraisal group
             const members = await storage.getAppraisalGroupMembers(
               validatedData.appraisalGroupId,
               requestingUserId
             );
+            console.log(
+              `[Initiate Appraisal] Found ${members.length} total members`
+            );
             const activeMembers = members.filter(
               (member) => member.user && member.user.status === "active"
+            );
+            console.log(
+              `[Initiate Appraisal] Found ${activeMembers.length} active members`
             );
 
             // Create evaluations for each active member
@@ -4808,6 +5157,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
               // Skip if employee is in excluded list
               if (validatedData.excludedEmployeeIds?.includes(employee.id)) {
+                console.log(
+                  `[Initiate Appraisal] Skipping excluded employee ${employee.id} (${employee.email})`
+                );
                 continue;
               }
 
@@ -4822,7 +5174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const evaluationData = {
                 employeeId: employee.id,
                 managerId: managerId || requestingUserId,
-                reviewCycleId: "initiated-appraisal-" + initiatedAppraisal.id,
+                reviewCycleId: null, // No review cycle for initiated appraisals
                 initiatedAppraisalId: initiatedAppraisal.id,
                 status: "not_started" as const,
               };
@@ -4986,10 +5338,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["hr_manager"]),
     async (req: any, res) => {
       try {
-        const requestingUserId = req.user.claims.sub;
-        const appraisals = await storage.getInitiatedAppraisals(
-          requestingUserId
-        );
+        const companyId = await getUserCompanyId(req.user.id);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User not associated with a company" });
+        }
+        const appraisals = await storage.getInitiatedAppraisals(companyId);
         res.json(appraisals);
       } catch (error: unknown) {
         console.error("Error fetching initiated appraisals:", error);
@@ -5270,7 +5625,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const { appraisalId } = req.params;
-        const requestingUserId = req.user.claims.sub;
+        const requestingUserId = req.user.id;
 
         // Verify initiated appraisal exists and belongs to the HR manager
         const userAppraisals = await storage.getInitiatedAppraisals(
@@ -5366,7 +5721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["hr_manager"]),
     async (req: any, res) => {
       try {
-        const requestingUserId = req.user.claims.sub;
+        const requestingUserId = req.user.id;
 
         // Get user to find company ID
         const user = await storage.getUser(requestingUserId);
@@ -5394,7 +5749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["hr_manager"]),
     async (req: any, res) => {
       try {
-        const requestingUserId = req.user.claims.sub;
+        const requestingUserId = req.user.id;
 
         // Validate request body with Zod schema
         const { employeeId, initiatedAppraisalId } =
@@ -5489,7 +5844,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const evaluationId = req.params.id;
-        const managerId = req.user.claims.sub;
+        const managerId = req.user.id;
 
         const { managerRemarks, finalRating, managerEvaluationData } = req.body;
 
@@ -5603,7 +5958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const evaluationId = req.params.id;
-        const managerId = req.user.claims.sub;
+        const managerId = req.user.id;
 
         const { meetingDate, meetingTitle, meetingDescription } = req.body;
 
@@ -5679,7 +6034,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const evaluationId = req.params.id;
-        const employeeId = req.user.claims.sub;
+        const employeeId = req.user.id;
 
         const { meetingDate, duration, location, notes } = req.body;
 
@@ -5769,7 +6124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const evaluationId = req.params.id;
-        const managerId = req.user.claims.sub;
+        const managerId = req.user.id;
 
         const { meetingNotes, finalRating, showNotesToEmployee } = req.body;
 
@@ -5836,7 +6191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const evaluationId = req.params.id;
-        const managerId = req.user.claims.sub;
+        const managerId = req.user.id;
 
         // Validate the evaluation belongs to this manager
         const evaluation = await storage.getEvaluation(evaluationId);
@@ -5945,6 +6300,361 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error: unknown) {
         console.error("Error completing evaluation:", error);
         res.status(500).json({ message: "Failed to complete evaluation" });
+      }
+    }
+  );
+
+  // ========================================
+  // Development Goals API routes
+  // ========================================
+
+  // Get all development goals for current employee
+  app.get("/api/development-goals", isAuthenticated, async (req: any, res) => {
+    try {
+      const employeeId = req.user.id;
+      const goals = await storage.getDevelopmentGoals(employeeId);
+
+      // Fetch evaluation details for each goal
+      const goalsWithDetails = await Promise.all(
+        goals.map(async (goal) => {
+          const evaluation = await storage.getEvaluation(goal.evaluationId);
+          let appraisalCycle = null;
+          let frequencyCalendarPeriod = null;
+
+          if (evaluation?.initiatedAppraisalId) {
+            const initiatedAppraisal = await storage.getInitiatedAppraisal(
+              evaluation.initiatedAppraisalId
+            );
+            if (initiatedAppraisal?.frequencyCalendarId) {
+              const frequencyCalendar = await storage.getFrequencyCalendarById(
+                initiatedAppraisal.frequencyCalendarId
+              );
+              if (frequencyCalendar?.appraisalCycleId) {
+                appraisalCycle = await storage.getAppraisalCycleById(
+                  frequencyCalendar.appraisalCycleId
+                );
+              }
+
+              // Get the frequency calendar period from initiated_appraisal_detail_timings
+              const detailTimings =
+                await storage.getInitiatedAppraisalDetailTimings(
+                  evaluation.initiatedAppraisalId
+                );
+              if (detailTimings.length > 0) {
+                const detailTiming = detailTimings[0];
+                const calendarDetails =
+                  await storage.getFrequencyCalendarDetailsByCalendarId(
+                    initiatedAppraisal.frequencyCalendarId
+                  );
+                const matchingDetail = calendarDetails.find(
+                  (d) => d.id === detailTiming.frequencyCalendarDetailId
+                );
+                if (matchingDetail) {
+                  frequencyCalendarPeriod = {
+                    displayName: matchingDetail.displayName,
+                    startDate: matchingDetail.startDate,
+                    endDate: matchingDetail.endDate,
+                  };
+                }
+              }
+            }
+          }
+
+          return {
+            ...goal,
+            evaluation: evaluation
+              ? {
+                  id: evaluation.id,
+                  status: evaluation.status,
+                  meetingCompletedAt: evaluation.meetingCompletedAt,
+                  overallRating: evaluation.overallRating,
+                }
+              : null,
+            appraisalCycle: appraisalCycle
+              ? {
+                  id: appraisalCycle.id,
+                  code: appraisalCycle.code,
+                  description: appraisalCycle.description,
+                }
+              : null,
+            frequencyCalendarPeriod,
+          };
+        })
+      );
+
+      res.json(goalsWithDetails);
+    } catch (error: unknown) {
+      console.error("Error fetching development goals:", error);
+      res.status(500).json({ message: "Failed to fetch development goals" });
+    }
+  });
+
+  // Get development goals for a specific evaluation
+  app.get(
+    "/api/development-goals/evaluation/:evaluationId",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { evaluationId } = req.params;
+        const userId = req.user.id;
+
+        // Verify the user has access to this evaluation
+        const evaluation = await storage.getEvaluation(evaluationId);
+        if (!evaluation) {
+          return res.status(404).json({ message: "Evaluation not found" });
+        }
+
+        // Only allow the employee who owns the evaluation to access their goals
+        if (evaluation.employeeId !== userId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+
+        const goals = await storage.getDevelopmentGoalsByEvaluation(
+          evaluationId
+        );
+        res.json(goals);
+      } catch (error: unknown) {
+        console.error(
+          "Error fetching development goals for evaluation:",
+          error
+        );
+        res.status(500).json({ message: "Failed to fetch development goals" });
+      }
+    }
+  );
+
+  // Get completed evaluations eligible for development goals
+  // IMPORTANT: This route must come before parameterized routes like /api/development-goals/:id
+  app.get(
+    "/api/development-goals/eligible-evaluations",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const employeeId = req.user.id;
+        // Get all evaluations for this employee
+        const evaluations = await storage.getEvaluations({ employeeId });
+
+        // Filter to only completed evaluations (meeting completed)
+        const withMeeting = evaluations.filter((e) => e.meetingCompletedAt);
+
+        const eligibleEvaluations = await Promise.all(
+          withMeeting.map(async (evaluation) => {
+            let appraisalCycle = null;
+            let frequencyCalendarPeriod = null;
+            let isActiveAppraisalCycle = false;
+
+            if (evaluation.initiatedAppraisalId) {
+              const initiatedAppraisal = await storage.getInitiatedAppraisal(
+                evaluation.initiatedAppraisalId
+              );
+
+              if (initiatedAppraisal?.frequencyCalendarId) {
+                const frequencyCalendar =
+                  await storage.getFrequencyCalendarById(
+                    initiatedAppraisal.frequencyCalendarId
+                  );
+
+                if (frequencyCalendar?.appraisalCycleId) {
+                  appraisalCycle = await storage.getAppraisalCycleById(
+                    frequencyCalendar.appraisalCycleId
+                  );
+                  isActiveAppraisalCycle = appraisalCycle?.status === "active";
+                }
+
+                // Get the frequency calendar period from initiated_appraisal_detail_timings
+                const detailTimings =
+                  await storage.getInitiatedAppraisalDetailTimings(
+                    evaluation.initiatedAppraisalId!
+                  );
+                if (detailTimings.length > 0) {
+                  const detailTiming = detailTimings[0]; // Each initiated appraisal typically has one period
+                  const calendarDetails =
+                    await storage.getFrequencyCalendarDetailsByCalendarId(
+                      initiatedAppraisal.frequencyCalendarId
+                    );
+                  const matchingDetail = calendarDetails.find(
+                    (d) => d.id === detailTiming.frequencyCalendarDetailId
+                  );
+                  if (matchingDetail) {
+                    frequencyCalendarPeriod = {
+                      displayName: matchingDetail.displayName,
+                      startDate: matchingDetail.startDate,
+                      endDate: matchingDetail.endDate,
+                    };
+                  }
+                }
+              }
+            }
+
+            // Get existing goals count for this evaluation
+            const existingGoals = await storage.getDevelopmentGoalsByEvaluation(
+              evaluation.id
+            );
+
+            return {
+              id: evaluation.id,
+              meetingCompletedAt: evaluation.meetingCompletedAt,
+              overallRating: evaluation.overallRating,
+              appraisalCycle: appraisalCycle
+                ? {
+                    id: appraisalCycle.id,
+                    code: appraisalCycle.code,
+                    description: appraisalCycle.description,
+                    status: appraisalCycle.status,
+                  }
+                : null,
+              frequencyCalendarPeriod,
+              isActiveAppraisalCycle,
+              goalsCount: existingGoals.length,
+            };
+          })
+        );
+
+        // Return all evaluations with completed meetings
+        // Allow goals even without appraisal cycles (for "now" type appraisals)
+        res.json(eligibleEvaluations);
+      } catch (error: unknown) {
+        console.error("Error fetching eligible evaluations:", error);
+        res
+          .status(500)
+          .json({ message: "Failed to fetch eligible evaluations" });
+      }
+    }
+  );
+
+  // Create a new development goal
+  app.post("/api/development-goals", isAuthenticated, async (req: any, res) => {
+    try {
+      const employeeId = req.user.id;
+      const { insertDevelopmentGoalSchema } = await import("@shared/schema");
+      const goalData = insertDevelopmentGoalSchema.parse({
+        ...req.body,
+        employeeId,
+      });
+
+      // Verify the evaluation exists and belongs to this employee
+      const evaluation = await storage.getEvaluation(goalData.evaluationId);
+      if (!evaluation) {
+        return res.status(404).json({ message: "Evaluation not found" });
+      }
+      if (evaluation.employeeId !== employeeId) {
+        return res.status(403).json({
+          message:
+            "Access denied: You can only add goals to your own evaluations",
+        });
+      }
+
+      // Verify the evaluation is completed (meeting completed)
+      if (!evaluation.meetingCompletedAt) {
+        return res.status(400).json({
+          message:
+            "Development goals can only be added after the evaluation meeting is completed",
+        });
+      }
+
+      // Verify the appraisal cycle is still active
+      if (evaluation.initiatedAppraisalId) {
+        const initiatedAppraisal = await storage.getInitiatedAppraisal(
+          evaluation.initiatedAppraisalId
+        );
+        if (initiatedAppraisal?.frequencyCalendarId) {
+          const frequencyCalendar = await storage.getFrequencyCalendar(
+            initiatedAppraisal.frequencyCalendarId,
+            ""
+          );
+          if (frequencyCalendar?.appraisalCycleId) {
+            const appraisalCycle = await storage.getAppraisalCycle(
+              frequencyCalendar.appraisalCycleId,
+              ""
+            );
+            if (appraisalCycle?.status !== "active") {
+              return res.status(400).json({
+                message:
+                  "Development goals can only be added for active appraisal cycles",
+              });
+            }
+          }
+        }
+      }
+
+      const goal = await storage.createDevelopmentGoal(goalData);
+      res.status(201).json(goal);
+    } catch (error: unknown) {
+      console.error("Error creating development goal:", error);
+      if (error instanceof z.ZodError) {
+        return res
+          .status(400)
+          .json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create development goal" });
+    }
+  });
+
+  // Update a development goal
+  app.put(
+    "/api/development-goals/:id",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { id } = req.params;
+        const employeeId = req.user.id;
+
+        // Verify the goal exists and belongs to this employee
+        const existingGoal = await storage.getDevelopmentGoal(id);
+        if (!existingGoal) {
+          return res
+            .status(404)
+            .json({ message: "Development goal not found" });
+        }
+        if (existingGoal.employeeId !== employeeId) {
+          return res.status(403).json({
+            message: "Access denied: You can only edit your own goals",
+          });
+        }
+
+        const { updateDevelopmentGoalSchema } = await import("@shared/schema");
+        const updateData = updateDevelopmentGoalSchema.parse(req.body);
+        const updatedGoal = await storage.updateDevelopmentGoal(id, updateData);
+        res.json(updatedGoal);
+      } catch (error: unknown) {
+        console.error("Error updating development goal:", error);
+        if (error instanceof z.ZodError) {
+          return res
+            .status(400)
+            .json({ message: "Invalid data", errors: error.errors });
+        }
+        res.status(500).json({ message: "Failed to update development goal" });
+      }
+    }
+  );
+
+  // Delete a development goal
+  app.delete(
+    "/api/development-goals/:id",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { id } = req.params;
+        const employeeId = req.user.id;
+
+        // Verify the goal exists and belongs to this employee
+        const existingGoal = await storage.getDevelopmentGoal(id);
+        if (!existingGoal) {
+          return res
+            .status(404)
+            .json({ message: "Development goal not found" });
+        }
+        if (existingGoal.employeeId !== employeeId) {
+          return res.status(403).json({
+            message: "Access denied: You can only delete your own goals",
+          });
+        }
+
+        await storage.deleteDevelopmentGoal(id);
+        res.json({ message: "Development goal deleted successfully" });
+      } catch (error: unknown) {
+        console.error("Error deleting development goal:", error);
+        res.status(500).json({ message: "Failed to delete development goal" });
       }
     }
   );

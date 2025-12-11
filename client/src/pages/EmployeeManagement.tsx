@@ -1,13 +1,39 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,7 +43,21 @@ import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Plus, Search, Filter, Edit, Trash2, Key, Upload, Download, FileSpreadsheet, CheckCircle, XCircle } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Filter,
+  Edit,
+  Trash2,
+  Key,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  CheckCircle,
+  XCircle,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 
 export default function EmployeeManagement() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -28,35 +68,40 @@ export default function EmployeeManagement() {
   const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadResults, setUploadResults] = useState<any>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
-  const isSuperAdmin = currentUser?.role === 'super_admin';
-  const isAdmin = currentUser?.role === 'admin';
-  
+  const isSuperAdmin = currentUser?.role === "super_admin";
+  const isAdmin = currentUser?.role === "admin";
+
   // Calculate password change permissions based on new policy
   const canChangePassword = (user: User | null) => {
     if (!user || !currentUser) return false;
-    
-    const isSuperAdmin = currentUser.role === 'super_admin';
-    const isAdmin = currentUser.role === 'admin';
-    const isUserCreatedByAdmin = user.createdById !== null && user.createdById === currentUser.id;
-    const isTargetPrivileged = user.role && ['admin', 'super_admin'].includes(user.role);
-    
-    return isSuperAdmin || (isAdmin && isUserCreatedByAdmin && !isTargetPrivileged);
+
+    const isSuperAdmin = currentUser.role === "super_admin";
+    const isAdmin = currentUser.role === "admin";
+    const isUserCreatedByAdmin =
+      user.createdById !== null && user.createdById === currentUser.id;
+    const isTargetPrivileged =
+      user.role && ["admin", "super_admin"].includes(user.role);
+
+    return (
+      isSuperAdmin || (isAdmin && isUserCreatedByAdmin && !isTargetPrivileged)
+    );
   };
 
   // Build query string from filters
   const queryParams = new URLSearchParams();
   if (roleFilter && roleFilter !== "all") queryParams.set("role", roleFilter);
-  if (statusFilter && statusFilter !== "all") queryParams.set("status", statusFilter);
+  if (statusFilter && statusFilter !== "all")
+    queryParams.set("status", statusFilter);
   const queryString = queryParams.toString();
 
   const { data: users = [], isLoading } = useQuery<User[]>({
-    queryKey: queryString 
-      ? ["/api/users", queryString] 
-      : ["/api/users"],
+    queryKey: queryString ? ["/api/users", queryString] : ["/api/users"],
   });
 
   const { data: locations = [] } = useQuery<any[]>({
@@ -85,8 +130,9 @@ export default function EmployeeManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      queryClient.invalidateQueries({ predicate: (query) => 
-        Array.isArray(query.queryKey) && query.queryKey[0] === "/api/users" 
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) && query.queryKey[0] === "/api/users",
       });
       setIsCreateModalOpen(false);
       toast({
@@ -104,13 +150,20 @@ export default function EmployeeManagement() {
   });
 
   const updateUserMutation = useMutation({
-    mutationFn: async ({ id, userData }: { id: string; userData: Partial<InsertUser> }) => {
+    mutationFn: async ({
+      id,
+      userData,
+    }: {
+      id: string;
+      userData: Partial<InsertUser>;
+    }) => {
       await apiRequest("PUT", `/api/users/${id}`, userData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      queryClient.invalidateQueries({ predicate: (query) => 
-        Array.isArray(query.queryKey) && query.queryKey[0] === "/api/users" 
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) && query.queryKey[0] === "/api/users",
       });
       setEditingUser(null);
       toast({
@@ -133,8 +186,9 @@ export default function EmployeeManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      queryClient.invalidateQueries({ predicate: (query) => 
-        Array.isArray(query.queryKey) && query.queryKey[0] === "/api/users" 
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) && query.queryKey[0] === "/api/users",
       });
       toast({
         title: "Success",
@@ -152,23 +206,23 @@ export default function EmployeeManagement() {
 
   const handleDownloadTemplate = async () => {
     try {
-      const response = await fetch('/api/users/bulk-upload/template', {
-        method: 'GET',
-        credentials: 'include',
+      const response = await fetch("/api/users/bulk-upload/template", {
+        method: "GET",
+        credentials: "include",
       });
-      
-      if (!response.ok) throw new Error('Failed to download template');
-      
+
+      if (!response.ok) throw new Error("Failed to download template");
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = 'user_bulk_upload_template.xlsx';
+      a.download = "user_bulk_upload_template.xlsx";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-      
+
       toast({
         title: "Success",
         description: "Template downloaded successfully",
@@ -189,29 +243,42 @@ export default function EmployeeManagement() {
         reader.onload = async (e) => {
           try {
             const base64 = e.target?.result as string;
-            const fileData = base64.split(',')[1]; // Remove data:...;base64, prefix
-            
-            const result = await apiRequest("POST", "/api/users/bulk-upload", { fileData });
+            const fileData = base64.split(",")[1]; // Remove data:...;base64, prefix
+
+            const result = await apiRequest("POST", "/api/users/bulk-upload", {
+              fileData,
+            });
             resolve(result);
           } catch (error) {
             reject(error);
           }
         };
-        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.onerror = () => reject(new Error("Failed to read file"));
         reader.readAsDataURL(file);
       });
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      queryClient.invalidateQueries({ predicate: (query) => 
-        Array.isArray(query.queryKey) && query.queryKey[0] === "/api/users" 
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) && query.queryKey[0] === "/api/users",
       });
       setUploadResults(data);
       setSelectedFile(null);
-      toast({
-        title: "Bulk Upload Completed",
-        description: `${data.summary.successful} users created successfully, ${data.summary.failed} failed`,
-      });
+
+      if (data?.summary) {
+        toast({
+          title: "Bulk Upload Completed",
+          description: `${
+            data.summary.successful || 0
+          } users created successfully, ${data.summary.failed || 0} failed`,
+        });
+      } else {
+        toast({
+          title: "Upload Completed",
+          description: "Bulk upload process completed",
+        });
+      }
     },
     onError: (error) => {
       toast({
@@ -226,7 +293,7 @@ export default function EmployeeManagement() {
     const file = event.target.files?.[0];
     if (file) {
       // Validate file type
-      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
         toast({
           title: "Invalid File",
           description: "Please select an Excel file (.xlsx or .xls)",
@@ -258,40 +325,61 @@ export default function EmployeeManagement() {
   };
 
   // Create a schema that handles empty passwords properly for updates
-  const flexibleUserSchema = z.object({
-    firstName: z.string().min(1, "First name is required"),
-    lastName: z.string().min(1, "Last name is required"),
-    email: z.string().email("Invalid email address"),
-    code: z.string().min(1, "Employee code is required"),
-    designation: z.string().optional(),
-    mobileNumber: z.string().optional(),
-    locationId: z.string().nullable().optional(),
-    companyId: z.string().nullable().optional(),
-    levelId: z.string().nullable().optional(),
-    gradeId: z.string().nullable().optional(),
-    reportingManagerId: z.string().nullable().optional(),
-    department: z.string().nullable().optional(),
-    role: z.enum(['super_admin', 'admin', 'hr_manager', 'employee', 'manager']),
-    roles: z.array(z.enum(['super_admin', 'admin', 'hr_manager', 'employee', 'manager'])).optional().default(['employee']),
-    status: z.enum(['active', 'inactive']).default('active'),
-    password: z.union([
-      z.string().min(8, "Password must be at least 8 characters"),
-      z.literal("").transform(() => undefined)
-    ]).optional(),
-    confirmPassword: z.union([
-      z.string(),
-      z.literal("").transform(() => undefined)
-    ]).optional(),
-  }).refine((data) => {
-    // If either password field is provided, both must be provided and match
-    if (data.password || data.confirmPassword) {
-      return data.password && data.confirmPassword && data.password === data.confirmPassword;
-    }
-    return true;
-  }, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
+  const flexibleUserSchema = z
+    .object({
+      firstName: z.string().min(1, "First name is required"),
+      lastName: z.string().min(1, "Last name is required"),
+      email: z.string().email("Invalid email address"),
+      code: z.string().min(1, "Employee code is required"),
+      designation: z.string().optional(),
+      mobileNumber: z.string().optional(),
+      locationId: z.string().nullable().optional(),
+      companyId: z.string().nullable().optional(),
+      levelId: z.string().nullable().optional(),
+      gradeId: z.string().nullable().optional(),
+      reportingManagerId: z.string().nullable().optional(),
+      department: z.string().nullable().optional(),
+      role: z.enum([
+        "super_admin",
+        "admin",
+        "hr_manager",
+        "employee",
+        "manager",
+      ]),
+      roles: z
+        .array(
+          z.enum(["super_admin", "admin", "hr_manager", "employee", "manager"])
+        )
+        .optional()
+        .default(["employee"]),
+      status: z.enum(["active", "inactive"]).default("active"),
+      password: z
+        .union([
+          z.string().min(8, "Password must be at least 8 characters"),
+          z.literal("").transform(() => undefined),
+        ])
+        .optional(),
+      confirmPassword: z
+        .union([z.string(), z.literal("").transform(() => undefined)])
+        .optional(),
+    })
+    .refine(
+      (data) => {
+        // If either password field is provided, both must be provided and match
+        if (data.password || data.confirmPassword) {
+          return (
+            data.password &&
+            data.confirmPassword &&
+            data.password === data.confirmPassword
+          );
+        }
+        return true;
+      },
+      {
+        message: "Passwords do not match",
+        path: ["confirmPassword"],
+      }
+    );
 
   const form = useForm<InsertUser>({
     resolver: zodResolver(flexibleUserSchema),
@@ -303,7 +391,8 @@ export default function EmployeeManagement() {
       designation: "",
       mobileNumber: "",
       locationId: "none",
-      companyId: isAdmin && currentUser?.companyId ? currentUser.companyId : "none",
+      companyId:
+        isAdmin && currentUser?.companyId ? currentUser.companyId : "none",
       levelId: "none",
       gradeId: "none",
       reportingManagerId: "none",
@@ -330,7 +419,8 @@ export default function EmployeeManagement() {
       companyId: data.companyId === "none" ? null : data.companyId,
       levelId: data.levelId === "none" ? null : data.levelId,
       gradeId: data.gradeId === "none" ? null : data.gradeId,
-      reportingManagerId: data.reportingManagerId === "none" ? null : data.reportingManagerId,
+      reportingManagerId:
+        data.reportingManagerId === "none" ? null : data.reportingManagerId,
       department: data.department === "none" ? null : data.department,
     };
 
@@ -349,13 +439,13 @@ export default function EmployeeManagement() {
     if (editingUser) {
       // For updates, only include password fields if they're actually filled in
       const updateData = { ...processedData };
-      
+
       // Remove password fields if they're empty (to avoid triggering password update logic)
       if (!data.password && !data.confirmPassword) {
         delete updateData.password;
         delete updateData.confirmPassword;
       }
-      
+
       updateUserMutation.mutate({ id: editingUser.id, userData: updateData });
     } else {
       createUserMutation.mutate(processedData);
@@ -373,7 +463,10 @@ export default function EmployeeManagement() {
       mobileNumber: user.mobileNumber || "",
       locationId: user.locationId || "none",
       // CRITICAL: Force admin to use their company when editing
-      companyId: isAdmin && currentUser?.companyId ? currentUser.companyId : (user.companyId || "none"),
+      companyId:
+        isAdmin && currentUser?.companyId
+          ? currentUser.companyId
+          : user.companyId || "none",
       levelId: user.levelId || "none",
       gradeId: user.gradeId || "none",
       reportingManagerId: user.reportingManagerId || "none",
@@ -391,17 +484,29 @@ export default function EmployeeManagement() {
     }
   };
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch = searchQuery === "" || 
+  // Enrich users with company information
+  const enrichedUsers = users.map((user) => {
+    const company = companies.find((c: any) => c.id === user.companyId);
+    return {
+      ...user,
+      companyName: company?.name || null,
+    };
+  });
+
+  const filteredUsers = enrichedUsers.filter((user) => {
+    const matchesSearch =
+      searchQuery === "" ||
       user.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     return matchesSearch;
   });
 
   const resetForm = () => {
     setEditingUser(null);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     form.reset({
       firstName: "",
       lastName: "",
@@ -410,7 +515,8 @@ export default function EmployeeManagement() {
       designation: "",
       mobileNumber: "",
       locationId: "none",
-      companyId: isAdmin && currentUser?.companyId ? currentUser.companyId : "none",
+      companyId:
+        isAdmin && currentUser?.companyId ? currentUser.companyId : "none",
       levelId: "none",
       gradeId: "none",
       reportingManagerId: "none",
@@ -428,486 +534,662 @@ export default function EmployeeManagement() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">User Management</h1>
-            <p className="text-muted-foreground">Manage user profiles and roles</p>
+            <p className="text-muted-foreground">
+              Manage user profiles and roles
+            </p>
           </div>
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => setIsBulkUploadModalOpen(true)} 
+            <Button
+              variant="outline"
+              onClick={() => setIsBulkUploadModalOpen(true)}
               data-testid="bulk-upload-button"
             >
               <Upload className="h-4 w-4 mr-2" />
               Bulk Upload
             </Button>
-            <Dialog open={isCreateModalOpen || !!editingUser} onOpenChange={(open) => {
-              if (!open) {
-                setIsCreateModalOpen(false);
-                resetForm();
-              }
-            }}>
+            <Dialog
+              open={isCreateModalOpen || !!editingUser}
+              onOpenChange={(open) => {
+                if (!open) {
+                  setIsCreateModalOpen(false);
+                  resetForm();
+                }
+              }}
+            >
               <DialogTrigger asChild>
-                <Button onClick={() => setIsCreateModalOpen(true)} data-testid="add-user-button">
+                <Button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  data-testid="add-user-button"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add User
                 </Button>
               </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
-                <DialogDescription>
-                  {editingUser ? "Update user information" : "Create a new user profile"}
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="firstName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>First Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} value={field.value ?? ""} data-testid="input-first-name" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="lastName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Last Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} value={field.value ?? ""} data-testid="input-last-name" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" {...field} value={field.value ?? ""} data-testid="input-email" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="code"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Employee Code</FormLabel>
-                          <FormControl>
-                            <Input {...field} value={field.value ?? ""} data-testid="input-code" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="designation"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Designation</FormLabel>
-                          <FormControl>
-                            <Input {...field} value={field.value ?? ""} data-testid="input-designation" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="mobileNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Mobile Number</FormLabel>
-                          <FormControl>
-                            <Input {...field} value={field.value ?? ""} data-testid="input-mobile" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="locationId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Location</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? "none"}>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingUser ? "Edit User" : "Add New User"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {editingUser
+                      ? "Update user information"
+                      : "Create a new user profile"}
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                  <form
+                    onSubmit={form.handleSubmit(onSubmit)}
+                    className="space-y-4"
+                  >
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>First Name</FormLabel>
                             <FormControl>
-                              <SelectTrigger data-testid="select-location">
-                                <SelectValue placeholder="Select location" />
-                              </SelectTrigger>
+                              <Input
+                                {...field}
+                                value={field.value ?? ""}
+                                data-testid="input-first-name"
+                              />
                             </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">No Location</SelectItem>
-                              {locations.map((location: any) => (
-                                <SelectItem key={location.id} value={location.id}>
-                                  {location.name} ({location.code})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="companyId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Company</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            value={field.value ?? "none"}
-                            disabled={isAdmin}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-company">
-                                <SelectValue placeholder="Select company" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">No Company</SelectItem>
-                              {companies.map((company: any) => (
-                                <SelectItem key={company.id} value={company.id}>
-                                  {company.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                          {isAdmin && (
-                            <p className="text-xs text-muted-foreground">
-                              As an Administrator, you can only create users for your company
-                            </p>
-                          )}
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="department"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Department</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? "none"}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-department">
-                                <SelectValue placeholder="Select department" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">No Department</SelectItem>
-                              {departments.map((department: any) => (
-                                <SelectItem key={department.id} value={department.code}>
-                                  {department.description} ({department.code})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="levelId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Level</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? "none"}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-level">
-                                <SelectValue placeholder="Select level" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">No Level</SelectItem>
-                              {levels.map((level: any) => (
-                                <SelectItem key={level.id} value={level.id}>
-                                  {level.description} ({level.code})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="gradeId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Grade</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? "none"}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-grade">
-                                <SelectValue placeholder="Select grade" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">No Grade</SelectItem>
-                              {grades.map((grade: any) => (
-                                <SelectItem key={grade.id} value={grade.id}>
-                                  {grade.description} ({grade.code})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="reportingManagerId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Reporting Manager</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? "none"}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-manager">
-                                <SelectValue placeholder="Select reporting manager" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">No Manager</SelectItem>
-                              {users.filter((user: any) => user.id !== editingUser?.id).map((user: any) => (
-                                <SelectItem key={user.id} value={user.id}>
-                                  {user.firstName} {user.lastName} ({user.email})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? "active"}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-status">
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="inactive">Inactive</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="roles"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Roles</FormLabel>
-                          <div className="space-y-2" data-testid="select-roles">
-                            {[
-                              { value: "employee", label: "Employee" },
-                              { value: "manager", label: "Manager" },
-                              { value: "hr_manager", label: "HR Manager" },
-                              { value: "admin", label: "Administrator" },
-                              { value: "super_admin", label: "Super Administrator" }
-                            ].map((role) => (
-                              <div key={role.value} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={role.value}
-                                  checked={field.value?.includes(role.value as "super_admin" | "admin" | "hr_manager" | "employee" | "manager")}
-                                  onCheckedChange={(checked) => {
-                                    const currentRoles = field.value || [];
-                                    if (checked) {
-                                      field.onChange([...currentRoles, role.value]);
-                                    } else {
-                                      field.onChange(currentRoles.filter((r: string) => r !== role.value));
-                                    }
-                                  }}
-                                  data-testid={`checkbox-role-${role.value}`}
-                                />
-                                <label
-                                  htmlFor={role.value}
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                  {role.label}
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  {/* Password fields - Super Admin or Creator */}
-                  {(isSuperAdmin || isAdmin) && (
-                    <div className="border-t pt-4">
-                      <div className="flex items-center gap-2 mb-4">
-                        <Key className="h-4 w-4" />
-                        <h3 className="text-lg font-medium">{editingUser ? "Change Password" : "Set Password"}</h3>
-                        {editingUser && !canChangePassword(editingUser) && (
-                          <Badge variant="secondary" className="ml-2">
-                            {editingUser.createdById !== currentUser?.id 
-                              ? "Creator or Super Admin Required"
-                              : editingUser.role && ["admin", "super_admin"].includes(editingUser.role)
-                                ? "Cannot Change Admin Password"
-                                : "Super Admin Required"
-                            }
-                          </Badge>
+                            <FormMessage />
+                          </FormItem>
                         )}
-                      </div>
-                      
-                      {editingUser && !canChangePassword(editingUser) && (
-                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3 mb-4">
-                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                            <strong>Note:</strong> {
-                              editingUser.createdById !== currentUser?.id
-                                ? "You can only change passwords for users you created, or contact a Super Administrator."
-                                : editingUser.role && ["admin", "super_admin"].includes(editingUser.role)
-                                  ? "For security reasons, passwords of Administrator and Super Administrator accounts cannot be changed by other Administrators."
-                                  : "Password changes require Super Administrator privileges."
-                            }
-                          </p>
-                        </div>
-                      )}
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="password"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>New Password</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="password"
-                                  placeholder={
-                                    editingUser && canChangePassword(editingUser) 
-                                      ? "Enter new password" 
-                                      : !editingUser 
-                                        ? "Enter new password"
-                                        : "Authorization required"
-                                  }
-                                  disabled={editingUser ? !canChangePassword(editingUser) : false}
-                                  {...field}
-                                  data-testid="input-password"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="confirmPassword"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Confirm Password</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="password"
-                                  placeholder={
-                                    editingUser && canChangePassword(editingUser) 
-                                      ? "Confirm new password" 
-                                      : !editingUser 
-                                        ? "Confirm new password"
-                                        : "Authorization required"
-                                  }
-                                  disabled={editingUser ? !canChangePassword(editingUser) : false}
-                                  {...field}
-                                  data-testid="input-confirm-password"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        {editingUser ? (
-                          canChangePassword(editingUser)
-                            ? "Leave password fields empty if you don't want to change the password."
-                            : "Password fields are disabled based on authorization rules."
-                        ) : (
-                          "Set a password for the new user account."
+                      />
+                      <FormField
+                        control={form.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Last Name</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value ?? ""}
+                                data-testid="input-last-name"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
                         )}
-                      </p>
+                      />
                     </div>
-                  )}
 
-                  <div className="flex gap-3 pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setIsCreateModalOpen(false);
-                        resetForm();
-                      }}
-                      className="flex-1"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="flex-1"
-                      disabled={createUserMutation.isPending || updateUserMutation.isPending}
-                      data-testid="submit-user"
-                    >
-                      {editingUser ? "Update User" : "Create User"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="email"
+                                {...field}
+                                value={field.value ?? ""}
+                                data-testid="input-email"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="code"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Employee Code</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value ?? ""}
+                                data-testid="input-code"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="designation"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Designation</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value ?? ""}
+                                data-testid="input-designation"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="mobileNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Mobile Number</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value ?? ""}
+                                data-testid="input-mobile"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="locationId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Location</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value ?? "none"}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-location">
+                                  <SelectValue placeholder="Select location" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">
+                                  No Location
+                                </SelectItem>
+                                {locations.map((location: any) => (
+                                  <SelectItem
+                                    key={location.id}
+                                    value={location.id}
+                                  >
+                                    {location.name} ({location.code})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="companyId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Company</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value ?? "none"}
+                              disabled={isAdmin}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-company">
+                                  <SelectValue placeholder="Select company" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">No Company</SelectItem>
+                                {companies.map((company: any) => (
+                                  <SelectItem
+                                    key={company.id}
+                                    value={company.id}
+                                  >
+                                    {company.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                            {isAdmin && (
+                              <p className="text-xs text-muted-foreground">
+                                As an Administrator, you can only create users
+                                for your company
+                              </p>
+                            )}
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="department"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Department</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value ?? "none"}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-department">
+                                  <SelectValue placeholder="Select department" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">
+                                  No Department
+                                </SelectItem>
+                                {departments.map((department: any) => (
+                                  <SelectItem
+                                    key={department.id}
+                                    value={department.code}
+                                  >
+                                    {department.description} ({department.code})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="levelId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Level</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value ?? "none"}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-level">
+                                  <SelectValue placeholder="Select level" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">No Level</SelectItem>
+                                {levels.map((level: any) => (
+                                  <SelectItem key={level.id} value={level.id}>
+                                    {level.description} ({level.code})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="gradeId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Grade</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value ?? "none"}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-grade">
+                                  <SelectValue placeholder="Select grade" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">No Grade</SelectItem>
+                                {grades.map((grade: any) => (
+                                  <SelectItem key={grade.id} value={grade.id}>
+                                    {grade.description} ({grade.code})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="reportingManagerId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Reporting Manager</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value ?? "none"}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-manager">
+                                  <SelectValue placeholder="Select reporting manager" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">No Manager</SelectItem>
+                                {users
+                                  .filter(
+                                    (user: any) => user.id !== editingUser?.id
+                                  )
+                                  .map((user: any) => (
+                                    <SelectItem key={user.id} value={user.id}>
+                                      {user.firstName} {user.lastName} (
+                                      {user.email})
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="status"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Status</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value ?? "active"}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-status">
+                                  <SelectValue placeholder="Select status" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="inactive">
+                                  Inactive
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="roles"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Roles</FormLabel>
+                            <div
+                              className="space-y-2"
+                              data-testid="select-roles"
+                            >
+                              {[
+                                { value: "employee", label: "Employee" },
+                                { value: "manager", label: "Manager" },
+                                { value: "hr_manager", label: "HR Manager" },
+                                { value: "admin", label: "Administrator" },
+                                {
+                                  value: "super_admin",
+                                  label: "Super Administrator",
+                                },
+                              ].map((role) => (
+                                <div
+                                  key={role.value}
+                                  className="flex items-center space-x-2"
+                                >
+                                  <Checkbox
+                                    id={role.value}
+                                    checked={field.value?.includes(
+                                      role.value as
+                                        | "super_admin"
+                                        | "admin"
+                                        | "hr_manager"
+                                        | "employee"
+                                        | "manager"
+                                    )}
+                                    onCheckedChange={(checked) => {
+                                      const currentRoles = field.value || [];
+                                      if (checked) {
+                                        field.onChange([
+                                          ...currentRoles,
+                                          role.value,
+                                        ]);
+                                      } else {
+                                        field.onChange(
+                                          currentRoles.filter(
+                                            (r: string) => r !== role.value
+                                          )
+                                        );
+                                      }
+                                    }}
+                                    data-testid={`checkbox-role-${role.value}`}
+                                  />
+                                  <label
+                                    htmlFor={role.value}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  >
+                                    {role.label}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Password fields - Super Admin or Creator */}
+                    {(isSuperAdmin || isAdmin) && (
+                      <div className="border-t pt-4">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Key className="h-4 w-4" />
+                          <h3 className="text-lg font-medium">
+                            {editingUser ? "Change Password" : "Set Password"}
+                          </h3>
+                          {editingUser && !canChangePassword(editingUser) && (
+                            <Badge variant="secondary" className="ml-2">
+                              {editingUser.createdById !== currentUser?.id
+                                ? "Creator or Super Admin Required"
+                                : editingUser.role &&
+                                  ["admin", "super_admin"].includes(
+                                    editingUser.role
+                                  )
+                                ? "Cannot Change Admin Password"
+                                : "Super Admin Required"}
+                            </Badge>
+                          )}
+                        </div>
+
+                        {editingUser && !canChangePassword(editingUser) && (
+                          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3 mb-4">
+                            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                              <strong>Note:</strong>{" "}
+                              {editingUser.createdById !== currentUser?.id
+                                ? "You can only change passwords for users you created, or contact a Super Administrator."
+                                : editingUser.role &&
+                                  ["admin", "super_admin"].includes(
+                                    editingUser.role
+                                  )
+                                ? "For security reasons, passwords of Administrator and Super Administrator accounts cannot be changed by other Administrators."
+                                : "Password changes require Super Administrator privileges."}
+                            </p>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="password"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>New Password</FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <Input
+                                      type={showPassword ? "text" : "password"}
+                                      placeholder={
+                                        editingUser &&
+                                        canChangePassword(editingUser)
+                                          ? "Enter new password"
+                                          : !editingUser
+                                          ? "Enter new password"
+                                          : "Authorization required"
+                                      }
+                                      disabled={
+                                        editingUser
+                                          ? !canChangePassword(editingUser)
+                                          : false
+                                      }
+                                      {...field}
+                                      data-testid="input-password"
+                                      className="pr-10"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                      onClick={() =>
+                                        setShowPassword(!showPassword)
+                                      }
+                                      disabled={
+                                        editingUser
+                                          ? !canChangePassword(editingUser)
+                                          : false
+                                      }
+                                      tabIndex={-1}
+                                    >
+                                      {showPassword ? (
+                                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                      ) : (
+                                        <Eye className="h-4 w-4 text-muted-foreground" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="confirmPassword"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Confirm Password</FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <Input
+                                      type={
+                                        showConfirmPassword
+                                          ? "text"
+                                          : "password"
+                                      }
+                                      placeholder={
+                                        editingUser &&
+                                        canChangePassword(editingUser)
+                                          ? "Confirm new password"
+                                          : !editingUser
+                                          ? "Confirm new password"
+                                          : "Authorization required"
+                                      }
+                                      disabled={
+                                        editingUser
+                                          ? !canChangePassword(editingUser)
+                                          : false
+                                      }
+                                      {...field}
+                                      data-testid="input-confirm-password"
+                                      className="pr-10"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                      onClick={() =>
+                                        setShowConfirmPassword(
+                                          !showConfirmPassword
+                                        )
+                                      }
+                                      disabled={
+                                        editingUser
+                                          ? !canChangePassword(editingUser)
+                                          : false
+                                      }
+                                      tabIndex={-1}
+                                    >
+                                      {showConfirmPassword ? (
+                                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                      ) : (
+                                        <Eye className="h-4 w-4 text-muted-foreground" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {editingUser
+                            ? canChangePassword(editingUser)
+                              ? "Leave password fields empty if you don't want to change the password."
+                              : "Password fields are disabled based on authorization rules."
+                            : "Set a password for the new user account."}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-3 pt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsCreateModalOpen(false);
+                          resetForm();
+                        }}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="flex-1"
+                        disabled={
+                          createUserMutation.isPending ||
+                          updateUserMutation.isPending
+                        }
+                        data-testid="submit-user"
+                      >
+                        {editingUser ? "Update User" : "Create User"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
         {/* Bulk Upload Modal */}
-        <Dialog open={isBulkUploadModalOpen} onOpenChange={handleCloseBulkUploadModal}>
+        <Dialog
+          open={isBulkUploadModalOpen}
+          onOpenChange={handleCloseBulkUploadModal}
+        >
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Bulk Upload Users</DialogTitle>
@@ -915,7 +1197,7 @@ export default function EmployeeManagement() {
                 Upload an Excel file to create multiple users at once
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-4">
               {/* Download Template Section */}
               <div className="border rounded-lg p-4 bg-muted/50">
@@ -926,7 +1208,8 @@ export default function EmployeeManagement() {
                       Download Sample Template
                     </h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Start by downloading the sample template with the required format
+                      Start by downloading the sample template with the required
+                      format
                     </p>
                   </div>
                   <Button
@@ -966,54 +1249,74 @@ export default function EmployeeManagement() {
               </div>
 
               {/* Upload Results */}
-              {uploadResults && (
+              {uploadResults && uploadResults.summary && (
                 <div className="border rounded-lg p-4">
                   <h3 className="font-medium mb-3">Upload Results</h3>
                   <div className="grid grid-cols-3 gap-4 mb-4">
                     <div className="text-center">
-                      <p className="text-2xl font-bold">{uploadResults.summary.total}</p>
+                      <p className="text-2xl font-bold">
+                        {uploadResults.summary.total}
+                      </p>
                       <p className="text-sm text-muted-foreground">Total</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-green-600">{uploadResults.summary.successful}</p>
-                      <p className="text-sm text-muted-foreground">Successful</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {uploadResults.summary.successful}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Successful
+                      </p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-red-600">{uploadResults.summary.failed}</p>
+                      <p className="text-2xl font-bold text-red-600">
+                        {uploadResults.summary.failed}
+                      </p>
                       <p className="text-sm text-muted-foreground">Failed</p>
                     </div>
                   </div>
 
                   {/* Success List */}
-                  {uploadResults.results.success.length > 0 && (
+                  {uploadResults.results?.success?.length > 0 && (
                     <div className="mb-4">
                       <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
                         <CheckCircle className="h-4 w-4 text-green-600" />
-                        Successfully Created ({uploadResults.results.success.length})
+                        Successfully Created (
+                        {uploadResults.results.success.length})
                       </h4>
                       <div className="max-h-40 overflow-y-auto space-y-1">
-                        {uploadResults.results.success.map((item: any, index: number) => (
-                          <div key={index} className="text-sm bg-green-50 p-2 rounded">
-                            Row {item.row}: {item.name} ({item.email})
-                          </div>
-                        ))}
+                        {uploadResults.results.success.map(
+                          (item: any, index: number) => (
+                            <div
+                              key={index}
+                              className="text-sm bg-green-50 p-2 rounded"
+                            >
+                              Row {item.row}: {item.name} ({item.email})
+                            </div>
+                          )
+                        )}
                       </div>
                     </div>
                   )}
 
                   {/* Error List */}
-                  {uploadResults.results.errors.length > 0 && (
+                  {uploadResults.results?.errors?.length > 0 && (
                     <div>
                       <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
                         <XCircle className="h-4 w-4 text-red-600" />
                         Errors ({uploadResults.results.errors.length})
                       </h4>
                       <div className="max-h-40 overflow-y-auto space-y-1">
-                        {uploadResults.results.errors.map((item: any, index: number) => (
-                          <div key={index} className="text-sm bg-red-50 p-2 rounded">
-                            Row {item.row}: {item.error} {item.email && `(${item.email})`}
-                          </div>
-                        ))}
+                        {uploadResults.results.errors.map(
+                          (item: any, index: number) => (
+                            <div
+                              key={index}
+                              className="text-sm bg-red-50 p-2 rounded"
+                            >
+                              Row {item.row}: {item.error}{" "}
+                              {item.email && `(${item.email})`}
+                            </div>
+                          )
+                        )}
                       </div>
                     </div>
                   )}
@@ -1028,7 +1331,7 @@ export default function EmployeeManagement() {
                   className="flex-1"
                   data-testid="cancel-bulk-upload"
                 >
-                  {uploadResults ? 'Close' : 'Cancel'}
+                  {uploadResults ? "Close" : "Cancel"}
                 </Button>
                 {!uploadResults && (
                   <Button
@@ -1037,7 +1340,9 @@ export default function EmployeeManagement() {
                     className="flex-1"
                     data-testid="submit-bulk-upload"
                   >
-                    {bulkUploadMutation.isPending ? 'Uploading...' : 'Upload Users'}
+                    {bulkUploadMutation.isPending
+                      ? "Uploading..."
+                      : "Upload Users"}
                   </Button>
                 )}
               </div>
@@ -1072,11 +1377,16 @@ export default function EmployeeManagement() {
                   <SelectItem value="manager">Manager</SelectItem>
                   <SelectItem value="hr_manager">HR Manager</SelectItem>
                   <SelectItem value="admin">Administrator</SelectItem>
-                  <SelectItem value="super_admin">Super Administrator</SelectItem>
+                  <SelectItem value="super_admin">
+                    Super Administrator
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]" data-testid="filter-status">
+                <SelectTrigger
+                  className="w-[180px]"
+                  data-testid="filter-status"
+                >
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1094,14 +1404,18 @@ export default function EmployeeManagement() {
           <CardHeader>
             <CardTitle>Employees</CardTitle>
             <CardDescription>
-              {filteredUsers.length} employee{filteredUsers.length !== 1 ? 's' : ''} found
+              {filteredUsers.length} employee
+              {filteredUsers.length !== 1 ? "s" : ""} found
             </CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="space-y-4">
                 {[...Array(5)].map((_, i) => (
-                  <div key={i} className="flex items-center space-x-4 animate-pulse">
+                  <div
+                    key={i}
+                    className="flex items-center space-x-4 animate-pulse"
+                  >
                     <div className="w-10 h-10 bg-muted rounded-full"></div>
                     <div className="flex-1">
                       <div className="h-4 bg-muted rounded w-1/4 mb-2"></div>
@@ -1125,30 +1439,57 @@ export default function EmployeeManagement() {
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
                         <span className="text-primary-foreground font-medium text-sm">
-                          {user.firstName?.[0]}{user.lastName?.[0]}
+                          {user.firstName?.[0]}
+                          {user.lastName?.[0]}
                         </span>
                       </div>
                       <div>
-                        <p className="font-medium" data-testid={`user-name-${user.id}`}>
-                          {user.firstName} {user.lastName}
+                        <div className="flex items-center gap-2">
+                          <p
+                            className="font-medium"
+                            data-testid={`user-name-${user.id}`}
+                          >
+                            {user.firstName} {user.lastName}
+                          </p>
+                          {isSuperAdmin && (user as any).companyName && (
+                            <Badge variant="outline" className="text-xs">
+                              {(user as any).companyName}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {user.email}
                         </p>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
-                        <p className="text-sm text-muted-foreground">{user.designation}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {user.designation}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="flex flex-wrap gap-1">
-                        {((user as any).roles && Array.isArray((user as any).roles) ? (user as any).roles : [user.role]).map((role: string, index: number) => (
-                          <Badge 
+                        {((user as any).roles &&
+                        Array.isArray((user as any).roles)
+                          ? (user as any).roles
+                          : [user.role]
+                        ).map((role: string, index: number) => (
+                          <Badge
                             key={`${user.id}-${role}-${index}`}
-                            variant={role === 'super_admin' ? 'default' : 'secondary'}
+                            variant={
+                              role === "super_admin" ? "default" : "secondary"
+                            }
                             data-testid={`user-role-${user.id}-${role}`}
                           >
-                            {role === 'hr_manager' ? 'HR Manager' : role?.replace('_', ' ')}
+                            {role === "hr_manager"
+                              ? "HR Manager"
+                              : role?.replace("_", " ")}
                           </Badge>
                         ))}
                       </div>
-                      <Badge variant={user.status === 'active' ? 'default' : 'secondary'}>
+                      <Badge
+                        variant={
+                          user.status === "active" ? "default" : "secondary"
+                        }
+                      >
                         {user.status}
                       </Badge>
                       <div className="flex gap-2">
