@@ -6,7 +6,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Edit, Trash2, Clock } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  Clock,
+  Check,
+  ChevronDown,
+  X as XIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -36,12 +60,100 @@ import { insertReviewFrequencySchema } from "@shared/schema";
 import type { ReviewFrequency, InsertReviewFrequency } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
+// Multi-select filter component
+interface MultiSelectProps {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder: string;
+  label?: string;
+}
+
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder,
+  label,
+}: MultiSelectProps) {
+  const [open, setOpen] = useState(false);
+
+  const handleSelect = (value: string) => {
+    const newSelected = selected.includes(value)
+      ? selected.filter((item) => item !== value)
+      : [...selected, value];
+    onChange(newSelected);
+  };
+
+  const handleClear = () => {
+    onChange([]);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-[200px] justify-between hover:bg-transparent"
+        >
+          {selected.length > 0 ? (
+            <span className="truncate">
+              {selected.length} {label || "items"} selected
+            </span>
+          ) : (
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0" align="start">
+        <Command>
+          <CommandList>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  onSelect={() => handleSelect(option.value)}
+                  className="cursor-pointer data-[selected=true]:bg-blue-400 dark:data-[selected=true]:bg-blue-900 hover:!bg-blue-400 dark:hover:!bg-blue-900"
+                >
+                  <div className="flex items-center gap-2 flex-1">
+                    <Checkbox
+                      checked={selected.includes(option.value)}
+                      onCheckedChange={() => handleSelect(option.value)}
+                    />
+                    <span>{option.label}</span>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+          {selected.length > 0 && (
+            <div className="border-t p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={handleClear}
+              >
+                Clear filters
+              </Button>
+            </div>
+          )}
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function ReviewFrequencyManagement() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [editingFrequency, setEditingFrequency] = useState<ReviewFrequency | null>(null);
+  const [editingFrequency, setEditingFrequency] =
+    useState<ReviewFrequency | null>(null);
 
   // Fetch review frequencies
   const {
@@ -160,9 +272,15 @@ export default function ReviewFrequencyManagement() {
 
   // Filtering logic
   const filteredFrequencies = frequencies.filter((frequency) => {
-    const matchesSearch = frequency.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (frequency.description && frequency.description.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesStatus = statusFilter === "all" || frequency.status === statusFilter;
+    const matchesSearch =
+      frequency.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (frequency.description &&
+        frequency.description
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()));
+    const matchesStatus =
+      statusFilters.length === 0 ||
+      (frequency.status && statusFilters.includes(frequency.status));
     return matchesSearch && matchesStatus;
   });
 
@@ -181,16 +299,23 @@ export default function ReviewFrequencyManagement() {
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold" data-testid="text-page-title">Review Frequency Management</h1>
-            <p className="text-muted-foreground">Manage review frequency settings for your organization</p>
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">
+              Review Frequency Management
+            </h1>
+            <p className="text-muted-foreground">
+              Manage review frequency settings for your organization
+            </p>
           </div>
-          <Dialog open={isCreateModalOpen} onOpenChange={(open) => {
-            setIsCreateModalOpen(open);
-            if (!open) {
-              setEditingFrequency(null);
-              resetForm();
-            }
-          }}>
+          <Dialog
+            open={isCreateModalOpen}
+            onOpenChange={(open) => {
+              setIsCreateModalOpen(open);
+              if (!open) {
+                setEditingFrequency(null);
+                resetForm();
+              }
+            }}
+          >
             <DialogTrigger asChild>
               <Button className="gap-2" data-testid="button-create">
                 <Plus className="h-4 w-4" />
@@ -200,11 +325,16 @@ export default function ReviewFrequencyManagement() {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>
-                  {editingFrequency ? "Edit Review Frequency" : "Create Review Frequency"}
+                  {editingFrequency
+                    ? "Edit Review Frequency"
+                    : "Create Review Frequency"}
                 </DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="space-y-4"
+                >
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -213,9 +343,9 @@ export default function ReviewFrequencyManagement() {
                         <FormItem>
                           <FormLabel>Frequency Code</FormLabel>
                           <FormControl>
-                            <Input 
-                              {...field} 
-                              placeholder="e.g., ANNUAL, SEMI, QUARTERLY" 
+                            <Input
+                              {...field}
+                              placeholder="e.g., ANNUAL, SEMI, QUARTERLY"
                               data-testid="input-code"
                             />
                           </FormControl>
@@ -229,7 +359,10 @@ export default function ReviewFrequencyManagement() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? "active"}>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value ?? "active"}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-status">
                                 <SelectValue placeholder="Select status" />
@@ -252,9 +385,9 @@ export default function ReviewFrequencyManagement() {
                       <FormItem>
                         <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            {...field} 
-                            placeholder="Describe this review frequency..." 
+                          <Textarea
+                            {...field}
+                            placeholder="Describe this review frequency..."
                             rows={3}
                             data-testid="input-description"
                           />
@@ -266,7 +399,9 @@ export default function ReviewFrequencyManagement() {
                   <div className="flex gap-2 pt-4">
                     <Button
                       type="submit"
-                      disabled={createMutation.isPending || updateMutation.isPending}
+                      disabled={
+                        createMutation.isPending || updateMutation.isPending
+                      }
                       data-testid="button-submit"
                     >
                       {createMutation.isPending || updateMutation.isPending
@@ -305,16 +440,16 @@ export default function ReviewFrequencyManagement() {
               data-testid="input-search"
             />
           </div>
-          <Select value={statusFilter} onValueChange={(value: "all" | "active" | "inactive") => setStatusFilter(value)}>
-            <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
+          <MultiSelect
+            options={[
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "Inactive" },
+            ]}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="All Status"
+            label="status"
+          />
         </div>
 
         {isLoading ? (
@@ -337,10 +472,12 @@ export default function ReviewFrequencyManagement() {
           <div className="text-center py-12">
             <Clock className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">
-              {searchQuery || statusFilter !== "all" ? "No review frequencies found" : "No review frequencies yet"}
+              {searchQuery || statusFilters.length > 0
+                ? "No review frequencies found"
+                : "No review frequencies yet"}
             </h3>
             <p className="text-muted-foreground mb-4">
-              {searchQuery || statusFilter !== "all"
+              {searchQuery || statusFilters.length > 0
                 ? "Try adjusting your search or filter criteria"
                 : "Create your first review frequency to get started"}
             </p>
@@ -348,17 +485,27 @@ export default function ReviewFrequencyManagement() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredFrequencies.map((frequency) => (
-              <Card key={frequency.id} className="hover:shadow-md transition-shadow">
+              <Card
+                key={frequency.id}
+                className="hover:shadow-md transition-shadow"
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
                       <Clock className="h-5 w-5 text-purple-600" />
                       <div>
-                        <CardTitle className="text-lg" data-testid={`text-code-${frequency.id}`}>
+                        <CardTitle
+                          className="text-lg"
+                          data-testid={`text-code-${frequency.id}`}
+                        >
                           {frequency.code}
                         </CardTitle>
-                        <Badge 
-                          variant={frequency.status === "active" ? "default" : "secondary"}
+                        <Badge
+                          variant={
+                            frequency.status === "active"
+                              ? "default"
+                              : "secondary"
+                          }
                           data-testid={`badge-status-${frequency.id}`}
                         >
                           {frequency.status}
@@ -387,7 +534,10 @@ export default function ReviewFrequencyManagement() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <p className="text-sm text-muted-foreground" data-testid={`text-description-${frequency.id}`}>
+                  <p
+                    className="text-sm text-muted-foreground"
+                    data-testid={`text-description-${frequency.id}`}
+                  >
                     {frequency.description || "No description provided"}
                   </p>
                 </CardContent>

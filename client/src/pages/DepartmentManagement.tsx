@@ -2,26 +2,169 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { Trash2, Edit, Search, Building2, Plus } from "lucide-react";
+import {
+  Trash2,
+  Edit,
+  Search,
+  Building2,
+  Plus,
+  Check,
+  ChevronDown,
+  X as XIcon,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { RoleGuard } from "@/components/RoleGuard";
-import { type Department, type InsertDepartment, insertDepartmentSchema } from "@shared/schema";
+import {
+  type Department,
+  type InsertDepartment,
+  insertDepartmentSchema,
+} from "@shared/schema";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { cn } from "@/lib/utils";
+
+// Multi-select filter component
+interface MultiSelectProps {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder: string;
+  label?: string;
+}
+
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder,
+  label,
+}: MultiSelectProps) {
+  const [open, setOpen] = useState(false);
+
+  const handleSelect = (value: string) => {
+    const newSelected = selected.includes(value)
+      ? selected.filter((item) => item !== value)
+      : [...selected, value];
+    onChange(newSelected);
+  };
+
+  const handleClear = () => {
+    onChange([]);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-[200px] justify-between hover:bg-transparent"
+        >
+          {selected.length > 0 ? (
+            <span className="truncate">
+              {selected.length} {label || "items"} selected
+            </span>
+          ) : (
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0" align="start">
+        <Command>
+          <CommandList>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  onSelect={() => handleSelect(option.value)}
+                  className="cursor-pointer data-[selected=true]:bg-blue-400 dark:data-[selected=true]:bg-blue-900 hover:!bg-blue-400 dark:hover:!bg-blue-900"
+                >
+                  <div className="flex items-center gap-2 flex-1">
+                    <Checkbox
+                      checked={selected.includes(option.value)}
+                      onCheckedChange={() => handleSelect(option.value)}
+                    />
+                    <span>{option.label}</span>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+          {selected.length > 0 && (
+            <div className="border-t p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={handleClear}
+              >
+                Clear filters
+              </Button>
+            </div>
+          )}
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function DepartmentManagement() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
+  const [editingDepartment, setEditingDepartment] = useState<Department | null>(
+    null
+  );
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -49,14 +192,22 @@ export default function DepartmentManagement() {
       console.error("Error creating department:", error);
       toast({
         title: "Error",
-        description: isUnauthorizedError(error) ? "Access denied" : "Failed to create department",
+        description: isUnauthorizedError(error)
+          ? "Access denied"
+          : "Failed to create department",
         variant: "destructive",
       });
     },
   });
 
   const updateDepartmentMutation = useMutation({
-    mutationFn: async ({ id, departmentData }: { id: string; departmentData: Partial<InsertDepartment> }) => {
+    mutationFn: async ({
+      id,
+      departmentData,
+    }: {
+      id: string;
+      departmentData: Partial<InsertDepartment>;
+    }) => {
       await apiRequest("PUT", `/api/departments/${id}`, departmentData);
     },
     onSuccess: () => {
@@ -72,7 +223,9 @@ export default function DepartmentManagement() {
       console.error("Error updating department:", error);
       toast({
         title: "Error",
-        description: isUnauthorizedError(error) ? "Access denied" : "Failed to update department",
+        description: isUnauthorizedError(error)
+          ? "Access denied"
+          : "Failed to update department",
         variant: "destructive",
       });
     },
@@ -93,7 +246,9 @@ export default function DepartmentManagement() {
       console.error("Error deleting department:", error);
       toast({
         title: "Error",
-        description: isUnauthorizedError(error) ? "Access denied" : "Failed to delete department",
+        description: isUnauthorizedError(error)
+          ? "Access denied"
+          : "Failed to delete department",
         variant: "destructive",
       });
     },
@@ -145,17 +300,20 @@ export default function DepartmentManagement() {
 
   // Filter departments based on search and status
   const filteredDepartments = departments.filter((department) => {
-    const matchesSearch = searchQuery === "" || 
+    const matchesSearch =
+      searchQuery === "" ||
       department.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       department.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === "all" || department.status === statusFilter;
-    
+
+    const matchesStatus =
+      statusFilters.length === 0 ||
+      (department.status && statusFilters.includes(department.status));
+
     return matchesSearch && matchesStatus;
   });
 
   return (
-    <RoleGuard allowedRoles={['admin']}>
+    <RoleGuard allowedRoles={["admin"]}>
       <div className="p-6 max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -167,13 +325,13 @@ export default function DepartmentManagement() {
               Manage company departments for organizational structure
             </p>
           </div>
-          <Dialog 
-            open={isCreateModalOpen || editingDepartment !== null} 
+          <Dialog
+            open={isCreateModalOpen || editingDepartment !== null}
             onOpenChange={(open) => !open && handleCloseModal()}
           >
             <DialogTrigger asChild>
-              <Button 
-                onClick={() => setIsCreateModalOpen(true)} 
+              <Button
+                onClick={() => setIsCreateModalOpen(true)}
                 data-testid="button-add-department"
                 className="flex items-center gap-2"
               >
@@ -187,13 +345,16 @@ export default function DepartmentManagement() {
                   {editingDepartment ? "Edit Department" : "Add New Department"}
                 </DialogTitle>
                 <DialogDescription>
-                  {editingDepartment 
-                    ? "Update the department information below." 
+                  {editingDepartment
+                    ? "Update the department information below."
                     : "Enter the details for the new department."}
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="space-y-4"
+                >
                   <FormField
                     control={form.control}
                     name="code"
@@ -201,9 +362,9 @@ export default function DepartmentManagement() {
                       <FormItem>
                         <FormLabel>Department Code</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="e.g., HR, IT, FIN" 
-                            {...field} 
+                          <Input
+                            placeholder="e.g., HR, IT, FIN"
+                            {...field}
                             data-testid="input-department-code"
                           />
                         </FormControl>
@@ -218,9 +379,9 @@ export default function DepartmentManagement() {
                       <FormItem>
                         <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="e.g., Human Resources Department" 
-                            {...field} 
+                          <Input
+                            placeholder="e.g., Human Resources Department"
+                            {...field}
                             data-testid="input-department-description"
                           />
                         </FormControl>
@@ -234,8 +395,8 @@ export default function DepartmentManagement() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Status</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
+                        <Select
+                          onValueChange={field.onChange}
                           value={field.value ?? "active"}
                         >
                           <FormControl>
@@ -253,22 +414,28 @@ export default function DepartmentManagement() {
                     )}
                   />
                   <div className="flex justify-end gap-2 pt-4">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
                       onClick={handleCloseModal}
                       data-testid="button-cancel-department"
                     >
                       Cancel
                     </Button>
-                    <Button 
+                    <Button
                       type="submit"
-                      disabled={createDepartmentMutation.isPending || updateDepartmentMutation.isPending}
+                      disabled={
+                        createDepartmentMutation.isPending ||
+                        updateDepartmentMutation.isPending
+                      }
                       data-testid="button-save-department"
                     >
-                      {createDepartmentMutation.isPending || updateDepartmentMutation.isPending 
-                        ? "Saving..." 
-                        : editingDepartment ? "Update" : "Create"}
+                      {createDepartmentMutation.isPending ||
+                      updateDepartmentMutation.isPending
+                        ? "Saving..."
+                        : editingDepartment
+                        ? "Update"
+                        : "Create"}
                     </Button>
                   </div>
                 </form>
@@ -289,16 +456,16 @@ export default function DepartmentManagement() {
               data-testid="input-search-departments"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-filter-status">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
+          <MultiSelect
+            options={[
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "Inactive" },
+            ]}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="All Status"
+            label="status"
+          />
         </div>
 
         {/* Department List */}
@@ -321,14 +488,16 @@ export default function DepartmentManagement() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No departments found</h3>
+              <h3 className="text-lg font-semibold mb-2">
+                No departments found
+              </h3>
               <p className="text-muted-foreground text-center mb-4">
-                {searchQuery || statusFilter !== "all" 
-                  ? "No departments match your current filters." 
+                {searchQuery || statusFilters.length > 0
+                  ? "No departments match your current filters."
                   : "Start by creating your first department."}
               </p>
-              {searchQuery === "" && statusFilter === "all" && (
-                <Button 
+              {searchQuery === "" && statusFilters.length === 0 && (
+                <Button
                   onClick={() => setIsCreateModalOpen(true)}
                   data-testid="button-create-first-department"
                 >
@@ -341,19 +510,30 @@ export default function DepartmentManagement() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredDepartments.map((department) => (
-              <Card key={department.id} className="hover:shadow-md transition-shadow">
+              <Card
+                key={department.id}
+                className="hover:shadow-md transition-shadow"
+              >
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle className="text-lg" data-testid={`text-department-code-${department.id}`}>
+                      <CardTitle
+                        className="text-lg"
+                        data-testid={`text-department-code-${department.id}`}
+                      >
                         {department.code}
                       </CardTitle>
-                      <CardDescription className="mt-1" data-testid={`text-department-description-${department.id}`}>
+                      <CardDescription
+                        className="mt-1"
+                        data-testid={`text-department-description-${department.id}`}
+                      >
                         {department.description}
                       </CardDescription>
                     </div>
-                    <Badge 
-                      variant={department.status === "active" ? "default" : "secondary"}
+                    <Badge
+                      variant={
+                        department.status === "active" ? "default" : "secondary"
+                      }
                       data-testid={`badge-department-status-${department.id}`}
                     >
                       {department.status}
@@ -374,7 +554,9 @@ export default function DepartmentManagement() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => deleteDepartmentMutation.mutate(department.id)}
+                      onClick={() =>
+                        deleteDepartmentMutation.mutate(department.id)
+                      }
                       disabled={deleteDepartmentMutation.isPending}
                       data-testid={`button-delete-department-${department.id}`}
                     >

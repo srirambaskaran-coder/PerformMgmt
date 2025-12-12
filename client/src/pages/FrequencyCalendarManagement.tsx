@@ -6,7 +6,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Edit, Trash2, Calendar } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  Calendar,
+  Check,
+  ChevronDown,
+  X as XIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -33,15 +57,108 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { insertFrequencyCalendarSchema } from "@shared/schema";
-import type { FrequencyCalendar, InsertFrequencyCalendar, AppraisalCycle, ReviewFrequency } from "@shared/schema";
+import type {
+  FrequencyCalendar,
+  InsertFrequencyCalendar,
+  AppraisalCycle,
+  ReviewFrequency,
+} from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+
+// Multi-select filter component
+interface MultiSelectProps {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder: string;
+  label?: string;
+}
+
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder,
+  label,
+}: MultiSelectProps) {
+  const [open, setOpen] = useState(false);
+
+  const handleSelect = (value: string) => {
+    const newSelected = selected.includes(value)
+      ? selected.filter((item) => item !== value)
+      : [...selected, value];
+    onChange(newSelected);
+  };
+
+  const handleClear = () => {
+    onChange([]);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-[200px] justify-between hover:bg-transparent"
+        >
+          {selected.length > 0 ? (
+            <span className="truncate">
+              {selected.length} {label || "items"} selected
+            </span>
+          ) : (
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0" align="start">
+        <Command>
+          <CommandList>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  onSelect={() => handleSelect(option.value)}
+                  className="cursor-pointer data-[selected=true]:bg-blue-400 dark:data-[selected=true]:bg-blue-900 hover:!bg-blue-400 dark:hover:!bg-blue-900"
+                >
+                  <div className="flex items-center gap-2 flex-1">
+                    <Checkbox
+                      checked={selected.includes(option.value)}
+                      onCheckedChange={() => handleSelect(option.value)}
+                    />
+                    <span>{option.label}</span>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+          {selected.length > 0 && (
+            <div className="border-t p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={handleClear}
+              >
+                Clear filters
+              </Button>
+            </div>
+          )}
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function FrequencyCalendarManagement() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [editingCalendar, setEditingCalendar] = useState<FrequencyCalendar | null>(null);
+  const [editingCalendar, setEditingCalendar] =
+    useState<FrequencyCalendar | null>(null);
 
   // Fetch frequency calendars
   const {
@@ -176,20 +293,24 @@ export default function FrequencyCalendarManagement() {
 
   // Filtering logic
   const filteredCalendars = calendars.filter((calendar) => {
-    const matchesSearch = calendar.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (calendar.description && calendar.description.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesStatus = statusFilter === "all" || calendar.status === statusFilter;
+    const matchesSearch =
+      calendar.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (calendar.description &&
+        calendar.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesStatus =
+      statusFilters.length === 0 ||
+      (calendar.status && statusFilters.includes(calendar.status));
     return matchesSearch && matchesStatus;
   });
 
   // Helper functions
   const getAppraisalCycleName = (id: string) => {
-    const cycle = appraisalCycles.find(c => c.id === id);
+    const cycle = appraisalCycles.find((c) => c.id === id);
     return cycle ? cycle.code : "Unknown";
   };
 
   const getReviewFrequencyName = (id: string) => {
-    const frequency = reviewFrequencies.find(f => f.id === id);
+    const frequency = reviewFrequencies.find((f) => f.id === id);
     return frequency ? frequency.code : "Unknown";
   };
 
@@ -208,16 +329,23 @@ export default function FrequencyCalendarManagement() {
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold" data-testid="text-page-title">Frequency Calendar Management</h1>
-            <p className="text-muted-foreground">Manage frequency calendar configurations for your organization</p>
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">
+              Frequency Calendar Management
+            </h1>
+            <p className="text-muted-foreground">
+              Manage frequency calendar configurations for your organization
+            </p>
           </div>
-          <Dialog open={isCreateModalOpen} onOpenChange={(open) => {
-            setIsCreateModalOpen(open);
-            if (!open) {
-              setEditingCalendar(null);
-              resetForm();
-            }
-          }}>
+          <Dialog
+            open={isCreateModalOpen}
+            onOpenChange={(open) => {
+              setIsCreateModalOpen(open);
+              if (!open) {
+                setEditingCalendar(null);
+                resetForm();
+              }
+            }}
+          >
             <DialogTrigger asChild>
               <Button className="gap-2" data-testid="button-create">
                 <Plus className="h-4 w-4" />
@@ -227,11 +355,16 @@ export default function FrequencyCalendarManagement() {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>
-                  {editingCalendar ? "Edit Frequency Calendar" : "Create Frequency Calendar"}
+                  {editingCalendar
+                    ? "Edit Frequency Calendar"
+                    : "Create Frequency Calendar"}
                 </DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="space-y-4"
+                >
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -240,9 +373,9 @@ export default function FrequencyCalendarManagement() {
                         <FormItem>
                           <FormLabel>Calendar Code</FormLabel>
                           <FormControl>
-                            <Input 
-                              {...field} 
-                              placeholder="e.g., CAL-2024-Q1, FC-ANNUAL" 
+                            <Input
+                              {...field}
+                              placeholder="e.g., CAL-2024-Q1, FC-ANNUAL"
                               data-testid="input-code"
                             />
                           </FormControl>
@@ -256,7 +389,10 @@ export default function FrequencyCalendarManagement() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? "active"}>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value ?? "active"}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-status">
                                 <SelectValue placeholder="Select status" />
@@ -279,7 +415,10 @@ export default function FrequencyCalendarManagement() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Appraisal Cycle</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value ?? ""}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-appraisal-cycle">
                                 <SelectValue placeholder="Select appraisal cycle" />
@@ -303,7 +442,10 @@ export default function FrequencyCalendarManagement() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Review Frequency</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value ?? ""}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-review-frequency">
                                 <SelectValue placeholder="Select review frequency" />
@@ -311,7 +453,10 @@ export default function FrequencyCalendarManagement() {
                             </FormControl>
                             <SelectContent>
                               {reviewFrequencies.map((frequency) => (
-                                <SelectItem key={frequency.id} value={frequency.id}>
+                                <SelectItem
+                                  key={frequency.id}
+                                  value={frequency.id}
+                                >
                                   {frequency.code}
                                 </SelectItem>
                               ))}
@@ -329,9 +474,9 @@ export default function FrequencyCalendarManagement() {
                       <FormItem>
                         <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            {...field} 
-                            placeholder="Describe this frequency calendar..." 
+                          <Textarea
+                            {...field}
+                            placeholder="Describe this frequency calendar..."
                             rows={3}
                             data-testid="input-description"
                           />
@@ -343,7 +488,9 @@ export default function FrequencyCalendarManagement() {
                   <div className="flex gap-2 pt-4">
                     <Button
                       type="submit"
-                      disabled={createMutation.isPending || updateMutation.isPending}
+                      disabled={
+                        createMutation.isPending || updateMutation.isPending
+                      }
                       data-testid="button-submit"
                     >
                       {createMutation.isPending || updateMutation.isPending
@@ -382,16 +529,16 @@ export default function FrequencyCalendarManagement() {
               data-testid="input-search"
             />
           </div>
-          <Select value={statusFilter} onValueChange={(value: "all" | "active" | "inactive") => setStatusFilter(value)}>
-            <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
+          <MultiSelect
+            options={[
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "Inactive" },
+            ]}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="All Status"
+            label="status"
+          />
         </div>
 
         {isLoading ? (
@@ -414,10 +561,12 @@ export default function FrequencyCalendarManagement() {
           <div className="text-center py-12">
             <Calendar className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">
-              {searchQuery || statusFilter !== "all" ? "No frequency calendars found" : "No frequency calendars yet"}
+              {searchQuery || statusFilters.length > 0
+                ? "No frequency calendars found"
+                : "No frequency calendars yet"}
             </h3>
             <p className="text-muted-foreground mb-4">
-              {searchQuery || statusFilter !== "all"
+              {searchQuery || statusFilters.length > 0
                 ? "Try adjusting your search or filter criteria"
                 : "Create your first frequency calendar to get started"}
             </p>
@@ -425,17 +574,27 @@ export default function FrequencyCalendarManagement() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredCalendars.map((calendar) => (
-              <Card key={calendar.id} className="hover:shadow-md transition-shadow">
+              <Card
+                key={calendar.id}
+                className="hover:shadow-md transition-shadow"
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-5 w-5 text-purple-600" />
                       <div>
-                        <CardTitle className="text-lg" data-testid={`text-code-${calendar.id}`}>
+                        <CardTitle
+                          className="text-lg"
+                          data-testid={`text-code-${calendar.id}`}
+                        >
                           {calendar.code}
                         </CardTitle>
-                        <Badge 
-                          variant={calendar.status === "active" ? "default" : "secondary"}
+                        <Badge
+                          variant={
+                            calendar.status === "active"
+                              ? "default"
+                              : "secondary"
+                          }
                           data-testid={`badge-status-${calendar.id}`}
                         >
                           {calendar.status}
@@ -464,15 +623,20 @@ export default function FrequencyCalendarManagement() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0 space-y-2">
-                  <p className="text-sm text-muted-foreground" data-testid={`text-description-${calendar.id}`}>
+                  <p
+                    className="text-sm text-muted-foreground"
+                    data-testid={`text-description-${calendar.id}`}
+                  >
                     {calendar.description || "No description provided"}
                   </p>
                   <div className="flex flex-col gap-1 text-sm">
                     <span>
-                      <strong>Cycle:</strong> {getAppraisalCycleName(calendar.appraisalCycleId)}
+                      <strong>Cycle:</strong>{" "}
+                      {getAppraisalCycleName(calendar.appraisalCycleId)}
                     </span>
                     <span>
-                      <strong>Frequency:</strong> {getReviewFrequencyName(calendar.reviewFrequencyId)}
+                      <strong>Frequency:</strong>{" "}
+                      {getReviewFrequencyName(calendar.reviewFrequencyId)}
                     </span>
                   </div>
                 </CardContent>

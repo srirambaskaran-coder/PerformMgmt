@@ -1375,7 +1375,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["super_admin", "admin", "hr_manager"]),
     async (req: any, res) => {
       try {
-        const { role, department, status } = req.query;
+        const { role, department, status, companyId } = req.query;
         const requestingUserId = req.user.id;
 
         // SECURITY: Get current user to check company restrictions for admins
@@ -1400,6 +1400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: role as string,
           department: department as string,
           status: status as string,
+          companyId: companyId as string,
         };
         // Storage layer will automatically filter by company for admins
         const users = await storage.getUsers(filters, requestingUserId);
