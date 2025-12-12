@@ -22,6 +22,7 @@ import {
   Search,
   CalendarCheck,
   Target,
+  BarChart3,
 } from "lucide-react";
 
 interface NavItem {
@@ -119,6 +120,12 @@ const navItems: NavItem[] = [
     roles: ["hr_manager"],
   },
   {
+    href: "/analytics",
+    label: "Analytics",
+    icon: BarChart3,
+    roles: ["hr_manager"],
+  },
+  {
     href: "/questionnaires",
     label: "Questionnaires",
     icon: FileText,
@@ -134,6 +141,12 @@ const navItems: NavItem[] = [
     href: "/manager-submissions",
     label: "Submissions",
     icon: ClipboardList,
+    roles: ["manager"],
+  },
+  {
+    href: "/member-development-goals",
+    label: "Member Development Goals",
+    icon: Target,
     roles: ["manager"],
   },
   {

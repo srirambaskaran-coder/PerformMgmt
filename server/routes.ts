@@ -6305,6 +6305,445 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // ========================================
+  // Analytics Dashboard Endpoints
+  // ========================================
+
+  app.get(
+    "/api/analytics/performance-trends",
+    isAuthenticated,
+    requireRoles(["super_admin", "admin", "hr_manager"]),
+    async (req: any, res) => {
+      try {
+        const requestingUserId = req.user.id;
+        const requestingUser = await storage.getUser(requestingUserId);
+
+        if (!requestingUser?.companyId) {
+          return res
+            .status(400)
+            .json({ message: "User must belong to a company" });
+        }
+
+        const companyId = requestingUser.companyId;
+
+        // Get all evaluations for the company with ratings
+        const allEvaluations =
+          await storage.getEvaluationsForCalibration(companyId);
+        const completedEvaluations = allEvaluations.filter(
+          (e: any) => e.overallRating !== null && e.overallRating !== undefined
+        );
+
+        // Get all users for the company
+        const users = await storage.getUsers({ companyId }, requestingUserId);
+
+        // Get company data for filtering
+        const locations = await storage.getLocations(companyId);
+        const levels = await storage.getLevels(companyId);
+        const grades = await storage.getGrades(companyId);
+        const appraisalCycles = await storage.getAllAppraisalCycles(companyId);
+
+        // 1. Rating Distribution
+        const ratingDistribution = [1, 2, 3, 4, 5].map((rating) => ({
+          rating,
+          count: completedEvaluations.filter(
+            (e: any) => e.overallRating === rating
+          ).length,
+          calibratedCount: completedEvaluations.filter(
+            (e: any) => e.calibratedRating === rating
+          ).length,
+        }));
+
+        // 2. Performance Trends by Appraisal Cycle
+        const cyclePerformance = appraisalCycles
+          .map((cycle: any) => {
+            const cycleEvaluations = completedEvaluations.filter(
+              (e: any) => e.appraisalCycleId === cycle.id
+            );
+            const ratings = cycleEvaluations.map(
+              (e: any) => e.overallRating as number
+            );
+            const calibratedRatings = cycleEvaluations
+              .filter((e: any) => e.calibratedRating)
+              .map((e: any) => e.calibratedRating as number);
+
+            return {
+              cycleId: cycle.id,
+              cycleName: cycle.code,
+              cycleDescription: cycle.description,
+              totalEvaluations: cycleEvaluations.length,
+              averageRating:
+                ratings.length > 0
+                  ? Number(
+                      (
+                        ratings.reduce((a: number, b: number) => a + b, 0) /
+                        ratings.length
+                      ).toFixed(2)
+                    )
+                  : 0,
+              averageCalibratedRating:
+                calibratedRatings.length > 0
+                  ? Number(
+                      (
+                        calibratedRatings.reduce(
+                          (a: number, b: number) => a + b,
+                          0
+                        ) / calibratedRatings.length
+                      ).toFixed(2)
+                    )
+                  : 0,
+              completionRate:
+                cycleEvaluations.length > 0
+                  ? Math.round(
+                      (cycleEvaluations.filter(
+                        (e: any) => e.meetingCompletedAt
+                      ).length /
+                        cycleEvaluations.length) *
+                        100
+                    )
+                  : 0,
+            };
+          })
+          .filter((c: any) => c.totalEvaluations > 0);
+
+        // 3. Department Performance Comparison
+        const departmentPerformance: Record<
+          string,
+          { count: number; totalRating: number; name: string }
+        > = {};
+        completedEvaluations.forEach((e: any) => {
+          const dept = e.department || "Unknown";
+          if (!departmentPerformance[dept]) {
+            departmentPerformance[dept] = { count: 0, totalRating: 0, name: dept };
+          }
+          departmentPerformance[dept].count++;
+          departmentPerformance[dept].totalRating += (e.overallRating as number) || 0;
+        });
+
+        const departmentStats = Object.values(departmentPerformance)
+          .map((d) => ({
+            department: d.name,
+            employeeCount: d.count,
+            averageRating:
+              d.count > 0 ? Number((d.totalRating / d.count).toFixed(2)) : 0,
+          }))
+          .sort((a, b) => b.averageRating - a.averageRating);
+
+        // 4. Location Performance Comparison
+        const locationPerformance: Record<
+          string,
+          { count: number; totalRating: number; name: string }
+        > = {};
+        completedEvaluations.forEach((e: any) => {
+          const locId = e.locationId || "unknown";
+          const location = locations.find((l: any) => l.id === locId);
+          const locName = location?.name || "Unknown";
+          if (!locationPerformance[locId]) {
+            locationPerformance[locId] = {
+              count: 0,
+              totalRating: 0,
+              name: locName,
+            };
+          }
+          locationPerformance[locId].count++;
+          locationPerformance[locId].totalRating += (e.overallRating as number) || 0;
+        });
+
+        const locationStats = Object.values(locationPerformance)
+          .map((l) => ({
+            location: l.name,
+            employeeCount: l.count,
+            averageRating:
+              l.count > 0 ? Number((l.totalRating / l.count).toFixed(2)) : 0,
+          }))
+          .sort((a, b) => b.averageRating - a.averageRating);
+
+        // 5. Level Performance
+        const levelPerformance: Record<
+          string,
+          { count: number; totalRating: number; name: string }
+        > = {};
+        completedEvaluations.forEach((e: any) => {
+          const levId = e.levelId || "unknown";
+          const level = levels.find((l: any) => l.id === levId);
+          const levName = level
+            ? `${level.code} - ${level.description}`
+            : "Unknown";
+          if (!levelPerformance[levId]) {
+            levelPerformance[levId] = {
+              count: 0,
+              totalRating: 0,
+              name: levName,
+            };
+          }
+          levelPerformance[levId].count++;
+          levelPerformance[levId].totalRating += (e.overallRating as number) || 0;
+        });
+
+        const levelStats = Object.values(levelPerformance)
+          .map((l) => ({
+            level: l.name,
+            employeeCount: l.count,
+            averageRating:
+              l.count > 0 ? Number((l.totalRating / l.count).toFixed(2)) : 0,
+          }))
+          .sort((a, b) => b.averageRating - a.averageRating);
+
+        // 6. Grade Performance
+        const gradePerformance: Record<
+          string,
+          { count: number; totalRating: number; name: string }
+        > = {};
+        completedEvaluations.forEach((e: any) => {
+          const grdId = e.gradeId || "unknown";
+          const grade = grades.find((g: any) => g.id === grdId);
+          const grdName = grade
+            ? `${grade.code} - ${grade.description}`
+            : "Unknown";
+          if (!gradePerformance[grdId]) {
+            gradePerformance[grdId] = {
+              count: 0,
+              totalRating: 0,
+              name: grdName,
+            };
+          }
+          gradePerformance[grdId].count++;
+          gradePerformance[grdId].totalRating += (e.overallRating as number) || 0;
+        });
+
+        const gradeStats = Object.values(gradePerformance)
+          .map((g) => ({
+            grade: g.name,
+            employeeCount: g.count,
+            averageRating:
+              g.count > 0 ? Number((g.totalRating / g.count).toFixed(2)) : 0,
+          }))
+          .sort((a, b) => b.averageRating - a.averageRating);
+
+        // 7. Summary Statistics
+        const allRatings = completedEvaluations.map(
+          (e: any) => e.overallRating as number
+        );
+        const calibratedRatings = completedEvaluations
+          .filter((e: any) => e.calibratedRating)
+          .map((e: any) => e.calibratedRating as number);
+
+        const summary = {
+          totalEmployees: users.length,
+          totalEvaluations: allEvaluations.length,
+          completedEvaluations: completedEvaluations.length,
+          averageRating:
+            allRatings.length > 0
+              ? Number(
+                  (
+                    allRatings.reduce((a: number, b: number) => a + b, 0) /
+                    allRatings.length
+                  ).toFixed(2)
+                )
+              : 0,
+          averageCalibratedRating:
+            calibratedRatings.length > 0
+              ? Number(
+                  (
+                    calibratedRatings.reduce(
+                      (a: number, b: number) => a + b,
+                      0
+                    ) / calibratedRatings.length
+                  ).toFixed(2)
+                )
+              : 0,
+          calibrationRate:
+            completedEvaluations.length > 0
+              ? Math.round(
+                  (completedEvaluations.filter((e: any) => e.calibratedRating)
+                    .length /
+                    completedEvaluations.length) *
+                    100
+                )
+              : 0,
+          meetingsCompletedRate:
+            completedEvaluations.length > 0
+              ? Math.round(
+                  (completedEvaluations.filter((e: any) => e.meetingCompletedAt)
+                    .length /
+                    completedEvaluations.length) *
+                    100
+                )
+              : 0,
+          topPerformers: completedEvaluations.filter(
+            (e: any) => e.overallRating === 5
+          ).length,
+          needsImprovement: completedEvaluations.filter(
+            (e: any) => e.overallRating !== null && e.overallRating <= 2
+          ).length,
+        };
+
+        // 8. Manager Performance (average ratings given by each manager)
+        const managerPerformance: Record<
+          string,
+          { count: number; totalRating: number; name: string; id: string }
+        > = {};
+        completedEvaluations.forEach((e: any) => {
+          const mgrId = e.managerId || "unknown";
+          const manager = users.find((u: any) => u.id === mgrId);
+          const mgrName = manager
+            ? `${manager.firstName} ${manager.lastName}`
+            : "Unknown";
+          if (!managerPerformance[mgrId]) {
+            managerPerformance[mgrId] = {
+              count: 0,
+              totalRating: 0,
+              name: mgrName,
+              id: mgrId,
+            };
+          }
+          managerPerformance[mgrId].count++;
+          managerPerformance[mgrId].totalRating += (e.overallRating as number) || 0;
+        });
+
+        const managerStats = Object.values(managerPerformance)
+          .map((m) => ({
+            managerId: m.id,
+            managerName: m.name,
+            teamSize: m.count,
+            averageRatingGiven:
+              m.count > 0 ? Number((m.totalRating / m.count).toFixed(2)) : 0,
+          }))
+          .filter((m) => m.managerName !== "Unknown")
+          .sort((a, b) => b.teamSize - a.teamSize);
+
+        res.json({
+          summary,
+          ratingDistribution,
+          cyclePerformance,
+          departmentStats,
+          locationStats,
+          levelStats,
+          gradeStats,
+          managerStats,
+        });
+      } catch (error) {
+        console.error("Error fetching performance analytics:", error);
+        res
+          .status(500)
+          .json({ message: "Failed to fetch performance analytics" });
+      }
+    }
+  );
+
+  // Import calibrated ratings from Excel - HR Manager only
+  app.post(
+    "/api/evaluations/calibrate/import",
+    isAuthenticated,
+    requireRoles(["hr_manager"]),
+    async (req: any, res) => {
+      try {
+        const { calibrations } = req.body;
+        const requestingUserId = req.user.id;
+
+        if (!Array.isArray(calibrations) || calibrations.length === 0) {
+          return res
+            .status(400)
+            .json({ message: "No calibrations data provided" });
+        }
+
+        if (calibrations.length > 500) {
+          return res
+            .status(400)
+            .json({ message: "Maximum 500 records allowed per import" });
+        }
+
+        const requestingUser = await storage.getUser(requestingUserId);
+        if (!requestingUser?.companyId) {
+          return res.status(403).json({ message: "User company not found" });
+        }
+
+        const allCalibrationEvaluations =
+          await storage.getEvaluationsForCalibration(requestingUser.companyId);
+        const validEvaluationIds = new Set(
+          allCalibrationEvaluations.map((e: any) => e.id)
+        );
+
+        const results = {
+          successful: 0,
+          failed: 0,
+          errors: [] as Array<{ employeeCode: string; error: string }>,
+        };
+
+        for (const calibration of calibrations) {
+          try {
+            const { evaluationId, employeeCode, calibratedRating, remarks } =
+              calibration;
+
+            if (!evaluationId || typeof evaluationId !== "string") {
+              results.failed++;
+              results.errors.push({
+                employeeCode: String(employeeCode || "Unknown"),
+                error: "Evaluation ID is required",
+              });
+              continue;
+            }
+
+            const trimmedId = evaluationId.trim();
+
+            const rating = parseFloat(calibratedRating);
+            if (isNaN(rating)) {
+              results.failed++;
+              results.errors.push({
+                employeeCode: String(employeeCode || "Unknown"),
+                error: "Valid calibrated rating is required (1-5)",
+              });
+              continue;
+            }
+
+            if (rating < 1 || rating > 5) {
+              results.failed++;
+              results.errors.push({
+                employeeCode: String(employeeCode || "Unknown"),
+                error: "Rating must be between 1 and 5",
+              });
+              continue;
+            }
+
+            if (!validEvaluationIds.has(trimmedId)) {
+              results.failed++;
+              results.errors.push({
+                employeeCode: String(employeeCode || "Unknown"),
+                error: "Evaluation not found or not accessible",
+              });
+              continue;
+            }
+
+            await storage.updateEvaluationCalibration(
+              trimmedId,
+              rating,
+              typeof remarks === "string" ? remarks.trim() : "",
+              requestingUserId
+            );
+
+            results.successful++;
+          } catch (error) {
+            results.failed++;
+            results.errors.push({
+              employeeCode: String(calibration.employeeCode || "Unknown"),
+              error: "Internal error processing this record",
+            });
+          }
+        }
+
+        res.json({
+          summary: {
+            successful: results.successful,
+            failed: results.failed,
+          },
+          errors: results.errors,
+        });
+      } catch (error) {
+        console.error("Error importing calibrations:", error);
+        res.status(500).json({ message: "Failed to import calibrations" });
+      }
+    }
+  );
+
+  // ========================================
   // Development Goals API routes
   // ========================================
 
@@ -6518,6 +6957,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res
           .status(500)
           .json({ message: "Failed to fetch eligible evaluations" });
+      }
+    }
+  );
+
+  // Get team member development goals for manager
+  app.get(
+    "/api/development-goals/team",
+    isAuthenticated,
+    requireRoles(["manager"]),
+    async (req: any, res) => {
+      try {
+        const managerId = req.user.id;
+        const goals = await storage.getTeamMemberDevelopmentGoals(managerId);
+
+        // Fetch employee and evaluation details for each goal
+        const goalsWithDetails = await Promise.all(
+          goals.map(async (goal) => {
+            const employee = await storage.getUser(goal.employeeId);
+            const evaluation = await storage.getEvaluation(goal.evaluationId);
+            let appraisalCycle = null;
+            let appraisalGroup = null;
+            let frequencyCalendarPeriod = null;
+
+            if (evaluation?.initiatedAppraisalId) {
+              const initiatedAppraisal = await storage.getInitiatedAppraisal(
+                evaluation.initiatedAppraisalId
+              );
+              if (initiatedAppraisal) {
+                // Get appraisal group
+                if (initiatedAppraisal.appraisalGroupId) {
+                  const group = await storage.getAppraisalGroup(
+                    initiatedAppraisal.appraisalGroupId
+                  );
+                  if (group) {
+                    appraisalGroup = {
+                      id: group.id,
+                      name: group.name,
+                    };
+                  }
+                }
+
+                if (initiatedAppraisal.frequencyCalendarId) {
+                  const frequencyCalendar =
+                    await storage.getFrequencyCalendarById(
+                      initiatedAppraisal.frequencyCalendarId
+                    );
+                  if (frequencyCalendar?.appraisalCycleId) {
+                    appraisalCycle = await storage.getAppraisalCycleById(
+                      frequencyCalendar.appraisalCycleId
+                    );
+
+                    // Get frequency calendar period
+                    const detailTimings =
+                      await storage.getInitiatedAppraisalDetailTimings(
+                        evaluation.initiatedAppraisalId
+                      );
+                    if (detailTimings.length > 0) {
+                      const detailTiming = detailTimings[0];
+                      const calendarDetails =
+                        await storage.getFrequencyCalendarDetailsByCalendarId(
+                          initiatedAppraisal.frequencyCalendarId
+                        );
+                      const matchingDetail = calendarDetails.find(
+                        (d) => d.id === detailTiming.frequencyCalendarDetailId
+                      );
+                      if (matchingDetail) {
+                        frequencyCalendarPeriod = {
+                          displayName: matchingDetail.displayName,
+                          startDate: matchingDetail.startDate,
+                          endDate: matchingDetail.endDate,
+                        };
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            return {
+              ...goal,
+              employee: employee
+                ? {
+                    id: employee.id,
+                    code: employee.code,
+                    firstName: employee.firstName,
+                    lastName: employee.lastName,
+                    email: employee.email,
+                    department: employee.department,
+                    designation: employee.designation,
+                    locationId: employee.locationId,
+                    levelId: employee.levelId,
+                    gradeId: employee.gradeId,
+                    managerId: employee.managerId,
+                  }
+                : null,
+              evaluation: evaluation
+                ? {
+                    id: evaluation.id,
+                    status: evaluation.status,
+                    meetingCompletedAt: evaluation.meetingCompletedAt,
+                    overallRating: evaluation.overallRating,
+                  }
+                : null,
+              appraisalCycle: appraisalCycle
+                ? {
+                    id: appraisalCycle.id,
+                    code: appraisalCycle.code,
+                    description: appraisalCycle.description,
+                  }
+                : null,
+              appraisalGroup,
+              frequencyCalendarPeriod,
+            };
+          })
+        );
+
+        res.json(goalsWithDetails);
+      } catch (error: unknown) {
+        console.error("Error fetching team member development goals:", error);
+        res
+          .status(500)
+          .json({ message: "Failed to fetch team member development goals" });
       }
     }
   );

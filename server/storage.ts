@@ -1036,6 +1036,7 @@ export interface IStorage {
     goal: UpdateDevelopmentGoal
   ): Promise<DevelopmentGoal>;
   deleteDevelopmentGoal(id: string): Promise<void>;
+  getTeamMemberDevelopmentGoals(managerId: string): Promise<DevelopmentGoal[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3556,6 +3557,13 @@ export class DatabaseStorage implements IStorage {
     try {
       await pool.request().input("Id", id).execute("dbo.DeleteDevelopmentGoal");
     } catch {}
+  }
+
+  async getTeamMemberDevelopmentGoals(managerId: string): Promise<DevelopmentGoal[]> {
+    const pool = await getPool();
+    const req = pool.request().input("ManagerId", managerId);
+    const result = await req.execute("dbo.GetTeamMemberDevelopmentGoals");
+    return result.recordset.map(mapRawDevelopmentGoal);
   }
 }
 

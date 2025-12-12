@@ -32,6 +32,8 @@ import Meetings from "@/pages/Meetings";
 import HRMeetingsView from "@/pages/HRMeetingsView";
 import CalibrateRatings from "@/pages/CalibrateRatings";
 import DevelopmentGoals from "@/pages/DevelopmentGoals";
+import Analytics from "@/pages/Analytics";
+import MemberDevelopmentGoals from "@/pages/MemberDevelopmentGoals";
 import Settings from "@/pages/Settings";
 
 function Router() {
@@ -87,10 +89,12 @@ function Router() {
           <Route path="/review-appraisal" component={ReviewAppraisal} />
           <Route path="/evaluations" component={Evaluations} />
           <Route path="/manager-submissions" component={ManagerSubmissions} />
+          <Route path="/member-development-goals" component={MemberDevelopmentGoals} />
           <Route path="/meetings" component={Meetings} />
           <Route path="/development-goals" component={DevelopmentGoals} />
           <Route path="/hr-meetings" component={HRMeetingsView} />
           <Route path="/calibrate-ratings" component={CalibrateRatings} />
+          <Route path="/analytics" component={Analytics} />
           <Route path="/settings" component={Settings} />
         </>
       )}
