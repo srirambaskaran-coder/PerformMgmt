@@ -27,6 +27,19 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Form,
   FormControl,
   FormField,
@@ -57,12 +70,104 @@ import {
   XCircle,
   Eye,
   EyeOff,
+  Check,
+  ChevronDown,
+  X as XIcon,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// Multi-select filter component
+interface MultiSelectProps {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder: string;
+  label?: string;
+}
+
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder,
+  label,
+}: MultiSelectProps) {
+  const [open, setOpen] = useState(false);
+
+  const handleSelect = (value: string) => {
+    const newSelected = selected.includes(value)
+      ? selected.filter((item) => item !== value)
+      : [...selected, value];
+    onChange(newSelected);
+  };
+
+  const handleClear = () => {
+    onChange([]);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-[200px] justify-between hover:bg-transparent"
+        >
+          {selected.length > 0 ? (
+            <span className="truncate">
+              {selected.length} {label || "items"} selected
+            </span>
+          ) : (
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0" align="start">
+        <Command>
+          <CommandList>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  onSelect={() => handleSelect(option.value)}
+                  className="cursor-pointer data-[selected=true]:bg-blue-400 dark:data-[selected=true]:bg-blue-900 hover:!bg-blue-400 dark:hover:!bg-blue-900"
+                >
+                  <div className="flex items-center gap-2 flex-1">
+                    <Checkbox
+                      checked={selected.includes(option.value)}
+                      onCheckedChange={() => handleSelect(option.value)}
+                    />
+                    <span>{option.label}</span>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+          {selected.length > 0 && (
+            <div className="border-t p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={handleClear}
+              >
+                Clear filters
+              </Button>
+            </div>
+          )}
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function EmployeeManagement() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [roleFilters, setRoleFilters] = useState<string[]>([]);
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [companyFilters, setCompanyFilters] = useState<string[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
@@ -93,15 +198,9 @@ export default function EmployeeManagement() {
     );
   };
 
-  // Build query string from filters
-  const queryParams = new URLSearchParams();
-  if (roleFilter && roleFilter !== "all") queryParams.set("role", roleFilter);
-  if (statusFilter && statusFilter !== "all")
-    queryParams.set("status", statusFilter);
-  const queryString = queryParams.toString();
-
+  // Fetch all users without filters - filtering is done on frontend
   const { data: users = [], isLoading } = useQuery<User[]>({
-    queryKey: queryString ? ["/api/users", queryString] : ["/api/users"],
+    queryKey: ["/api/users"],
   });
 
   const { data: locations = [] } = useQuery<any[]>({
@@ -500,7 +599,19 @@ export default function EmployeeManagement() {
       user.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesSearch;
+    const matchesRole =
+      roleFilters.length === 0 ||
+      (user.role && roleFilters.includes(user.role));
+
+    const matchesStatus =
+      statusFilters.length === 0 ||
+      (user.status && statusFilters.includes(user.status));
+
+    const matchesCompany =
+      companyFilters.length === 0 ||
+      (user.companyId && companyFilters.includes(user.companyId));
+
+    return matchesSearch && matchesRole && matchesStatus && matchesCompany;
   });
 
   const resetForm = () => {
@@ -1367,34 +1478,44 @@ export default function EmployeeManagement() {
                   data-testid="search-employees"
                 />
               </div>
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="w-[180px]" data-testid="filter-role">
-                  <SelectValue placeholder="All Roles" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="employee">Employee</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
-                  <SelectItem value="hr_manager">HR Manager</SelectItem>
-                  <SelectItem value="admin">Administrator</SelectItem>
-                  <SelectItem value="super_admin">
-                    Super Administrator
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger
-                  className="w-[180px]"
-                  data-testid="filter-status"
-                >
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
+
+              <MultiSelect
+                options={[
+                  { value: "employee", label: "Employee" },
+                  { value: "manager", label: "Manager" },
+                  { value: "hr_manager", label: "HR Manager" },
+                  { value: "admin", label: "Administrator" },
+                  { value: "super_admin", label: "Super Administrator" },
+                ]}
+                selected={roleFilters}
+                onChange={setRoleFilters}
+                placeholder="All Roles"
+                label="roles"
+              />
+
+              <MultiSelect
+                options={[
+                  { value: "active", label: "Active" },
+                  { value: "inactive", label: "Inactive" },
+                ]}
+                selected={statusFilters}
+                onChange={setStatusFilters}
+                placeholder="All Status"
+                label="status"
+              />
+
+              {isSuperAdmin && (
+                <MultiSelect
+                  options={companies.map((company: any) => ({
+                    value: company.id,
+                    label: company.name,
+                  }))}
+                  selected={companyFilters}
+                  onChange={setCompanyFilters}
+                  placeholder="All Companies"
+                  label="companies"
+                />
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1452,7 +1573,10 @@ export default function EmployeeManagement() {
                             {user.firstName} {user.lastName}
                           </p>
                           {isSuperAdmin && (user as any).companyName && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge
+                              variant="secondary"
+                              className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100"
+                            >
                               {(user as any).companyName}
                             </Badge>
                           )}

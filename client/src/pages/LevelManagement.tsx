@@ -1,25 +1,168 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertLevelSchema, type Level, type InsertLevel } from "@shared/schema";
+import {
+  insertLevelSchema,
+  type Level,
+  type InsertLevel,
+} from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Plus, Search, Edit, Trash2, Layers, Tag, Clock } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Layers,
+  Tag,
+  Clock,
+  Check,
+  ChevronDown,
+  X as XIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// Multi-select filter component
+interface MultiSelectProps {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder: string;
+  label?: string;
+}
+
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder,
+  label,
+}: MultiSelectProps) {
+  const [open, setOpen] = useState(false);
+
+  const handleSelect = (value: string) => {
+    const newSelected = selected.includes(value)
+      ? selected.filter((item) => item !== value)
+      : [...selected, value];
+    onChange(newSelected);
+  };
+
+  const handleClear = () => {
+    onChange([]);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-[200px] justify-between hover:bg-transparent"
+        >
+          {selected.length > 0 ? (
+            <span className="truncate">
+              {selected.length} {label || "items"} selected
+            </span>
+          ) : (
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0" align="start">
+        <Command>
+          <CommandList>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  onSelect={() => handleSelect(option.value)}
+                  className="cursor-pointer data-[selected=true]:bg-blue-400 dark:data-[selected=true]:bg-blue-900 hover:!bg-blue-400 dark:hover:!bg-blue-900"
+                >
+                  <div className="flex items-center gap-2 flex-1">
+                    <Checkbox
+                      checked={selected.includes(option.value)}
+                      onCheckedChange={() => handleSelect(option.value)}
+                    />
+                    <span>{option.label}</span>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+          {selected.length > 0 && (
+            <div className="border-t p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={handleClear}
+              >
+                Clear filters
+              </Button>
+            </div>
+          )}
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function LevelManagement() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingLevel, setEditingLevel] = useState<Level | null>(null);
 
@@ -49,14 +192,22 @@ export default function LevelManagement() {
       console.error("Error creating level:", error);
       toast({
         title: "Error",
-        description: isUnauthorizedError(error) ? "Access denied" : "Failed to create level",
+        description: isUnauthorizedError(error)
+          ? "Access denied"
+          : "Failed to create level",
         variant: "destructive",
       });
     },
   });
 
   const updateLevelMutation = useMutation({
-    mutationFn: async ({ id, levelData }: { id: string; levelData: Partial<InsertLevel> }) => {
+    mutationFn: async ({
+      id,
+      levelData,
+    }: {
+      id: string;
+      levelData: Partial<InsertLevel>;
+    }) => {
       await apiRequest("PUT", `/api/levels/${id}`, levelData);
     },
     onSuccess: () => {
@@ -72,7 +223,9 @@ export default function LevelManagement() {
       console.error("Error updating level:", error);
       toast({
         title: "Error",
-        description: isUnauthorizedError(error) ? "Access denied" : "Failed to update level",
+        description: isUnauthorizedError(error)
+          ? "Access denied"
+          : "Failed to update level",
         variant: "destructive",
       });
     },
@@ -93,7 +246,9 @@ export default function LevelManagement() {
       console.error("Error deleting level:", error);
       toast({
         title: "Error",
-        description: isUnauthorizedError(error) ? "Access denied" : "Failed to delete level",
+        description: isUnauthorizedError(error)
+          ? "Access denied"
+          : "Failed to delete level",
         variant: "destructive",
       });
     },
@@ -145,25 +300,33 @@ export default function LevelManagement() {
 
   // Filtering logic
   const filteredLevels = levels.filter((level) => {
-    const matchesSearch = level.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (level.description && level.description.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesStatus = statusFilter === "all" || level.status === statusFilter;
+    const matchesSearch =
+      level.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (level.description &&
+        level.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesStatus =
+      statusFilters.length === 0 ||
+      (level.status && statusFilters.includes(level.status));
     return matchesSearch && matchesStatus;
   });
 
   return (
-    <RoleGuard allowedRoles={['admin']}>
+    <RoleGuard allowedRoles={["admin"]}>
       <div className="container mx-auto py-6">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold">Level Management</h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Manage organizational levels for employee categorization and evaluation purposes
+              Manage organizational levels for employee categorization and
+              evaluation purposes
             </p>
           </div>
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
             <DialogTrigger asChild>
-              <Button data-testid="button-create-level" onClick={() => resetForm()}>
+              <Button
+                data-testid="button-create-level"
+                onClick={() => resetForm()}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Create Level
               </Button>
@@ -174,11 +337,16 @@ export default function LevelManagement() {
                   {editingLevel ? "Edit Level" : "Create New Level"}
                 </DialogTitle>
                 <DialogDescription>
-                  {editingLevel ? "Update the organizational level details" : "Define a new organizational level for employee categorization"}
+                  {editingLevel
+                    ? "Update the organizational level details"
+                    : "Define a new organizational level for employee categorization"}
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="space-y-6"
+                >
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -187,9 +355,9 @@ export default function LevelManagement() {
                         <FormItem>
                           <FormLabel>Level Code</FormLabel>
                           <FormControl>
-                            <Input 
-                              {...field} 
-                              placeholder="e.g., L1, L2, MGR, DIR" 
+                            <Input
+                              {...field}
+                              placeholder="e.g., L1, L2, MGR, DIR"
                               data-testid="input-code"
                             />
                           </FormControl>
@@ -203,7 +371,10 @@ export default function LevelManagement() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? "active"}>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value ?? "active"}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-status">
                                 <SelectValue placeholder="Select status" />
@@ -227,9 +398,9 @@ export default function LevelManagement() {
                       <FormItem>
                         <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            {...field} 
-                            placeholder="Describe the responsibilities and expectations for this level..." 
+                          <Textarea
+                            {...field}
+                            placeholder="Describe the responsibilities and expectations for this level..."
                             className="min-h-24"
                             data-testid="input-description"
                           />
@@ -240,9 +411,9 @@ export default function LevelManagement() {
                   />
 
                   <div className="flex justify-end space-x-2">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
                       onClick={() => {
                         setIsCreateModalOpen(false);
                         setEditingLevel(null);
@@ -252,13 +423,20 @@ export default function LevelManagement() {
                     >
                       Cancel
                     </Button>
-                    <Button 
-                      type="submit" 
-                      disabled={createLevelMutation.isPending || updateLevelMutation.isPending}
+                    <Button
+                      type="submit"
+                      disabled={
+                        createLevelMutation.isPending ||
+                        updateLevelMutation.isPending
+                      }
                       data-testid="button-submit"
                     >
-                      {createLevelMutation.isPending || updateLevelMutation.isPending ? "Saving..." : 
-                       editingLevel ? "Update" : "Create"}
+                      {createLevelMutation.isPending ||
+                      updateLevelMutation.isPending
+                        ? "Saving..."
+                        : editingLevel
+                        ? "Update"
+                        : "Create"}
                     </Button>
                   </div>
                 </form>
@@ -279,16 +457,16 @@ export default function LevelManagement() {
               data-testid="input-search"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40" data-testid="filter-status">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
+          <MultiSelect
+            options={[
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "Inactive" },
+            ]}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="All Status"
+            label="status"
+          />
         </div>
 
         {/* Levels List */}
@@ -302,8 +480,8 @@ export default function LevelManagement() {
               <Layers className="w-16 h-16 mx-auto text-gray-400 mb-4" />
               <p className="text-lg font-medium">No levels found</p>
               <p className="text-gray-600 dark:text-gray-400">
-                {searchQuery || statusFilter !== "all" 
-                  ? "Try adjusting your search or filters" 
+                {searchQuery || statusFilters.length > 0
+                  ? "Try adjusting your search or filters"
                   : "Get started by creating your first organizational level"}
               </p>
             </div>
@@ -315,24 +493,36 @@ export default function LevelManagement() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <Layers className="w-5 h-5 text-blue-600" />
-                        <CardTitle className="text-lg" data-testid={`text-code-${level.id}`}>
+                        <CardTitle
+                          className="text-lg"
+                          data-testid={`text-code-${level.id}`}
+                        >
                           {level.code}
                         </CardTitle>
-                        <Badge variant={level.status === 'active' ? 'default' : 'secondary'}>
+                        <Badge
+                          variant={
+                            level.status === "active" ? "default" : "secondary"
+                          }
+                        >
                           {level.status}
                         </Badge>
                       </div>
                       {level.description && (
-                        <CardDescription data-testid={`text-description-${level.id}`}>
+                        <CardDescription
+                          data-testid={`text-description-${level.id}`}
+                        >
                           {level.description}
                         </CardDescription>
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <Dialog open={!!editingLevel} onOpenChange={(open) => !open && setEditingLevel(null)}>
+                      <Dialog
+                        open={!!editingLevel}
+                        onOpenChange={(open) => !open && setEditingLevel(null)}
+                      >
                         <DialogTrigger asChild>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => handleEdit(level)}
                             data-testid={`button-edit-${level.id}`}
@@ -348,7 +538,10 @@ export default function LevelManagement() {
                             </DialogDescription>
                           </DialogHeader>
                           <Form {...form}>
-                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                            <form
+                              onSubmit={form.handleSubmit(onSubmit)}
+                              className="space-y-6"
+                            >
                               <div className="grid grid-cols-2 gap-4">
                                 <FormField
                                   control={form.control}
@@ -357,9 +550,9 @@ export default function LevelManagement() {
                                     <FormItem>
                                       <FormLabel>Level Code</FormLabel>
                                       <FormControl>
-                                        <Input 
-                                          {...field} 
-                                          placeholder="e.g., L1, L2, MGR, DIR" 
+                                        <Input
+                                          {...field}
+                                          placeholder="e.g., L1, L2, MGR, DIR"
                                           data-testid="input-edit-code"
                                         />
                                       </FormControl>
@@ -373,15 +566,22 @@ export default function LevelManagement() {
                                   render={({ field }) => (
                                     <FormItem>
                                       <FormLabel>Status</FormLabel>
-                                      <Select onValueChange={field.onChange} value={field.value ?? "active"}>
+                                      <Select
+                                        onValueChange={field.onChange}
+                                        value={field.value ?? "active"}
+                                      >
                                         <FormControl>
                                           <SelectTrigger data-testid="select-edit-status">
                                             <SelectValue placeholder="Select status" />
                                           </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                          <SelectItem value="active">Active</SelectItem>
-                                          <SelectItem value="inactive">Inactive</SelectItem>
+                                          <SelectItem value="active">
+                                            Active
+                                          </SelectItem>
+                                          <SelectItem value="inactive">
+                                            Inactive
+                                          </SelectItem>
                                         </SelectContent>
                                       </Select>
                                       <FormMessage />
@@ -397,9 +597,9 @@ export default function LevelManagement() {
                                   <FormItem>
                                     <FormLabel>Description</FormLabel>
                                     <FormControl>
-                                      <Textarea 
-                                        {...field} 
-                                        placeholder="Describe the responsibilities and expectations for this level..." 
+                                      <Textarea
+                                        {...field}
+                                        placeholder="Describe the responsibilities and expectations for this level..."
                                         className="min-h-24"
                                         data-testid="input-edit-description"
                                       />
@@ -410,28 +610,30 @@ export default function LevelManagement() {
                               />
 
                               <div className="flex justify-end space-x-2">
-                                <Button 
-                                  type="button" 
-                                  variant="outline" 
+                                <Button
+                                  type="button"
+                                  variant="outline"
                                   onClick={() => setEditingLevel(null)}
                                   data-testid="button-edit-cancel"
                                 >
                                   Cancel
                                 </Button>
-                                <Button 
-                                  type="submit" 
+                                <Button
+                                  type="submit"
                                   disabled={updateLevelMutation.isPending}
                                   data-testid="button-edit-submit"
                                 >
-                                  {updateLevelMutation.isPending ? "Updating..." : "Update"}
+                                  {updateLevelMutation.isPending
+                                    ? "Updating..."
+                                    : "Update"}
                                 </Button>
                               </div>
                             </form>
                           </Form>
                         </DialogContent>
                       </Dialog>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => handleDelete(level.id)}
                         disabled={deleteLevelMutation.isPending}
@@ -452,7 +654,12 @@ export default function LevelManagement() {
                       <p className="pl-6">{level.description}</p>
                       <div className="flex items-center gap-2 pt-2">
                         <Clock className="w-4 h-4" />
-                        <span>Created: {level.createdAt ? new Date(level.createdAt).toLocaleDateString() : 'Unknown'}</span>
+                        <span>
+                          Created:{" "}
+                          {level.createdAt
+                            ? new Date(level.createdAt).toLocaleDateString()
+                            : "Unknown"}
+                        </span>
                       </div>
                     </div>
                   </CardContent>

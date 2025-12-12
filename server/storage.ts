@@ -1071,6 +1071,7 @@ export class DatabaseStorage implements IStorage {
     try {
       const req = pool.request();
       req.input("RequestingUserId", requestingUserId || null);
+      // Pass comma-separated values as-is to the stored procedure
       req.input("Role", filters?.role || null);
       req.input("CompanyId", filters?.companyId || null);
       req.input("Department", filters?.department || null);

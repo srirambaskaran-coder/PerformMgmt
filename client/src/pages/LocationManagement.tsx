@@ -1,24 +1,165 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertLocationSchema, type Location, type InsertLocation } from "@shared/schema";
+import {
+  insertLocationSchema,
+  type Location,
+  type InsertLocation,
+} from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Plus, Search, Edit, Trash2, MapPin } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  MapPin,
+  Check,
+  ChevronDown,
+  X as XIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// Multi-select filter component
+interface MultiSelectProps {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder: string;
+  label?: string;
+}
+
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder,
+  label,
+}: MultiSelectProps) {
+  const [open, setOpen] = useState(false);
+
+  const handleSelect = (value: string) => {
+    const newSelected = selected.includes(value)
+      ? selected.filter((item) => item !== value)
+      : [...selected, value];
+    onChange(newSelected);
+  };
+
+  const handleClear = () => {
+    onChange([]);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-[200px] justify-between hover:bg-transparent"
+        >
+          {selected.length > 0 ? (
+            <span className="truncate">
+              {selected.length} {label || "items"} selected
+            </span>
+          ) : (
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0" align="start">
+        <Command>
+          <CommandList>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  onSelect={() => handleSelect(option.value)}
+                  className="cursor-pointer data-[selected=true]:bg-blue-400 dark:data-[selected=true]:bg-blue-900 hover:!bg-blue-400 dark:hover:!bg-blue-900"
+                >
+                  <div className="flex items-center gap-2 flex-1">
+                    <Checkbox
+                      checked={selected.includes(option.value)}
+                      onCheckedChange={() => handleSelect(option.value)}
+                    />
+                    <span>{option.label}</span>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+          {selected.length > 0 && (
+            <div className="border-t p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={handleClear}
+              >
+                Clear filters
+              </Button>
+            </div>
+          )}
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function LocationManagement() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
 
@@ -51,7 +192,13 @@ export default function LocationManagement() {
   });
 
   const updateLocationMutation = useMutation({
-    mutationFn: async ({ id, locationData }: { id: string; locationData: Partial<InsertLocation> }) => {
+    mutationFn: async ({
+      id,
+      locationData,
+    }: {
+      id: string;
+      locationData: Partial<InsertLocation>;
+    }) => {
       await apiRequest("PUT", `/api/locations/${id}`, locationData);
     },
     onSuccess: () => {
@@ -104,7 +251,10 @@ export default function LocationManagement() {
 
   const onSubmit = (data: InsertLocation) => {
     if (editingLocation) {
-      updateLocationMutation.mutate({ id: editingLocation.id, locationData: data });
+      updateLocationMutation.mutate({
+        id: editingLocation.id,
+        locationData: data,
+      });
     } else {
       createLocationMutation.mutate(data);
     }
@@ -139,14 +289,17 @@ export default function LocationManagement() {
   };
 
   const filteredLocations = locations.filter((location) => {
-    const matchesSearch = searchQuery === "" || 
+    const matchesSearch =
+      searchQuery === "" ||
       location.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       location.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       location.state?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       location.country?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === "all" || location.status === statusFilter;
-    
+
+    const matchesStatus =
+      statusFilters.length === 0 ||
+      (location.status && statusFilters.includes(location.status));
+
     return matchesSearch && matchesStatus;
   });
 
@@ -156,29 +309,44 @@ export default function LocationManagement() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Location Management</h1>
-            <p className="text-muted-foreground">Manage office locations and branches</p>
+            <p className="text-muted-foreground">
+              Manage office locations and branches
+            </p>
           </div>
-          <Dialog open={isCreateModalOpen || !!editingLocation} onOpenChange={(open) => {
-            if (!open) {
-              setIsCreateModalOpen(false);
-              resetForm();
-            }
-          }}>
+          <Dialog
+            open={isCreateModalOpen || !!editingLocation}
+            onOpenChange={(open) => {
+              if (!open) {
+                setIsCreateModalOpen(false);
+                resetForm();
+              }
+            }}
+          >
             <DialogTrigger asChild>
-              <Button onClick={() => setIsCreateModalOpen(true)} data-testid="add-location-button">
+              <Button
+                onClick={() => setIsCreateModalOpen(true)}
+                data-testid="add-location-button"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Location
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg">
               <DialogHeader>
-                <DialogTitle>{editingLocation ? "Edit Location" : "Add New Location"}</DialogTitle>
+                <DialogTitle>
+                  {editingLocation ? "Edit Location" : "Add New Location"}
+                </DialogTitle>
                 <DialogDescription>
-                  {editingLocation ? "Update location information" : "Create a new office location"}
+                  {editingLocation
+                    ? "Update location information"
+                    : "Create a new office location"}
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="space-y-4"
+                >
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -187,7 +355,11 @@ export default function LocationManagement() {
                         <FormItem>
                           <FormLabel>Location Code</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="NYC01" data-testid="input-location-code" />
+                            <Input
+                              {...field}
+                              placeholder="NYC01"
+                              data-testid="input-location-code"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -200,7 +372,11 @@ export default function LocationManagement() {
                         <FormItem>
                           <FormLabel>Location Name</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="New York Office" data-testid="input-location-name" />
+                            <Input
+                              {...field}
+                              placeholder="New York Office"
+                              data-testid="input-location-name"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -216,7 +392,11 @@ export default function LocationManagement() {
                         <FormItem>
                           <FormLabel>State</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="New York" data-testid="input-state" />
+                            <Input
+                              {...field}
+                              placeholder="New York"
+                              data-testid="input-state"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -229,7 +409,11 @@ export default function LocationManagement() {
                         <FormItem>
                           <FormLabel>Country</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="United States" data-testid="input-country" />
+                            <Input
+                              {...field}
+                              placeholder="United States"
+                              data-testid="input-country"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -243,7 +427,10 @@ export default function LocationManagement() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-status">
                               <SelectValue placeholder="Select status" />
@@ -274,7 +461,10 @@ export default function LocationManagement() {
                     <Button
                       type="submit"
                       className="flex-1"
-                      disabled={createLocationMutation.isPending || updateLocationMutation.isPending}
+                      disabled={
+                        createLocationMutation.isPending ||
+                        updateLocationMutation.isPending
+                      }
                       data-testid="submit-location"
                     >
                       {editingLocation ? "Update Location" : "Create Location"}
@@ -303,16 +493,16 @@ export default function LocationManagement() {
                   data-testid="search-locations"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]" data-testid="filter-status">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
+              <MultiSelect
+                options={[
+                  { value: "active", label: "Active" },
+                  { value: "inactive", label: "Inactive" },
+                ]}
+                selected={statusFilters}
+                onChange={setStatusFilters}
+                placeholder="All Status"
+                label="status"
+              />
             </div>
           </CardContent>
         </Card>
@@ -332,12 +522,19 @@ export default function LocationManagement() {
           ) : filteredLocations.length === 0 ? (
             <div className="col-span-full text-center py-12">
               <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground text-lg mb-2">No locations found</p>
-              <p className="text-muted-foreground text-sm">Add your first location to get started</p>
+              <p className="text-muted-foreground text-lg mb-2">
+                No locations found
+              </p>
+              <p className="text-muted-foreground text-sm">
+                Add your first location to get started
+              </p>
             </div>
           ) : (
             filteredLocations.map((location) => (
-              <Card key={location.id} data-testid={`location-card-${location.id}`}>
+              <Card
+                key={location.id}
+                data-testid={`location-card-${location.id}`}
+              >
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -345,11 +542,22 @@ export default function LocationManagement() {
                         <MapPin className="h-6 w-6 text-primary-foreground" />
                       </div>
                       <div>
-                        <h3 className="font-semibold" data-testid={`location-name-${location.id}`}>
+                        <h3
+                          className="font-semibold"
+                          data-testid={`location-name-${location.id}`}
+                        >
                           {location.name}
                         </h3>
-                        <p className="text-sm text-muted-foreground">{location.code}</p>
-                        <Badge variant={location.status === 'active' ? 'default' : 'secondary'}>
+                        <p className="text-sm text-muted-foreground">
+                          {location.code}
+                        </p>
+                        <Badge
+                          variant={
+                            location.status === "active"
+                              ? "default"
+                              : "secondary"
+                          }
+                        >
                           {location.status}
                         </Badge>
                       </div>
@@ -373,7 +581,7 @@ export default function LocationManagement() {
                       </Button>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-1 text-sm text-muted-foreground">
                     {location.state && <p>{location.state}</p>}
                     {location.country && <p>{location.country}</p>}

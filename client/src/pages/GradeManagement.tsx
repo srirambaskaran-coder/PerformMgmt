@@ -1,25 +1,168 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertGradeSchema, type Grade, type InsertGrade } from "@shared/schema";
+import {
+  insertGradeSchema,
+  type Grade,
+  type InsertGrade,
+} from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Plus, Search, Edit, Trash2, Award, Tag, Clock } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Award,
+  Tag,
+  Clock,
+  Check,
+  ChevronDown,
+  X as XIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// Multi-select filter component
+interface MultiSelectProps {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder: string;
+  label?: string;
+}
+
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder,
+  label,
+}: MultiSelectProps) {
+  const [open, setOpen] = useState(false);
+
+  const handleSelect = (value: string) => {
+    const newSelected = selected.includes(value)
+      ? selected.filter((item) => item !== value)
+      : [...selected, value];
+    onChange(newSelected);
+  };
+
+  const handleClear = () => {
+    onChange([]);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-[200px] justify-between hover:bg-transparent"
+        >
+          {selected.length > 0 ? (
+            <span className="truncate">
+              {selected.length} {label || "items"} selected
+            </span>
+          ) : (
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0" align="start">
+        <Command>
+          <CommandList>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  onSelect={() => handleSelect(option.value)}
+                  className="cursor-pointer data-[selected=true]:bg-blue-400 dark:data-[selected=true]:bg-blue-900 hover:!bg-blue-400 dark:hover:!bg-blue-900"
+                >
+                  <div className="flex items-center gap-2 flex-1">
+                    <Checkbox
+                      checked={selected.includes(option.value)}
+                      onCheckedChange={() => handleSelect(option.value)}
+                    />
+                    <span>{option.label}</span>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+          {selected.length > 0 && (
+            <div className="border-t p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={handleClear}
+              >
+                Clear filters
+              </Button>
+            </div>
+          )}
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function GradeManagement() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingGrade, setEditingGrade] = useState<Grade | null>(null);
 
@@ -49,14 +192,22 @@ export default function GradeManagement() {
       console.error("Error creating grade:", error);
       toast({
         title: "Error",
-        description: isUnauthorizedError(error) ? "Access denied" : "Failed to create grade",
+        description: isUnauthorizedError(error)
+          ? "Access denied"
+          : "Failed to create grade",
         variant: "destructive",
       });
     },
   });
 
   const updateGradeMutation = useMutation({
-    mutationFn: async ({ id, gradeData }: { id: string; gradeData: Partial<InsertGrade> }) => {
+    mutationFn: async ({
+      id,
+      gradeData,
+    }: {
+      id: string;
+      gradeData: Partial<InsertGrade>;
+    }) => {
       await apiRequest("PUT", `/api/grades/${id}`, gradeData);
     },
     onSuccess: () => {
@@ -72,7 +223,9 @@ export default function GradeManagement() {
       console.error("Error updating grade:", error);
       toast({
         title: "Error",
-        description: isUnauthorizedError(error) ? "Access denied" : "Failed to update grade",
+        description: isUnauthorizedError(error)
+          ? "Access denied"
+          : "Failed to update grade",
         variant: "destructive",
       });
     },
@@ -93,7 +246,9 @@ export default function GradeManagement() {
       console.error("Error deleting grade:", error);
       toast({
         title: "Error",
-        description: isUnauthorizedError(error) ? "Access denied" : "Failed to delete grade",
+        description: isUnauthorizedError(error)
+          ? "Access denied"
+          : "Failed to delete grade",
         variant: "destructive",
       });
     },
@@ -145,25 +300,33 @@ export default function GradeManagement() {
 
   // Filtering logic
   const filteredGrades = grades.filter((grade) => {
-    const matchesSearch = grade.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (grade.description && grade.description.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesStatus = statusFilter === "all" || grade.status === statusFilter;
+    const matchesSearch =
+      grade.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (grade.description &&
+        grade.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesStatus =
+      statusFilters.length === 0 ||
+      (grade.status && statusFilters.includes(grade.status));
     return matchesSearch && matchesStatus;
   });
 
   return (
-    <RoleGuard allowedRoles={['admin']}>
+    <RoleGuard allowedRoles={["admin"]}>
       <div className="container mx-auto py-6">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold">Grade Management</h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Manage organizational grades for employee categorization and compensation structure
+              Manage organizational grades for employee categorization and
+              compensation structure
             </p>
           </div>
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
             <DialogTrigger asChild>
-              <Button data-testid="button-create-grade" onClick={() => resetForm()}>
+              <Button
+                data-testid="button-create-grade"
+                onClick={() => resetForm()}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Create Grade
               </Button>
@@ -174,11 +337,16 @@ export default function GradeManagement() {
                   {editingGrade ? "Edit Grade" : "Create New Grade"}
                 </DialogTitle>
                 <DialogDescription>
-                  {editingGrade ? "Update the organizational grade details" : "Define a new organizational grade for employee compensation and categorization"}
+                  {editingGrade
+                    ? "Update the organizational grade details"
+                    : "Define a new organizational grade for employee compensation and categorization"}
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="space-y-6"
+                >
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -187,9 +355,9 @@ export default function GradeManagement() {
                         <FormItem>
                           <FormLabel>Grade Code</FormLabel>
                           <FormControl>
-                            <Input 
-                              {...field} 
-                              placeholder="e.g., G1, G2, A1, B1" 
+                            <Input
+                              {...field}
+                              placeholder="e.g., G1, G2, A1, B1"
                               data-testid="input-code"
                             />
                           </FormControl>
@@ -203,7 +371,10 @@ export default function GradeManagement() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? "active"}>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value ?? "active"}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-status">
                                 <SelectValue placeholder="Select status" />
@@ -227,9 +398,9 @@ export default function GradeManagement() {
                       <FormItem>
                         <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            {...field} 
-                            placeholder="Describe the responsibilities, compensation range, and requirements for this grade..." 
+                          <Textarea
+                            {...field}
+                            placeholder="Describe the responsibilities, compensation range, and requirements for this grade..."
                             className="min-h-24"
                             data-testid="input-description"
                           />
@@ -240,9 +411,9 @@ export default function GradeManagement() {
                   />
 
                   <div className="flex justify-end space-x-2">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
                       onClick={() => {
                         setIsCreateModalOpen(false);
                         setEditingGrade(null);
@@ -252,13 +423,20 @@ export default function GradeManagement() {
                     >
                       Cancel
                     </Button>
-                    <Button 
-                      type="submit" 
-                      disabled={createGradeMutation.isPending || updateGradeMutation.isPending}
+                    <Button
+                      type="submit"
+                      disabled={
+                        createGradeMutation.isPending ||
+                        updateGradeMutation.isPending
+                      }
                       data-testid="button-submit"
                     >
-                      {createGradeMutation.isPending || updateGradeMutation.isPending ? "Saving..." : 
-                       editingGrade ? "Update" : "Create"}
+                      {createGradeMutation.isPending ||
+                      updateGradeMutation.isPending
+                        ? "Saving..."
+                        : editingGrade
+                        ? "Update"
+                        : "Create"}
                     </Button>
                   </div>
                 </form>
@@ -279,16 +457,16 @@ export default function GradeManagement() {
               data-testid="input-search"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40" data-testid="filter-status">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
+          <MultiSelect
+            options={[
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "Inactive" },
+            ]}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="All Status"
+            label="status"
+          />
         </div>
 
         {/* Grades List */}
@@ -302,8 +480,8 @@ export default function GradeManagement() {
               <Award className="w-16 h-16 mx-auto text-gray-400 mb-4" />
               <p className="text-lg font-medium">No grades found</p>
               <p className="text-gray-600 dark:text-gray-400">
-                {searchQuery || statusFilter !== "all" 
-                  ? "Try adjusting your search or filters" 
+                {searchQuery || statusFilters.length > 0
+                  ? "Try adjusting your search or filters"
                   : "Get started by creating your first organizational grade"}
               </p>
             </div>
@@ -315,30 +493,39 @@ export default function GradeManagement() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <Award className="w-5 h-5 text-amber-600" />
-                        <CardTitle className="text-lg" data-testid={`text-code-${grade.id}`}>
+                        <CardTitle
+                          className="text-lg"
+                          data-testid={`text-code-${grade.id}`}
+                        >
                           {grade.code}
                         </CardTitle>
-                        <Badge variant={grade.status === 'active' ? 'default' : 'secondary'}>
+                        <Badge
+                          variant={
+                            grade.status === "active" ? "default" : "secondary"
+                          }
+                        >
                           {grade.status}
                         </Badge>
                       </div>
                       {grade.description && (
-                        <CardDescription data-testid={`text-description-${grade.id}`}>
+                        <CardDescription
+                          data-testid={`text-description-${grade.id}`}
+                        >
                           {grade.description}
                         </CardDescription>
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => handleEdit(grade)}
                         data-testid={`button-edit-${grade.id}`}
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => handleDelete(grade.id)}
                         disabled={deleteGradeMutation.isPending}
@@ -359,7 +546,12 @@ export default function GradeManagement() {
                       <p className="pl-6">{grade.description}</p>
                       <div className="flex items-center gap-2 pt-2">
                         <Clock className="w-4 h-4" />
-                        <span>Created: {grade.createdAt ? new Date(grade.createdAt).toLocaleDateString() : 'Unknown'}</span>
+                        <span>
+                          Created:{" "}
+                          {grade.createdAt
+                            ? new Date(grade.createdAt).toLocaleDateString()
+                            : "Unknown"}
+                        </span>
                       </div>
                     </div>
                   </CardContent>
@@ -370,7 +562,10 @@ export default function GradeManagement() {
         </div>
 
         {/* Edit Dialog - Single Instance */}
-        <Dialog open={!!editingGrade} onOpenChange={(open) => !open && setEditingGrade(null)}>
+        <Dialog
+          open={!!editingGrade}
+          onOpenChange={(open) => !open && setEditingGrade(null)}
+        >
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Edit Grade</DialogTitle>
@@ -379,7 +574,10 @@ export default function GradeManagement() {
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-6"
+              >
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -388,9 +586,9 @@ export default function GradeManagement() {
                       <FormItem>
                         <FormLabel>Grade Code</FormLabel>
                         <FormControl>
-                          <Input 
-                            {...field} 
-                            placeholder="e.g., G1, G2, A1, B1" 
+                          <Input
+                            {...field}
+                            placeholder="e.g., G1, G2, A1, B1"
                             data-testid="input-edit-code"
                           />
                         </FormControl>
@@ -404,7 +602,10 @@ export default function GradeManagement() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value ?? "active"}>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value ?? "active"}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-edit-status">
                               <SelectValue placeholder="Select status" />
@@ -428,9 +629,9 @@ export default function GradeManagement() {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          {...field} 
-                          placeholder="Describe the responsibilities, compensation range, and requirements for this grade..." 
+                        <Textarea
+                          {...field}
+                          placeholder="Describe the responsibilities, compensation range, and requirements for this grade..."
                           className="min-h-24"
                           data-testid="input-edit-description"
                         />
@@ -441,16 +642,16 @@ export default function GradeManagement() {
                 />
 
                 <div className="flex justify-end space-x-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => setEditingGrade(null)}
                     data-testid="button-edit-cancel"
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={updateGradeMutation.isPending}
                     data-testid="button-edit-submit"
                   >
