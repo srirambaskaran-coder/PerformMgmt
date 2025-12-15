@@ -1,1302 +1,807 @@
-import { sql } from "drizzle-orm";
-import {
-  index,
-  jsonb,
-  pgTable,
-  timestamp,
-  varchar,
-  text,
-  integer,
-  boolean,
-  decimal,
-  pgEnum,
-  foreignKey,
-  unique,
-  check,
-} from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Session storage table - mandatory for Replit Auth
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)]
-);
+// ============================================
+// ENUMS - Pure TypeScript enum types
+// ============================================
 
-// User roles enum
-export const userRoleEnum = pgEnum("user_role", [
-  "super_admin",
-  "admin",
-  "hr_manager",
-  "employee",
-  "manager",
-]);
+export const UserRoles = ["super_admin", "admin", "hr_manager", "employee", "manager"] as const;
+export type UserRole = typeof UserRoles[number];
 
-// User status enum
-export const statusEnum = pgEnum("status", ["active", "inactive"]);
+export const StatusValues = ["active", "inactive"] as const;
+export type Status = typeof StatusValues[number];
 
-// Questionnaire category enum
-export const categoryEnum = pgEnum("category", ["employee", "manager"]);
+export const CategoryValues = ["employee", "manager"] as const;
+export type Category = typeof CategoryValues[number];
 
-// Publish type enum
-export const publishTypeEnum = pgEnum("publish_type", [
-  "now",
-  "as_per_calendar",
-]);
+export const PublishTypeValues = ["now", "as_per_calendar"] as const;
+export type PublishType = typeof PublishTypeValues[number];
 
-// Appraisal type enum
-export const appraisalTypeEnum = pgEnum("appraisal_type", [
-  "questionnaire_based",
-  "kpi_based",
-  "mbo_based",
-  "okr_based",
-]);
+export const AppraisalTypeValues = ["questionnaire_based", "kpi_based", "mbo_based", "okr_based"] as const;
+export type AppraisalType = typeof AppraisalTypeValues[number];
 
-// Appraisal cycle status enum
-export const appraisalCycleStatusEnum = pgEnum("appraisal_cycle_status", [
-  "draft",
-  "active",
-  "closed",
-  "cancelled",
-]);
+export const AppraisalCycleStatusValues = ["draft", "active", "closed", "cancelled"] as const;
+export type AppraisalCycleStatus = typeof AppraisalCycleStatusValues[number];
 
-// Calendar provider enum
-export const calendarProviderEnum = pgEnum("calendar_provider", [
-  "google",
-  "outlook",
-]);
+export const CalendarProviderValues = ["google", "outlook"] as const;
+export type CalendarProvider = typeof CalendarProviderValues[number];
 
-// User storage table - mandatory for Replit Auth
-export const users = pgTable(
-  "users",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    email: varchar("email").unique(),
-    firstName: varchar("first_name"),
-    lastName: varchar("last_name"),
-    profileImageUrl: varchar("profile_image_url"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-    // Additional fields for the app
-    code: varchar("code").unique(),
-    designation: varchar("designation"),
-    department: varchar("department"),
-    dateOfJoining: timestamp("date_of_joining"),
-    mobileNumber: varchar("mobile_number"),
-    reportingManagerId: varchar("reporting_manager_id"),
-    locationId: varchar("location_id"),
-    companyId: varchar("company_id"),
-    levelId: varchar("level_id"),
-    gradeId: varchar("grade_id"),
-    role: userRoleEnum("role").default("employee"),
-    roles: text("roles").array(),
-    status: statusEnum("status").default("active"),
-    // Password field for admin-managed accounts
-    passwordHash: varchar("password_hash"),
-    // Track which Administrator created this user (for user isolation)
-    createdById: varchar("created_by_id"),
-  },
-  (table) => [
-    index("users_created_by_id_idx").on(table.createdById),
-    index("users_level_id_idx").on(table.levelId),
-    index("users_grade_id_idx").on(table.gradeId),
-  ]
-);
+export const GoalStatusValues = ["on_track", "delayed", "completed", "not_started"] as const;
+export type GoalStatus = typeof GoalStatusValues[number];
 
-// Companies table
-export const companies = pgTable("companies", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  name: varchar("name").notNull(),
-  address: text("address"),
-  clientContact: varchar("client_contact"),
-  email: varchar("email"),
-  contactNumber: varchar("contact_number"),
-  gstNumber: varchar("gst_number"),
-  logoUrl: varchar("logo_url"),
-  url: varchar("url"),
-  companyUrl: varchar("company_url").unique(), // URL slug for company login (e.g., 'hfactor')
-  status: statusEnum("status").default("active"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+// ============================================
+// INTERFACES - Pure TypeScript types
+// ============================================
 
-// Locations table
-export const locations = pgTable(
-  "locations",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    code: varchar("code").notNull(),
-    name: varchar("name").notNull(),
-    state: varchar("state"),
-    country: varchar("country"),
-    companyId: varchar("company_id"), // For multi-tenant isolation
-    status: statusEnum("status").default("active"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-    createdById: varchar("created_by_id"),
-  },
-  (table) => [
-    unique().on(table.companyId, table.code),
-    index("locations_company_id_idx").on(table.companyId),
-  ]
-);
+// Session storage interface
+export interface Session {
+  sid: string;
+  sess: Record<string, any>;
+  expire: Date;
+}
 
-// Questionnaire templates table
-export const questionnaireTemplates = pgTable(
-  "questionnaire_templates",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    name: varchar("name").notNull(), // Keep existing column name
-    description: text("description"), // Keep existing column name
-    targetRole: userRoleEnum("target_role").notNull(), // Keep existing column name
-    applicableCategory: categoryEnum("applicable_category"), // New field - optional for backward compatibility
-    applicableLevelId: varchar("applicable_level_id"), // Optional
-    applicableGradeId: varchar("applicable_grade_id"), // Optional
-    applicableLocationId: varchar("applicable_location_id"), // Optional
-    sendOnMail: boolean("send_on_mail").default(false),
-    questions: jsonb("questions").notNull(), // Array of question objects
-    year: integer("year"),
-    companyId: varchar("company_id"), // For multi-tenant isolation
-    status: statusEnum("status").default("active"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-    createdById: varchar("created_by_id"), // New field - nullable for existing records
-  },
-  (table) => [
-    index("questionnaire_templates_company_id_idx").on(table.companyId),
-    index("questionnaire_templates_created_by_id_idx").on(table.createdById),
-  ]
-);
+// User interface
+export interface User {
+  id: string;
+  email?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  profileImageUrl?: string | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  code?: string | null;
+  designation?: string | null;
+  department?: string | null;
+  dateOfJoining?: Date | null;
+  mobileNumber?: string | null;
+  reportingManagerId?: string | null;
+  locationId?: string | null;
+  companyId?: string | null;
+  levelId?: string | null;
+  gradeId?: string | null;
+  role?: UserRole | null;
+  roles?: string[] | null;
+  status?: Status | null;
+  passwordHash?: string | null;
+  createdById?: string | null;
+}
 
-// Performance review cycles table
-export const reviewCycles = pgTable("review_cycles", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  name: varchar("name").notNull(),
-  description: text("description"),
-  startDate: timestamp("start_date").notNull(),
-  endDate: timestamp("end_date").notNull(),
-  questionnaireTemplateId: varchar("questionnaire_template_id").notNull(),
-  status: statusEnum("status").default("active"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+export type SafeUser = Omit<User, "passwordHash">;
 
-// Employee evaluations table
-export const evaluations = pgTable("evaluations", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  employeeId: varchar("employee_id").notNull(),
-  managerId: varchar("manager_id").notNull(),
-  reviewCycleId: varchar("review_cycle_id").notNull(),
-  initiatedAppraisalId: varchar("initiated_appraisal_id"), // Direct link to initiated appraisal for accurate progress tracking
-  selfEvaluationData: jsonb("self_evaluation_data"), // Employee responses
-  selfEvaluationSubmittedAt: timestamp("self_evaluation_submitted_at"),
-  managerEvaluationData: jsonb("manager_evaluation_data"), // Manager responses
-  managerEvaluationSubmittedAt: timestamp("manager_evaluation_submitted_at"),
-  overallRating: integer("overall_rating"),
-  status: varchar("status").default("not_started"), // not_started, in_progress, completed, overdue
-  meetingScheduledAt: timestamp("meeting_scheduled_at"),
-  meetingNotes: text("meeting_notes"),
-  showNotesToEmployee: boolean("show_notes_to_employee").default(false),
-  meetingCompletedAt: timestamp("meeting_completed_at"),
-  finalizedAt: timestamp("finalized_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+// Company interface
+export interface Company {
+  id: string;
+  name: string;
+  address?: string | null;
+  clientContact?: string | null;
+  email?: string | null;
+  contactNumber?: string | null;
+  gstNumber?: string | null;
+  logoUrl?: string | null;
+  url?: string | null;
+  companyUrl?: string | null;
+  status?: Status | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
 
-// Email templates table
-export const emailTemplates = pgTable("email_templates", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  name: varchar("name").notNull(),
-  subject: varchar("subject").notNull(),
-  body: text("body").notNull(),
-  templateType: varchar("template_type").notNull(), // review_invitation, reminder, completion, etc.
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+// Location interface
+export interface Location {
+  id: string;
+  code: string;
+  name: string;
+  state?: string | null;
+  country?: string | null;
+  companyId?: string | null;
+  status?: Status | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  createdById?: string | null;
+}
 
-// Email configuration table
-export const emailConfig = pgTable("email_config", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  smtpHost: varchar("smtp_host").notNull(),
-  smtpPort: integer("smtp_port").notNull(),
-  smtpUsername: varchar("smtp_username").notNull(),
-  smtpPassword: varchar("smtp_password").notNull(),
-  fromEmail: varchar("from_email").notNull(),
-  fromName: varchar("from_name").notNull(),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+// Questionnaire Template interface
+export interface QuestionnaireTemplate {
+  id: string;
+  name: string;
+  description?: string | null;
+  targetRole: UserRole;
+  applicableCategory?: Category | null;
+  applicableLevelId?: string | null;
+  applicableGradeId?: string | null;
+  applicableLocationId?: string | null;
+  sendOnMail?: boolean | null;
+  questions: Record<string, any>[] | any;
+  year?: number | null;
+  companyId?: string | null;
+  status?: Status | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  createdById?: string | null;
+}
 
-// Registration table for SaaS onboarding
-export const registrations = pgTable("registrations", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  name: varchar("name").notNull(),
-  companyName: varchar("company_name").notNull(),
-  designation: varchar("designation").notNull(),
-  email: varchar("email").notNull(),
-  mobile: varchar("mobile").notNull(),
-  status: varchar("status").default("pending"), // pending, contacted, onboarded, rejected
-  notificationSent: boolean("notification_sent").default(false),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+// Review Cycle interface
+export interface ReviewCycle {
+  id: string;
+  name: string;
+  description?: string | null;
+  startDate: Date;
+  endDate: Date;
+  questionnaireTemplateId: string;
+  status?: Status | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
 
-// Secure access tokens for email links
-export const accessTokens = pgTable("access_tokens", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  token: varchar("token").notNull().unique(),
-  userId: varchar("user_id").notNull(),
-  evaluationId: varchar("evaluation_id").notNull(),
-  tokenType: varchar("token_type").notNull(), // 'self_evaluation', 'manager_review'
-  expiresAt: timestamp("expires_at").notNull(),
-  usedAt: timestamp("used_at"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+// Evaluation interface
+export interface Evaluation {
+  id: string;
+  employeeId: string;
+  managerId: string;
+  reviewCycleId?: string | null;
+  initiatedAppraisalId?: string | null;
+  selfEvaluationData?: Record<string, any> | null;
+  selfEvaluationSubmittedAt?: Date | null;
+  managerEvaluationData?: Record<string, any> | null;
+  managerEvaluationSubmittedAt?: Date | null;
+  overallRating?: number | null;
+  status?: string | null;
+  meetingScheduledAt?: Date | null;
+  meetingNotes?: string | null;
+  showNotesToEmployee?: boolean | null;
+  meetingCompletedAt?: Date | null;
+  finalizedAt?: Date | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
 
-// Calendar credentials table for storing OAuth tokens
-export const calendarCredentials = pgTable(
-  "calendar_credentials",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    companyId: varchar("company_id").notNull(),
-    provider: calendarProviderEnum("provider").notNull(),
-    clientId: varchar("client_id").notNull(),
-    clientSecret: varchar("client_secret").notNull(),
-    accessToken: text("access_token"),
-    refreshToken: text("refresh_token").notNull(),
-    expiresAt: timestamp("expires_at"),
-    scope: text("scope"),
-    isActive: boolean("is_active").default(true),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-  },
-  (table) => [
-    // Only one active credential per provider per company
-    unique("unique_company_provider_active").on(
-      table.companyId,
-      table.provider
-    ),
-    index("calendar_credentials_company_provider_idx").on(
-      table.companyId,
-      table.provider
-    ),
-  ]
-);
+// Email Template interface
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+  templateType: string;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
 
-// Level table - Administrator managed
-export const levels = pgTable(
-  "levels",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    code: varchar("code").notNull(),
-    description: text("description").notNull(),
-    companyId: varchar("company_id"), // For multi-tenant isolation
-    status: statusEnum("status").default("active"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-    createdById: varchar("created_by_id").notNull(),
-  },
-  (table) => [
-    unique().on(table.companyId, table.code),
-    index("levels_company_id_idx").on(table.companyId),
-    index("levels_created_by_id_idx").on(table.createdById),
-  ]
-);
+// Email Config interface
+export interface EmailConfig {
+  id: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUsername: string;
+  smtpPassword: string;
+  fromEmail: string;
+  fromName: string;
+  isActive?: boolean | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
 
-// Grade table - Administrator managed
-export const grades = pgTable(
-  "grades",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    code: varchar("code").notNull(),
-    description: text("description").notNull(),
-    companyId: varchar("company_id"), // For multi-tenant isolation
-    status: statusEnum("status").default("active"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-    createdById: varchar("created_by_id").notNull(),
-  },
-  (table) => [
-    unique().on(table.companyId, table.code),
-    index("grades_company_id_idx").on(table.companyId),
-    index("grades_created_by_id_idx").on(table.createdById),
-  ]
-);
+// Registration interface
+export interface Registration {
+  id: string;
+  name: string;
+  companyName: string;
+  designation: string;
+  email: string;
+  mobile: string;
+  status?: string | null;
+  notificationSent?: boolean | null;
+  notes?: string | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
 
-// Department table - Administrator managed
-export const departments = pgTable(
-  "departments",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    code: varchar("code").notNull(),
-    description: text("description").notNull(),
-    companyId: varchar("company_id"), // For multi-tenant isolation
-    status: statusEnum("status").default("active"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-    createdById: varchar("created_by_id").notNull(),
-  },
-  (table) => [
-    unique().on(table.companyId, table.code),
-    index("departments_company_id_idx").on(table.companyId),
-    index("departments_created_by_id_idx").on(table.createdById),
-  ]
-);
+// Access Token interface
+export interface AccessToken {
+  id: string;
+  token: string;
+  userId: string;
+  evaluationId: string;
+  tokenType: string;
+  expiresAt: Date;
+  usedAt?: Date | null;
+  isActive?: boolean | null;
+  createdAt?: Date | null;
+}
 
-// Appraisal Cycle table - Administrator managed
-export const appraisalCycles = pgTable(
-  "appraisal_cycles",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    code: varchar("code").notNull(),
-    description: text("description").notNull(),
-    fromDate: timestamp("from_date").notNull(),
-    toDate: timestamp("to_date").notNull(),
-    companyId: varchar("company_id"), // For multi-tenant isolation
-    status: statusEnum("status").default("active"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-    createdById: varchar("created_by_id").notNull(),
-  },
-  (table) => [
-    unique().on(table.companyId, table.code),
-    check(
-      "appraisal_cycles_date_check",
-      sql`${table.fromDate} <= ${table.toDate}`
-    ),
-    index("appraisal_cycles_company_id_idx").on(table.companyId),
-    index("appraisal_cycles_created_by_id_idx").on(table.createdById),
-  ]
-);
+// Calendar Credential interface
+export interface CalendarCredential {
+  id: string;
+  companyId: string;
+  provider: CalendarProvider;
+  clientId: string;
+  clientSecret: string;
+  accessToken?: string | null;
+  refreshToken: string;
+  expiresAt?: Date | null;
+  scope?: string | null;
+  isActive?: boolean | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
 
-// Review Frequency table - Administrator managed
-export const reviewFrequencies = pgTable(
-  "review_frequencies",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    code: varchar("code").notNull(),
-    description: text("description").notNull(),
-    companyId: varchar("company_id"), // For multi-tenant isolation
-    status: statusEnum("status").default("active"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-    createdById: varchar("created_by_id").notNull(),
-  },
-  (table) => [
-    unique().on(table.companyId, table.code),
-    index("review_frequencies_company_id_idx").on(table.companyId),
-    index("review_frequencies_created_by_id_idx").on(table.createdById),
-  ]
-);
+// Level interface
+export interface Level {
+  id: string;
+  code: string;
+  description: string;
+  companyId?: string | null;
+  status?: Status | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  createdById: string;
+}
 
-// Frequency Calendar table - Administrator managed
-export const frequencyCalendars = pgTable(
-  "frequency_calendars",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    code: varchar("code").notNull(),
-    description: text("description").notNull(),
-    appraisalCycleId: varchar("appraisal_cycle_id").notNull(),
-    reviewFrequencyId: varchar("review_frequency_id").notNull(),
-    companyId: varchar("company_id"), // For multi-tenant isolation
-    status: statusEnum("status").default("active"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-    createdById: varchar("created_by_id").notNull(),
-  },
-  (table) => [
-    unique().on(table.companyId, table.code),
-    index("frequency_calendars_company_id_idx").on(table.companyId),
-    index("frequency_calendars_created_by_id_idx").on(table.createdById),
-  ]
-);
+// Grade interface
+export interface Grade {
+  id: string;
+  code: string;
+  description: string;
+  companyId?: string | null;
+  status?: Status | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  createdById: string;
+}
 
-// Frequency Calendar Details table - Administrator managed
-export const frequencyCalendarDetails = pgTable(
-  "frequency_calendar_details",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    frequencyCalendarId: varchar("frequency_calendar_id").notNull(),
-    displayName: varchar("display_name").notNull(),
-    startDate: timestamp("start_date").notNull(),
-    endDate: timestamp("end_date").notNull(),
-    companyId: varchar("company_id"), // For multi-tenant isolation
-    status: statusEnum("status").default("active"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-    createdById: varchar("created_by_id").notNull(),
-  },
-  (table) => [
-    check(
-      "frequency_calendar_details_date_check",
-      sql`${table.startDate} <= ${table.endDate}`
-    ),
-    index("frequency_calendar_details_company_id_idx").on(table.companyId),
-    index("frequency_calendar_details_created_by_id_idx").on(table.createdById),
-  ]
-);
+// Department interface
+export interface Department {
+  id: string;
+  code: string;
+  description: string;
+  companyId?: string | null;
+  status?: Status | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  createdById: string;
+}
 
-// Publish Questionnaire table - Administrator managed
-export const publishQuestionnaires = pgTable(
-  "publish_questionnaires",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    code: varchar("code").notNull(),
-    displayName: varchar("display_name").notNull(),
-    templateId: varchar("template_id").notNull(),
-    frequencyCalendarId: varchar("frequency_calendar_id"),
-    companyId: varchar("company_id"), // For multi-tenant isolation
-    status: statusEnum("status").default("active"),
-    publishType: publishTypeEnum("publish_type").default("now"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-    createdById: varchar("created_by_id").notNull(),
-  },
-  (table) => [
-    unique().on(table.companyId, table.code),
-    check(
-      "publish_questionnaires_calendar_check",
-      sql`(${table.publishType} = 'now') OR (${table.publishType} = 'as_per_calendar' AND ${table.frequencyCalendarId} IS NOT NULL)`
-    ),
-    index("publish_questionnaires_company_id_idx").on(table.companyId),
-    index("publish_questionnaires_created_by_id_idx").on(table.createdById),
-  ]
-);
+// Appraisal Cycle interface
+export interface AppraisalCycle {
+  id: string;
+  code: string;
+  description: string;
+  fromDate: Date;
+  toDate: Date;
+  companyId?: string | null;
+  status?: Status | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  createdById: string;
+}
 
-// Initiated Appraisal table - HR Manager initiated appraisals
-export const initiatedAppraisals = pgTable(
-  "initiated_appraisals",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    appraisalGroupId: varchar("appraisal_group_id").notNull(),
-    appraisalType: appraisalTypeEnum("appraisal_type").notNull(),
-    questionnaireTemplateIds: text("questionnaire_template_ids")
-      .array()
-      .default(sql`ARRAY[]::text[]`), // For questionnaire_based
-    documentUrl: varchar("document_url"), // For uploaded documents (MBO/KPI)
-    frequencyCalendarId: varchar("frequency_calendar_id"),
-    daysToInitiate: integer("days_to_initiate").default(0), // Days after calendar period end
-    daysToClose: integer("days_to_close").default(30), // Days after calendar period end
-    numberOfReminders: integer("number_of_reminders").default(3), // 1-10 reminders
-    excludeTenureLessThanYear: boolean("exclude_tenure_less_than_year").default(
-      false
-    ),
-    excludedEmployeeIds: text("excluded_employee_ids")
-      .array()
-      .default(sql`ARRAY[]::text[]`), // Specific excluded employees
-    status: appraisalCycleStatusEnum("status").default("draft"),
-    makePublic: boolean("make_public").default(false),
-    publishType: publishTypeEnum("publish_type").default("now"),
-    createdById: varchar("created_by_id").notNull(), // HR Manager who created
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-  },
-  (table) => [
-    index("initiated_appraisals_group_id_idx").on(table.appraisalGroupId),
-    index("initiated_appraisals_created_by_id_idx").on(table.createdById),
-    check(
-      "initiated_appraisals_template_check",
-      sql`(${table.appraisalType} NOT IN ('questionnaire_based', 'mbo_based')) OR (array_length(${table.questionnaireTemplateIds}, 1) > 0 OR ${table.documentUrl} IS NOT NULL)`
-    ),
-  ]
-);
+// Review Frequency interface
+export interface ReviewFrequency {
+  id: string;
+  code: string;
+  description: string;
+  companyId?: string | null;
+  status?: Status | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  createdById: string;
+}
 
-// Initiated Appraisal Detail Timings - Per frequency calendar detail timing configurations
-export const initiatedAppraisalDetailTimings = pgTable(
-  "initiated_appraisal_detail_timings",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    initiatedAppraisalId: varchar("initiated_appraisal_id").notNull(),
-    frequencyCalendarDetailId: varchar(
-      "frequency_calendar_detail_id"
-    ).notNull(),
-    daysToInitiate: integer("days_to_initiate").notNull().default(0),
-    daysToClose: integer("days_to_close").notNull().default(30),
-    numberOfReminders: integer("number_of_reminders").notNull().default(3),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-  },
-  (table) => [
-    index("initiated_appraisal_detail_timings_appraisal_id_idx").on(
-      table.initiatedAppraisalId
-    ),
-    index("initiated_appraisal_detail_timings_detail_id_idx").on(
-      table.frequencyCalendarDetailId
-    ),
-    unique().on(table.initiatedAppraisalId, table.frequencyCalendarDetailId), // One timing config per detail per appraisal
-  ]
-);
+// Frequency Calendar interface
+export interface FrequencyCalendar {
+  id: string;
+  code: string;
+  description: string;
+  appraisalCycleId: string;
+  reviewFrequencyId: string;
+  companyId?: string | null;
+  status?: Status | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  createdById: string;
+}
 
-// Scheduled Appraisal Tasks - For calendar-based publishing
-export const scheduledAppraisalTasks = pgTable(
-  "scheduled_appraisal_tasks",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    initiatedAppraisalId: varchar("initiated_appraisal_id").notNull(),
-    frequencyCalendarDetailId: varchar(
-      "frequency_calendar_detail_id"
-    ).notNull(),
-    scheduledDate: timestamp("scheduled_date").notNull(), // When to create evaluations
-    status: varchar("status").notNull().default("pending"), // pending, completed, failed
-    executedAt: timestamp("executed_at"),
-    error: text("error"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-  },
-  (table) => [
-    index("scheduled_appraisal_tasks_date_idx").on(table.scheduledDate),
-    index("scheduled_appraisal_tasks_status_idx").on(table.status),
-    index("scheduled_appraisal_tasks_appraisal_id_idx").on(
-      table.initiatedAppraisalId
-    ),
-  ]
-);
+// Frequency Calendar Details interface
+export interface FrequencyCalendarDetails {
+  id: string;
+  frequencyCalendarId: string;
+  displayName: string;
+  startDate: Date;
+  endDate: Date;
+  companyId?: string | null;
+  status?: Status | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  createdById: string;
+}
 
-// Relations
-export const usersRelations = relations(users, ({ one, many }) => ({
-  reportingManager: one(users, {
-    fields: [users.reportingManagerId],
-    references: [users.id],
-    relationName: "reportingManager",
-  }),
-  directReports: many(users, {
-    relationName: "reportingManager",
-  }),
-  createdBy: one(users, {
-    fields: [users.createdById],
-    references: [users.id],
-    relationName: "createdByUser",
-  }),
-  createdUsers: many(users, {
-    relationName: "createdByUser",
-  }),
-  location: one(locations, {
-    fields: [users.locationId],
-    references: [locations.id],
-  }),
-  company: one(companies, {
-    fields: [users.companyId],
-    references: [companies.id],
-  }),
-  evaluationsAsEmployee: many(evaluations, {
-    relationName: "employeeEvaluations",
-  }),
-  evaluationsAsManager: many(evaluations, {
-    relationName: "managerEvaluations",
-  }),
-  level: one(levels, {
-    fields: [users.levelId],
-    references: [levels.id],
-  }),
-  grade: one(grades, {
-    fields: [users.gradeId],
-    references: [grades.id],
-  }),
-}));
+// Publish Questionnaire interface
+export interface PublishQuestionnaire {
+  id: string;
+  code: string;
+  displayName: string;
+  templateId: string;
+  frequencyCalendarId?: string | null;
+  companyId?: string | null;
+  status?: Status | null;
+  publishType?: PublishType | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  createdById: string;
+}
 
-export const locationsRelations = relations(locations, ({ many }) => ({
-  users: many(users),
-}));
+// Initiated Appraisal interface
+export interface InitiatedAppraisal {
+  id: string;
+  appraisalGroupId: string;
+  appraisalType: AppraisalType;
+  questionnaireTemplateIds?: string[] | null;
+  documentUrl?: string | null;
+  frequencyCalendarId?: string | null;
+  daysToInitiate?: number | null;
+  daysToClose?: number | null;
+  numberOfReminders?: number | null;
+  excludeTenureLessThanYear?: boolean | null;
+  excludedEmployeeIds?: string[] | null;
+  status?: AppraisalCycleStatus | null;
+  makePublic?: boolean | null;
+  publishType?: PublishType | null;
+  createdById: string;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
 
-export const companiesRelations = relations(companies, ({ many }) => ({
-  users: many(users),
-}));
+// Initiated Appraisal Detail Timing interface
+export interface InitiatedAppraisalDetailTiming {
+  id: string;
+  initiatedAppraisalId: string;
+  frequencyCalendarDetailId: string;
+  daysToInitiate: number;
+  daysToClose: number;
+  numberOfReminders: number;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
 
-export const reviewCyclesRelations = relations(
-  reviewCycles,
-  ({ one, many }) => ({
-    questionnaireTemplate: one(questionnaireTemplates, {
-      fields: [reviewCycles.questionnaireTemplateId],
-      references: [questionnaireTemplates.id],
-    }),
-    evaluations: many(evaluations),
-  })
-);
+// Scheduled Appraisal Task interface
+export interface ScheduledAppraisalTask {
+  id: string;
+  initiatedAppraisalId: string;
+  frequencyCalendarDetailId: string;
+  scheduledDate: Date;
+  status: string;
+  executedAt?: Date | null;
+  error?: string | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
 
-export const evaluationsRelations = relations(evaluations, ({ one }) => ({
-  employee: one(users, {
-    fields: [evaluations.employeeId],
-    references: [users.id],
-    relationName: "employeeEvaluations",
-  }),
-  manager: one(users, {
-    fields: [evaluations.managerId],
-    references: [users.id],
-    relationName: "managerEvaluations",
-  }),
-  reviewCycle: one(reviewCycles, {
-    fields: [evaluations.reviewCycleId],
-    references: [reviewCycles.id],
-  }),
-  initiatedAppraisal: one(initiatedAppraisals, {
-    fields: [evaluations.initiatedAppraisalId],
-    references: [initiatedAppraisals.id],
-  }),
-}));
+// Appraisal Group interface
+export interface AppraisalGroup {
+  id: string;
+  name: string;
+  description?: string | null;
+  createdById: string;
+  companyId?: string | null;
+  status?: Status | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
 
-// Relations for new entities
-export const levelsRelations = relations(levels, ({ one, many }) => ({
-  createdBy: one(users, {
-    fields: [levels.createdById],
-    references: [users.id],
-  }),
-  users: many(users),
-  questionnaires: many(questionnaireTemplates),
-}));
+// Appraisal Group Member interface
+export interface AppraisalGroupMember {
+  id: string;
+  appraisalGroupId: string;
+  userId: string;
+  addedById: string;
+  addedAt?: Date | null;
+}
 
-export const gradesRelations = relations(grades, ({ one, many }) => ({
-  createdBy: one(users, {
-    fields: [grades.createdById],
-    references: [users.id],
-  }),
-  users: many(users),
-  questionnaires: many(questionnaireTemplates),
-}));
+// Development Goal interface
+export interface DevelopmentGoal {
+  id: string;
+  evaluationId: string;
+  employeeId: string;
+  description: string;
+  plannedOutcome: string;
+  targetDate: Date;
+  progress?: number | null;
+  status?: GoalStatus | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
 
-export const departmentsRelations = relations(departments, ({ one, many }) => ({
-  createdBy: one(users, {
-    fields: [departments.createdById],
-    references: [users.id],
-  }),
-  users: many(users),
-}));
+// ============================================
+// INSERT TYPES - Types for creating records
+// ============================================
 
-export const appraisalCyclesRelations = relations(
-  appraisalCycles,
-  ({ one, many }) => ({
-    createdBy: one(users, {
-      fields: [appraisalCycles.createdById],
-      references: [users.id],
-    }),
-    frequencyCalendars: many(frequencyCalendars),
-  })
-);
+export type InsertUser = Omit<User, "id" | "createdAt" | "updatedAt" | "passwordHash" | "createdById"> & {
+  password?: string;
+  confirmPassword?: string;
+};
 
-export const reviewFrequenciesRelations = relations(
-  reviewFrequencies,
-  ({ one, many }) => ({
-    createdBy: one(users, {
-      fields: [reviewFrequencies.createdById],
-      references: [users.id],
-    }),
-    frequencyCalendars: many(frequencyCalendars),
-  })
-);
+export type InsertCompany = Omit<Company, "id" | "createdAt" | "updatedAt">;
+export type InsertLocation = Omit<Location, "id" | "createdAt" | "updatedAt">;
+export type InsertQuestionnaireTemplate = Omit<QuestionnaireTemplate, "id" | "createdAt" | "updatedAt">;
+export type InsertReviewCycle = Omit<ReviewCycle, "id" | "createdAt" | "updatedAt">;
+export type InsertEvaluation = Omit<Evaluation, "id" | "createdAt" | "updatedAt">;
+export type InsertEmailTemplate = Omit<EmailTemplate, "id" | "createdAt" | "updatedAt">;
+export type InsertEmailConfig = Omit<EmailConfig, "id" | "createdAt" | "updatedAt">;
+export type InsertRegistration = Omit<Registration, "id" | "createdAt" | "updatedAt" | "notificationSent" | "status">;
+export type InsertAccessToken = Omit<AccessToken, "id" | "createdAt">;
+export type InsertCalendarCredential = Omit<CalendarCredential, "id" | "createdAt" | "updatedAt">;
+export type InsertLevel = Omit<Level, "id" | "createdAt" | "updatedAt" | "createdById">;
+export type InsertGrade = Omit<Grade, "id" | "createdAt" | "updatedAt" | "createdById">;
+export type InsertDepartment = Omit<Department, "id" | "createdAt" | "updatedAt" | "createdById">;
+export type InsertAppraisalCycle = Omit<AppraisalCycle, "id" | "createdAt" | "updatedAt" | "createdById">;
+export type InsertReviewFrequency = Omit<ReviewFrequency, "id" | "createdAt" | "updatedAt" | "createdById">;
+export type InsertFrequencyCalendar = Omit<FrequencyCalendar, "id" | "createdAt" | "updatedAt" | "createdById">;
+export type InsertFrequencyCalendarDetails = Omit<FrequencyCalendarDetails, "id" | "createdAt" | "updatedAt" | "createdById">;
+export type InsertPublishQuestionnaire = Omit<PublishQuestionnaire, "id" | "createdAt" | "updatedAt" | "createdById">;
+export type InsertAppraisalGroup = Omit<AppraisalGroup, "id" | "createdAt" | "updatedAt">;
+export type InsertAppraisalGroupMember = Omit<AppraisalGroupMember, "id" | "addedAt">;
+export type InsertInitiatedAppraisal = Omit<InitiatedAppraisal, "id" | "createdAt" | "updatedAt">;
+export type InsertInitiatedAppraisalDetailTiming = Omit<InitiatedAppraisalDetailTiming, "id" | "createdAt" | "updatedAt">;
+export type InsertScheduledAppraisalTask = Omit<ScheduledAppraisalTask, "id" | "createdAt" | "updatedAt">;
+export type InsertDevelopmentGoal = Omit<DevelopmentGoal, "id" | "createdAt" | "updatedAt" | "status">;
 
-export const frequencyCalendarsRelations = relations(
-  frequencyCalendars,
-  ({ one, many }) => ({
-    createdBy: one(users, {
-      fields: [frequencyCalendars.createdById],
-      references: [users.id],
-    }),
-    appraisalCycle: one(appraisalCycles, {
-      fields: [frequencyCalendars.appraisalCycleId],
-      references: [appraisalCycles.id],
-    }),
-    reviewFrequency: one(reviewFrequencies, {
-      fields: [frequencyCalendars.reviewFrequencyId],
-      references: [reviewFrequencies.id],
-    }),
-    details: many(frequencyCalendarDetails),
-    publishQuestionnaires: many(publishQuestionnaires),
-  })
-);
+// ============================================
+// ZOD VALIDATION SCHEMAS - Pure Zod without drizzle-zod
+// ============================================
 
-export const frequencyCalendarDetailsRelations = relations(
-  frequencyCalendarDetails,
-  ({ one }) => ({
-    createdBy: one(users, {
-      fields: [frequencyCalendarDetails.createdById],
-      references: [users.id],
-    }),
-    frequencyCalendar: one(frequencyCalendars, {
-      fields: [frequencyCalendarDetails.frequencyCalendarId],
-      references: [frequencyCalendars.id],
-    }),
-  })
-);
-
-export const publishQuestionnairesRelations = relations(
-  publishQuestionnaires,
-  ({ one }) => ({
-    createdBy: one(users, {
-      fields: [publishQuestionnaires.createdById],
-      references: [users.id],
-    }),
-    template: one(questionnaireTemplates, {
-      fields: [publishQuestionnaires.templateId],
-      references: [questionnaireTemplates.id],
-    }),
-    frequencyCalendar: one(frequencyCalendars, {
-      fields: [publishQuestionnaires.frequencyCalendarId],
-      references: [frequencyCalendars.id],
-    }),
-  })
-);
-
-export const questionnaireTemplatesRelations = relations(
-  questionnaireTemplates,
-  ({ one, many }) => ({
-    createdBy: one(users, {
-      fields: [questionnaireTemplates.createdById],
-      references: [users.id],
-    }),
-    applicableLevel: one(levels, {
-      fields: [questionnaireTemplates.applicableLevelId],
-      references: [levels.id],
-    }),
-    applicableGrade: one(grades, {
-      fields: [questionnaireTemplates.applicableGradeId],
-      references: [grades.id],
-    }),
-    applicableLocation: one(locations, {
-      fields: [questionnaireTemplates.applicableLocationId],
-      references: [locations.id],
-    }),
-    publishQuestionnaires: many(publishQuestionnaires),
-    reviewCycles: many(reviewCycles),
-  })
-);
-
-export const initiatedAppraisalsRelations = relations(
-  initiatedAppraisals,
-  ({ one, many }) => ({
-    createdBy: one(users, {
-      fields: [initiatedAppraisals.createdById],
-      references: [users.id],
-    }),
-    evaluations: many(evaluations),
-  })
-);
-
-// Insert schemas
-export const insertUserSchema = createInsertSchema(users)
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-    passwordHash: true,
-    createdById: true,
-  })
-  .extend({
-    roles: z
-      .array(
-        z.enum(["super_admin", "admin", "hr_manager", "employee", "manager"])
-      )
-      .optional()
-      .default(["employee"]),
-    password: z
-      .string()
-      .min(8, "Password must be at least 8 characters")
-      .optional(),
-    confirmPassword: z.string().optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.password || data.confirmPassword) {
-        return data.password === data.confirmPassword;
-      }
-      return true;
-    },
-    {
-      message: "Passwords do not match",
-      path: ["confirmPassword"],
+// User schema
+export const insertUserSchema = z.object({
+  email: z.string().email().optional().nullable(),
+  firstName: z.string().optional().nullable(),
+  lastName: z.string().optional().nullable(),
+  profileImageUrl: z.string().optional().nullable(),
+  code: z.string().optional().nullable(),
+  designation: z.string().optional().nullable(),
+  department: z.string().optional().nullable(),
+  dateOfJoining: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  mobileNumber: z.string().optional().nullable(),
+  reportingManagerId: z.string().optional().nullable(),
+  locationId: z.string().optional().nullable(),
+  companyId: z.string().optional().nullable(),
+  levelId: z.string().optional().nullable(),
+  gradeId: z.string().optional().nullable(),
+  role: z.enum(UserRoles).optional().nullable(),
+  roles: z.array(z.enum(UserRoles)).optional().default(["employee"]),
+  status: z.enum(StatusValues).optional().nullable(),
+  password: z.string().min(8, "Password must be at least 8 characters").optional(),
+  confirmPassword: z.string().optional(),
+}).refine(
+  (data) => {
+    if (data.password || data.confirmPassword) {
+      return data.password === data.confirmPassword;
     }
-  );
-
-export const insertCompanySchema = createInsertSchema(companies).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertLocationSchema = createInsertSchema(locations).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertQuestionnaireTemplateSchema = createInsertSchema(
-  questionnaireTemplates
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertReviewCycleSchema = createInsertSchema(reviewCycles).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertEvaluationSchema = createInsertSchema(evaluations).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertEmailTemplateSchema = createInsertSchema(
-  emailTemplates
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertEmailConfigSchema = createInsertSchema(emailConfig).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertRegistrationSchema = createInsertSchema(registrations).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  notificationSent: true,
-  status: true,
-});
-
-export const insertAccessTokenSchema = createInsertSchema(accessTokens).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertCalendarCredentialSchema = createInsertSchema(
-  calendarCredentials
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-// Insert schemas for new entities
-export const insertLevelSchema = createInsertSchema(levels).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  createdById: true,
-});
-
-export const insertGradeSchema = createInsertSchema(grades).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  createdById: true,
-});
-
-export const insertDepartmentSchema = createInsertSchema(departments).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  createdById: true,
-});
-
-export const insertAppraisalCycleSchema = createInsertSchema(appraisalCycles)
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-    createdById: true,
-  })
-  .extend({
-    fromDate: z.preprocess((val) => new Date(val as string), z.date()),
-    toDate: z.preprocess((val) => new Date(val as string), z.date()),
-  });
-
-export const insertReviewFrequencySchema = createInsertSchema(
-  reviewFrequencies
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  createdById: true,
-});
-
-export const insertFrequencyCalendarSchema = createInsertSchema(
-  frequencyCalendars
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  createdById: true,
-});
-
-export const insertFrequencyCalendarDetailsSchema = createInsertSchema(
-  frequencyCalendarDetails
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-    createdById: true,
-  })
-  .extend({
-    startDate: z.preprocess((val) => new Date(val as string), z.date()),
-    endDate: z.preprocess((val) => new Date(val as string), z.date()),
-  });
-
-export const insertPublishQuestionnaireSchema = createInsertSchema(
-  publishQuestionnaires
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  createdById: true,
-});
-
-// Secure update schemas to prevent security vulnerabilities
-export const updateUserSchema = createInsertSchema(users)
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-    passwordHash: true,
-    createdById: true,
-  })
-  .extend({
-    roles: z
-      .array(
-        z.enum(["super_admin", "admin", "hr_manager", "employee", "manager"])
-      )
-      .optional(),
-  })
-  .partial()
-  .strict();
-
-// Dedicated schema for password updates only
-export const passwordUpdateSchema = z
-  .object({
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string(),
-  })
-  .strict()
-  .refine((data) => data.password === data.confirmPassword, {
+    return true;
+  },
+  {
     message: "Passwords do not match",
     path: ["confirmPassword"],
-  });
-
-// Schema for role updates with authorization validation
-export const roleUpdateSchema = z
-  .object({
-    role: z
-      .enum(["super_admin", "admin", "hr_manager", "employee", "manager"])
-      .optional(),
-    roles: z
-      .array(
-        z.enum(["super_admin", "admin", "hr_manager", "employee", "manager"])
-      )
-      .optional(),
-  })
-  .strict();
-
-// Send Reminder Request Schema
-export const sendReminderRequestSchema = z
-  .object({
-    employeeId: z.string().min(1, "Employee ID is required"),
-    initiatedAppraisalId: z
-      .string()
-      .min(1, "Initiated Appraisal ID is required"),
-  })
-  .strict();
-
-// Upsert user schema for Replit Auth
-export const upsertUserSchema = createInsertSchema(users).pick({
-  id: true,
-  email: true,
-  firstName: true,
-  lastName: true,
-  profileImageUrl: true,
-});
-
-// Types
-export type UpsertUser = z.infer<typeof upsertUserSchema>;
-export type User = typeof users.$inferSelect;
-export type SafeUser = Omit<User, "passwordHash">;
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type Company = typeof companies.$inferSelect;
-export type InsertCompany = z.infer<typeof insertCompanySchema>;
-export type Location = typeof locations.$inferSelect;
-export type InsertLocation = z.infer<typeof insertLocationSchema>;
-export type QuestionnaireTemplate = typeof questionnaireTemplates.$inferSelect;
-export type InsertQuestionnaireTemplate = z.infer<
-  typeof insertQuestionnaireTemplateSchema
->;
-export type ReviewCycle = typeof reviewCycles.$inferSelect;
-export type InsertReviewCycle = z.infer<typeof insertReviewCycleSchema>;
-export type Evaluation = typeof evaluations.$inferSelect;
-export type InsertEvaluation = z.infer<typeof insertEvaluationSchema>;
-export type EmailTemplate = typeof emailTemplates.$inferSelect;
-export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
-export type EmailConfig = typeof emailConfig.$inferSelect;
-export type InsertEmailConfig = z.infer<typeof insertEmailConfigSchema>;
-export type Registration = typeof registrations.$inferSelect;
-export type InsertRegistration = z.infer<typeof insertRegistrationSchema>;
-export type AccessToken = typeof accessTokens.$inferSelect;
-export type InsertAccessToken = z.infer<typeof insertAccessTokenSchema>;
-export type CalendarCredential = typeof calendarCredentials.$inferSelect;
-export type InsertCalendarCredential = z.infer<
-  typeof insertCalendarCredentialSchema
->;
-
-// Types for new entities
-export type Level = typeof levels.$inferSelect;
-export type InsertLevel = z.infer<typeof insertLevelSchema>;
-export type Grade = typeof grades.$inferSelect;
-export type InsertGrade = z.infer<typeof insertGradeSchema>;
-export type Department = typeof departments.$inferSelect;
-export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
-export type AppraisalCycle = typeof appraisalCycles.$inferSelect;
-export type InsertAppraisalCycle = z.infer<typeof insertAppraisalCycleSchema>;
-export type ReviewFrequency = typeof reviewFrequencies.$inferSelect;
-export type InsertReviewFrequency = z.infer<typeof insertReviewFrequencySchema>;
-export type FrequencyCalendar = typeof frequencyCalendars.$inferSelect;
-export type InsertFrequencyCalendar = z.infer<
-  typeof insertFrequencyCalendarSchema
->;
-export type FrequencyCalendarDetails =
-  typeof frequencyCalendarDetails.$inferSelect;
-export type InsertFrequencyCalendarDetails = z.infer<
-  typeof insertFrequencyCalendarDetailsSchema
->;
-export type PublishQuestionnaire = typeof publishQuestionnaires.$inferSelect;
-export type InsertPublishQuestionnaire = z.infer<
-  typeof insertPublishQuestionnaireSchema
->;
-
-// Appraisal Groups table
-export const appraisalGroups = pgTable(
-  "appraisal_groups",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    name: varchar("name").notNull(),
-    description: text("description"),
-    createdById: varchar("created_by_id").notNull(), // HR Manager who created the group
-    companyId: varchar("company_id"), // For multi-tenant isolation
-    status: statusEnum("status").default("active"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-  },
-  (table) => [
-    index("appraisal_groups_created_by_id_idx").on(table.createdById),
-    index("appraisal_groups_company_id_idx").on(table.companyId),
-  ]
+  }
 );
 
-// Appraisal Group Members table (many-to-many relationship)
-export const appraisalGroupMembers = pgTable(
-  "appraisal_group_members",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    appraisalGroupId: varchar("appraisal_group_id").notNull(),
-    userId: varchar("user_id").notNull(),
-    addedById: varchar("added_by_id").notNull(), // HR Manager who added this member
-    addedAt: timestamp("added_at").defaultNow(),
-  },
-  (table) => [
-    index("appraisal_group_members_group_id_idx").on(table.appraisalGroupId),
-    index("appraisal_group_members_user_id_idx").on(table.userId),
-    unique("appraisal_group_members_unique").on(
-      table.appraisalGroupId,
-      table.userId
-    ), // Prevent duplicate members
-  ]
-);
-
-// Insert schemas
-export const insertAppraisalGroupSchema = createInsertSchema(
-  appraisalGroups
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+// Company schema
+export const insertCompanySchema = z.object({
+  name: z.string().min(1),
+  address: z.string().optional().nullable(),
+  clientContact: z.string().optional().nullable(),
+  email: z.string().email().optional().nullable(),
+  contactNumber: z.string().optional().nullable(),
+  gstNumber: z.string().optional().nullable(),
+  logoUrl: z.string().optional().nullable(),
+  url: z.string().optional().nullable(),
+  companyUrl: z.string().optional().nullable(),
+  status: z.enum(StatusValues).optional().nullable(),
 });
 
-export const insertAppraisalGroupMemberSchema = createInsertSchema(
-  appraisalGroupMembers
-).omit({
-  id: true,
-  addedAt: true,
+// Location schema
+export const insertLocationSchema = z.object({
+  code: z.string().min(1),
+  name: z.string().min(1),
+  state: z.string().optional().nullable(),
+  country: z.string().optional().nullable(),
+  companyId: z.string().optional().nullable(),
+  status: z.enum(StatusValues).optional().nullable(),
+  createdById: z.string().optional().nullable(),
 });
 
-export const insertInitiatedAppraisalSchema = createInsertSchema(
-  initiatedAppraisals
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+// Questionnaire Template schema
+export const insertQuestionnaireTemplateSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional().nullable(),
+  targetRole: z.enum(UserRoles),
+  applicableCategory: z.enum(CategoryValues).optional().nullable(),
+  applicableLevelId: z.string().optional().nullable(),
+  applicableGradeId: z.string().optional().nullable(),
+  applicableLocationId: z.string().optional().nullable(),
+  sendOnMail: z.boolean().optional().default(false),
+  questions: z.any(),
+  year: z.number().optional().nullable(),
+  companyId: z.string().optional().nullable(),
+  status: z.enum(StatusValues).optional().nullable(),
+  createdById: z.string().optional().nullable(),
 });
 
-export const insertInitiatedAppraisalDetailTimingSchema = createInsertSchema(
-  initiatedAppraisalDetailTimings
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+// Review Cycle schema
+export const insertReviewCycleSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional().nullable(),
+  startDate: z.preprocess((val) => new Date(val as string), z.date()),
+  endDate: z.preprocess((val) => new Date(val as string), z.date()),
+  questionnaireTemplateId: z.string().min(1),
+  status: z.enum(StatusValues).optional().nullable(),
 });
 
-export const insertScheduledAppraisalTaskSchema = createInsertSchema(
-  scheduledAppraisalTasks
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+// Evaluation schema
+export const insertEvaluationSchema = z.object({
+  employeeId: z.string().min(1),
+  managerId: z.string().min(1),
+  reviewCycleId: z.string().optional().nullable(),
+  initiatedAppraisalId: z.string().optional().nullable(),
+  selfEvaluationData: z.any().optional().nullable(),
+  selfEvaluationSubmittedAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  managerEvaluationData: z.any().optional().nullable(),
+  managerEvaluationSubmittedAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  overallRating: z.number().optional().nullable(),
+  status: z.string().optional().default("not_started"),
+  meetingScheduledAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  meetingNotes: z.string().optional().nullable(),
+  showNotesToEmployee: z.boolean().optional().default(false),
+  meetingCompletedAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  finalizedAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
 });
 
-// Export types
-export type AppraisalGroup = typeof appraisalGroups.$inferSelect;
-export type InsertAppraisalGroup = z.infer<typeof insertAppraisalGroupSchema>;
-export type AppraisalGroupMember = typeof appraisalGroupMembers.$inferSelect;
-export type InsertAppraisalGroupMember = z.infer<
-  typeof insertAppraisalGroupMemberSchema
->;
-export type InitiatedAppraisal = typeof initiatedAppraisals.$inferSelect;
-export type InsertInitiatedAppraisal = z.infer<
-  typeof insertInitiatedAppraisalSchema
->;
-export type InitiatedAppraisalDetailTiming =
-  typeof initiatedAppraisalDetailTimings.$inferSelect;
-export type InsertInitiatedAppraisalDetailTiming = z.infer<
-  typeof insertInitiatedAppraisalDetailTimingSchema
->;
-export type ScheduledAppraisalTask =
-  typeof scheduledAppraisalTasks.$inferSelect;
-export type InsertScheduledAppraisalTask = z.infer<
-  typeof insertScheduledAppraisalTaskSchema
->;
+// Email Template schema
+export const insertEmailTemplateSchema = z.object({
+  name: z.string().min(1),
+  subject: z.string().min(1),
+  body: z.string().min(1),
+  templateType: z.string().min(1),
+});
 
-// Goal status enum
-export const goalStatusEnum = pgEnum("goal_status", [
-  "on_track",
-  "delayed",
-  "completed",
-  "not_started",
-]);
+// Email Config schema
+export const insertEmailConfigSchema = z.object({
+  smtpHost: z.string().min(1),
+  smtpPort: z.number().min(1).max(65535),
+  smtpUsername: z.string().min(1),
+  smtpPassword: z.string().min(1),
+  fromEmail: z.string().email(),
+  fromName: z.string().min(1),
+  isActive: z.boolean().optional().default(true),
+});
 
-// Development Goals table - Employee development goals linked to evaluations
-export const developmentGoals = pgTable(
-  "development_goals",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    evaluationId: varchar("evaluation_id").notNull(),
-    employeeId: varchar("employee_id").notNull(),
-    description: text("description").notNull(),
-    plannedOutcome: text("planned_outcome").notNull(),
-    targetDate: timestamp("target_date").notNull(),
-    progress: integer("progress").default(0), // 0-100 percentage
-    status: goalStatusEnum("status").default("not_started"), // Calculated based on progress and target date
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-  },
-  (table) => [
-    index("development_goals_evaluation_id_idx").on(table.evaluationId),
-    index("development_goals_employee_id_idx").on(table.employeeId),
-  ]
-);
+// Registration schema
+export const insertRegistrationSchema = z.object({
+  name: z.string().min(1),
+  companyName: z.string().min(1),
+  designation: z.string().min(1),
+  email: z.string().email(),
+  mobile: z.string().min(1),
+  notes: z.string().optional().nullable(),
+});
 
-// Development Goals Relations
-export const developmentGoalsRelations = relations(
-  developmentGoals,
-  ({ one }) => ({
-    evaluation: one(evaluations, {
-      fields: [developmentGoals.evaluationId],
-      references: [evaluations.id],
-    }),
-    employee: one(users, {
-      fields: [developmentGoals.employeeId],
-      references: [users.id],
-    }),
-  })
-);
+// Access Token schema
+export const insertAccessTokenSchema = z.object({
+  token: z.string().min(1),
+  userId: z.string().min(1),
+  evaluationId: z.string().min(1),
+  tokenType: z.string().min(1),
+  expiresAt: z.preprocess((val) => new Date(val as string), z.date()),
+  usedAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  isActive: z.boolean().optional().default(true),
+});
 
-// Insert schema for development goals
-export const insertDevelopmentGoalSchema = createInsertSchema(developmentGoals)
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-    status: true,
-  })
-  .extend({
-    targetDate: z.preprocess((val) => new Date(val as string), z.date()),
-    progress: z.number().min(0).max(100).optional().default(0),
-  });
+// Calendar Credential schema
+export const insertCalendarCredentialSchema = z.object({
+  companyId: z.string().min(1),
+  provider: z.enum(CalendarProviderValues),
+  clientId: z.string().min(1),
+  clientSecret: z.string().min(1),
+  accessToken: z.string().optional().nullable(),
+  refreshToken: z.string().min(1),
+  expiresAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  scope: z.string().optional().nullable(),
+  isActive: z.boolean().optional().default(true),
+});
+
+// Level schema
+export const insertLevelSchema = z.object({
+  code: z.string().min(1),
+  description: z.string().min(1),
+  companyId: z.string().optional().nullable(),
+  status: z.enum(StatusValues).optional().nullable(),
+});
+
+// Grade schema
+export const insertGradeSchema = z.object({
+  code: z.string().min(1),
+  description: z.string().min(1),
+  companyId: z.string().optional().nullable(),
+  status: z.enum(StatusValues).optional().nullable(),
+});
+
+// Department schema
+export const insertDepartmentSchema = z.object({
+  code: z.string().min(1),
+  description: z.string().min(1),
+  companyId: z.string().optional().nullable(),
+  status: z.enum(StatusValues).optional().nullable(),
+});
+
+// Appraisal Cycle schema
+export const insertAppraisalCycleSchema = z.object({
+  code: z.string().min(1),
+  description: z.string().min(1),
+  fromDate: z.preprocess((val) => new Date(val as string), z.date()),
+  toDate: z.preprocess((val) => new Date(val as string), z.date()),
+  companyId: z.string().optional().nullable(),
+  status: z.enum(StatusValues).optional().nullable(),
+});
+
+// Review Frequency schema
+export const insertReviewFrequencySchema = z.object({
+  code: z.string().min(1),
+  description: z.string().min(1),
+  companyId: z.string().optional().nullable(),
+  status: z.enum(StatusValues).optional().nullable(),
+});
+
+// Frequency Calendar schema
+export const insertFrequencyCalendarSchema = z.object({
+  code: z.string().min(1),
+  description: z.string().min(1),
+  appraisalCycleId: z.string().min(1),
+  reviewFrequencyId: z.string().min(1),
+  companyId: z.string().optional().nullable(),
+  status: z.enum(StatusValues).optional().nullable(),
+});
+
+// Frequency Calendar Details schema
+export const insertFrequencyCalendarDetailsSchema = z.object({
+  frequencyCalendarId: z.string().min(1),
+  displayName: z.string().min(1),
+  startDate: z.preprocess((val) => new Date(val as string), z.date()),
+  endDate: z.preprocess((val) => new Date(val as string), z.date()),
+  companyId: z.string().optional().nullable(),
+  status: z.enum(StatusValues).optional().nullable(),
+});
+
+// Publish Questionnaire schema
+export const insertPublishQuestionnaireSchema = z.object({
+  code: z.string().min(1),
+  displayName: z.string().min(1),
+  templateId: z.string().min(1),
+  frequencyCalendarId: z.string().optional().nullable(),
+  companyId: z.string().optional().nullable(),
+  status: z.enum(StatusValues).optional().nullable(),
+  publishType: z.enum(PublishTypeValues).optional().nullable(),
+});
+
+// Appraisal Group schema
+export const insertAppraisalGroupSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional().nullable(),
+  createdById: z.string().min(1),
+  companyId: z.string().optional().nullable(),
+  status: z.enum(StatusValues).optional().nullable(),
+});
+
+// Appraisal Group Member schema
+export const insertAppraisalGroupMemberSchema = z.object({
+  appraisalGroupId: z.string().min(1),
+  userId: z.string().min(1),
+  addedById: z.string().min(1),
+});
+
+// Initiated Appraisal schema
+export const insertInitiatedAppraisalSchema = z.object({
+  appraisalGroupId: z.string().min(1),
+  appraisalType: z.enum(AppraisalTypeValues),
+  questionnaireTemplateIds: z.array(z.string()).optional().nullable(),
+  documentUrl: z.string().optional().nullable(),
+  frequencyCalendarId: z.string().optional().nullable(),
+  daysToInitiate: z.number().optional().default(0),
+  daysToClose: z.number().optional().default(30),
+  numberOfReminders: z.number().min(1).max(10).optional().default(3),
+  excludeTenureLessThanYear: z.boolean().optional().default(false),
+  excludedEmployeeIds: z.array(z.string()).optional().nullable(),
+  status: z.enum(AppraisalCycleStatusValues).optional().default("draft"),
+  makePublic: z.boolean().optional().default(false),
+  publishType: z.enum(PublishTypeValues).optional().default("now"),
+  createdById: z.string().min(1),
+});
+
+// Initiated Appraisal Detail Timing schema
+export const insertInitiatedAppraisalDetailTimingSchema = z.object({
+  initiatedAppraisalId: z.string().min(1),
+  frequencyCalendarDetailId: z.string().min(1),
+  daysToInitiate: z.number().default(0),
+  daysToClose: z.number().default(30),
+  numberOfReminders: z.number().default(3),
+});
+
+// Scheduled Appraisal Task schema
+export const insertScheduledAppraisalTaskSchema = z.object({
+  initiatedAppraisalId: z.string().min(1),
+  frequencyCalendarDetailId: z.string().min(1),
+  scheduledDate: z.preprocess((val) => new Date(val as string), z.date()),
+  status: z.string().default("pending"),
+  executedAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  error: z.string().optional().nullable(),
+});
+
+// Development Goal schema
+export const insertDevelopmentGoalSchema = z.object({
+  evaluationId: z.string().min(1),
+  employeeId: z.string().min(1),
+  description: z.string().min(1),
+  plannedOutcome: z.string().min(1),
+  targetDate: z.preprocess((val) => new Date(val as string), z.date()),
+  progress: z.number().min(0).max(100).optional().default(0),
+});
 
 // Update schema for development goals
-export const updateDevelopmentGoalSchema = z
-  .object({
-    description: z.string().min(1).optional(),
-    plannedOutcome: z.string().min(1).optional(),
-    targetDate: z.preprocess(
-      (val) => (val ? new Date(val as string) : undefined),
-      z.date().optional()
-    ),
-    progress: z.number().min(0).max(100).optional(),
-  })
-  .strict();
+export const updateDevelopmentGoalSchema = z.object({
+  description: z.string().min(1).optional(),
+  plannedOutcome: z.string().min(1).optional(),
+  targetDate: z.preprocess(
+    (val) => (val ? new Date(val as string) : undefined),
+    z.date().optional()
+  ),
+  progress: z.number().min(0).max(100).optional(),
+}).strict();
 
-// Export development goal types
-export type DevelopmentGoal = typeof developmentGoals.$inferSelect;
-export type InsertDevelopmentGoal = z.infer<typeof insertDevelopmentGoalSchema>;
+// Update user schema
+export const updateUserSchema = z.object({
+  email: z.string().email().optional().nullable(),
+  firstName: z.string().optional().nullable(),
+  lastName: z.string().optional().nullable(),
+  profileImageUrl: z.string().optional().nullable(),
+  code: z.string().optional().nullable(),
+  designation: z.string().optional().nullable(),
+  department: z.string().optional().nullable(),
+  dateOfJoining: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  mobileNumber: z.string().optional().nullable(),
+  reportingManagerId: z.string().optional().nullable(),
+  locationId: z.string().optional().nullable(),
+  companyId: z.string().optional().nullable(),
+  levelId: z.string().optional().nullable(),
+  gradeId: z.string().optional().nullable(),
+  role: z.enum(UserRoles).optional().nullable(),
+  roles: z.array(z.enum(UserRoles)).optional(),
+  status: z.enum(StatusValues).optional().nullable(),
+}).partial().strict();
+
+// Password update schema
+export const passwordUpdateSchema = z.object({
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string(),
+}).strict().refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+// Role update schema
+export const roleUpdateSchema = z.object({
+  role: z.enum(UserRoles).optional(),
+  roles: z.array(z.enum(UserRoles)).optional(),
+}).strict();
+
+// Send Reminder Request schema
+export const sendReminderRequestSchema = z.object({
+  employeeId: z.string().min(1, "Employee ID is required"),
+  initiatedAppraisalId: z.string().min(1, "Initiated Appraisal ID is required"),
+}).strict();
+
+// Upsert user schema for Replit Auth
+export const upsertUserSchema = z.object({
+  id: z.string().min(1),
+  email: z.string().email().optional().nullable(),
+  firstName: z.string().optional().nullable(),
+  lastName: z.string().optional().nullable(),
+  profileImageUrl: z.string().optional().nullable(),
+});
+
+// Export type inference from schemas
+export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type UpdateDevelopmentGoal = z.infer<typeof updateDevelopmentGoalSchema>;
