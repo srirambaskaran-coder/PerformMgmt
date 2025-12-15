@@ -2,7 +2,24 @@
 
 Performance Management System - Backend API
 
-## Setup
+## ✨ Architecture
+
+This backend follows a **Layered Architecture** pattern:
+
+```
+Routes → Controllers → Services → Repositories → Database
+```
+
+- **Controllers**: Handle HTTP requests/responses
+- **Services**: Business logic and validation
+- **Repositories**: Database access layer
+- **Middleware**: Authentication, validation, error handling
+
+📖 **For detailed architecture documentation**, see:
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Complete architecture guide
+- [ARCHITECTURE_MIGRATION.md](ARCHITECTURE_MIGRATION.md) - Migration guide for adding features
+
+## 🚀 Quick Start
 
 1. Install dependencies:
 ```bash
@@ -41,7 +58,57 @@ npm run start:qc
 npm run start:prod
 ```
 
-## Environment Configuration
+## 📁 Project Structure
+
+```
+server/
+├── app.ts                      # Application entry point
+├── config/                     # Configuration files
+│   ├── cors.config.ts         # CORS settings
+│   └── database.config.ts     # Database config
+├── controllers/                # HTTP request handlers
+│   ├── auth.controller.ts
+│   └── user.controller.ts
+├── services/                   # Business logic
+│   ├── auth.service.ts
+│   └── user.service.ts
+├── repositories/               # Data access
+│   ├── base.repository.ts
+│   └── user.repository.ts
+├── middleware/                 # Middleware functions
+│   ├── auth.middleware.ts
+│   ├── error.middleware.ts
+│   └── validation.middleware.ts
+├── routes/                     # Route definitions
+│   ├── index.ts
+│   ├── auth.routes.ts
+│   └── user.routes.ts
+└── utils/                      # Utilities
+    ├── logger.ts
+    └── response.ts
+```
+
+## 🔌 API Endpoints
+
+All endpoints are under `/api`:
+
+### Authentication
+- `POST /api/auth/login` - User login
+- `POST /api/auth/logout` - User logout
+- `GET /api/auth/me` - Get current user
+- `GET /api/auth/check` - Check auth status
+
+### Users
+- `GET /api/users` - Get all users (requires auth)
+- `GET /api/users/:id` - Get user by ID (requires auth)
+- `POST /api/users` - Create user (requires admin)
+- `PUT /api/users/:id` - Update user (requires admin)
+- `DELETE /api/users/:id` - Delete user (requires super_admin)
+
+### System
+- `GET /api/health` - Health check
+
+## 🌍 Environment Configuration
 
 The backend automatically selects database and CORS settings based on:
 - `NODE_ENV`: development, production
