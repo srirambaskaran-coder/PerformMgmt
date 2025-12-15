@@ -1,7 +1,9 @@
 # Migration Guide: Calibrate Ratings and Development Goals Features
 
 ## Overview
+
 This migration adds the following features from the `Calibrate-Ratings-and-Development-Goals` branch:
+
 1. **Analytics Dashboard** - Performance trends and insights for HR managers
 2. **Enhanced Calibrate Ratings** - Excel import/export functionality
 3. **Member Development Goals** - Managers can view team members' development goals
@@ -11,14 +13,18 @@ This migration adds the following features from the `Calibrate-Ratings-and-Devel
 ### 1. Frontend Changes
 
 #### New Pages Added
+
 - **`Analytics.tsx`** - Analytics dashboard with performance metrics, charts, and trends
 - **`MemberDevelopmentGoals.tsx`** - Manager view for team development goals
 
 #### Updated Pages
+
 - **`CalibrateRatings.tsx`** - Added Excel import/export functionality with template generation
 
 #### Updated Components
+
 - **`Sidebar.tsx`**
+
   - Added `BarChart3` icon import
   - Added "Analytics" menu item for HR managers
   - Added "Member Development Goals" menu item for managers
@@ -32,10 +38,12 @@ This migration adds the following features from the `Calibrate-Ratings-and-Devel
 #### Updated Files
 
 **`server/storage.ts`**
+
 - Added `getTeamMemberDevelopmentGoals(managerId: string)` method to IStorage interface
 - Implemented method to call `dbo.GetTeamMemberDevelopmentGoals` stored procedure
 
 **`server/routes.ts`**
+
 - Added `/api/analytics/performance-trends` endpoint (GET) - Returns comprehensive analytics data
 - Added `/api/evaluations/calibrate/import` endpoint (POST) - Bulk import calibrated ratings from Excel
 - Added `/api/development-goals/team` endpoint (GET) - Returns development goals for manager's team members
@@ -43,14 +51,17 @@ This migration adds the following features from the `Calibrate-Ratings-and-Devel
 ### 3. Database Changes
 
 **New Stored Procedure Required:**
+
 - **`dbo.GetTeamMemberDevelopmentGoals`** - Retrieves development goals for employees managed by a specific manager
 
 **SQL Script Location:**
+
 - `database/stored_procedures_new_features.sql`
 
 ## Installation Steps
 
 ### Step 1: Run Database Migration
+
 Execute the SQL script to create the new stored procedure:
 
 ```sql
@@ -59,21 +70,26 @@ Execute the SQL script to create the new stored procedure:
 ```
 
 The script creates:
+
 - `dbo.GetTeamMemberDevelopmentGoals` stored procedure
 
 ### Step 2: Verify Existing Stored Procedures
+
 Make sure these procedures already exist (they should from your previous setup):
+
 - `dbo.GetEvaluationsForCalibration` - Returns evaluations with calibration data
 - `dbo.UpdateEvaluationCalibration` - Updates calibration fields
 
 If they don't exist, uncomment and run the reference implementations in the SQL script.
 
 ### Step 3: Install Dependencies (if needed)
+
 The new features use existing dependencies. No new packages required.
 
 ### Step 4: Test the Features
 
 #### Test Analytics Dashboard
+
 1. Login as HR Manager
 2. Navigate to **Analytics** from sidebar
 3. Verify you see:
@@ -83,6 +99,7 @@ The new features use existing dependencies. No new packages required.
    - Department/Location/Level/Grade comparisons
 
 #### Test Enhanced Calibrate Ratings
+
 1. Login as HR Manager
 2. Navigate to **Calibrate Ratings**
 3. Test:
@@ -91,6 +108,7 @@ The new features use existing dependencies. No new packages required.
    - Import from Excel (upload button)
 
 #### Test Member Development Goals
+
 1. Login as Manager
 2. Navigate to **Member Development Goals**
 3. Verify you see:
@@ -101,6 +119,7 @@ The new features use existing dependencies. No new packages required.
 ## API Endpoints Added
 
 ### 1. Analytics Endpoint
+
 ```
 GET /api/analytics/performance-trends
 Roles: super_admin, admin, hr_manager
@@ -117,6 +136,7 @@ Returns: {
 ```
 
 ### 2. Import Calibrations
+
 ```
 POST /api/evaluations/calibrate/import
 Roles: hr_manager
@@ -137,6 +157,7 @@ Returns: {
 ```
 
 ### 3. Team Development Goals
+
 ```
 GET /api/development-goals/team
 Roles: manager
@@ -155,6 +176,7 @@ Returns: [
 ## Feature Details
 
 ### Analytics Dashboard Features
+
 - **Summary Metrics**: Total employees, completed evaluations, average ratings
 - **Rating Distribution**: Visual breakdown of ratings (1-5)
 - **Cycle Performance**: Trends across appraisal cycles
@@ -164,6 +186,7 @@ Returns: [
 - **Manager Performance**: Team sizes and average ratings given
 
 ### Calibrate Ratings Enhancements
+
 - **Excel Export**: Export all evaluations to Excel for offline work
 - **Template Download**: Pre-formatted Excel template with instructions
 - **Bulk Import**: Upload calibrated ratings from Excel (max 500 records)
@@ -171,6 +194,7 @@ Returns: [
 - **Error Reporting**: Detailed errors for failed imports
 
 ### Member Development Goals
+
 - **Team View**: See all development goals for direct reports
 - **Advanced Filters**: Filter by appraisal cycle, employee, location, etc.
 - **Goal Tracking**: View progress and status of each goal
@@ -181,6 +205,7 @@ Returns: [
 If you need to rollback these changes:
 
 1. **Revert Frontend Changes**:
+
    ```bash
    cd D:\PMS_newchanges\PerformMgmt
    git checkout HEAD~1 client/src/App.tsx
@@ -192,6 +217,7 @@ If you need to rollback these changes:
    ```
 
 2. **Revert Backend Changes**:
+
    ```bash
    git checkout HEAD~1 server/routes.ts
    git checkout HEAD~1 server/storage.ts
@@ -213,6 +239,7 @@ If you need to rollback these changes:
 ## Support
 
 If you encounter issues:
+
 1. Check browser console for frontend errors
 2. Check server logs for backend errors
 3. Verify stored procedures exist in database
@@ -235,6 +262,7 @@ If you encounter issues:
 - [ ] All existing features still work
 
 ---
+
 **Migration completed on**: December 11, 2025
 **Source branch**: Calibrate-Ratings-and-Development-Goals
 **Source repo**: https://github.com/kirankshetty/PerformMgmt.git

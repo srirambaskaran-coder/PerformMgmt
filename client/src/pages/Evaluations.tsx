@@ -488,6 +488,8 @@ export default function Evaluations() {
                   placeholder="Enter your detailed response..."
                   className="min-h-[100px] mt-1"
                   data-testid={`question-response-${question.id}`}
+                  disabled={!!selectedEvaluation?.selfEvaluationSubmittedAt}
+                  readOnly={!!selectedEvaluation?.selfEvaluationSubmittedAt}
                 />
               </div>
             </div>
@@ -517,8 +519,12 @@ export default function Evaluations() {
                   onValueChange={(value) =>
                     updateResponse("rating", parseInt(value))
                   }
+                  disabled={!!selectedEvaluation?.selfEvaluationSubmittedAt}
                 >
-                  <SelectTrigger data-testid={`question-rating-${question.id}`}>
+                  <SelectTrigger
+                    data-testid={`question-rating-${question.id}`}
+                    disabled={!!selectedEvaluation?.selfEvaluationSubmittedAt}
+                  >
                     <SelectValue placeholder="Select rating" />
                   </SelectTrigger>
                   <SelectContent>
@@ -540,6 +546,8 @@ export default function Evaluations() {
                   placeholder="Explain your rating..."
                   className="min-h-[80px] mt-1"
                   data-testid={`question-response-${question.id}`}
+                  disabled={!!selectedEvaluation?.selfEvaluationSubmittedAt}
+                  readOnly={!!selectedEvaluation?.selfEvaluationSubmittedAt}
                 />
               </div>
             </div>
@@ -642,9 +650,14 @@ export default function Evaluations() {
                           <Calendar className="h-4 w-4" />
                           <span>
                             Due:{" "}
-                            {evaluation.reviewCycle?.endDate
+                            {evaluation.createdAt
                               ? new Date(
-                                  evaluation.reviewCycle.endDate
+                                  new Date(evaluation.createdAt).getTime() +
+                                    7 * 24 * 60 * 60 * 1000
+                                ).toLocaleDateString()
+                              : evaluation.frequencyCalendarDetail?.endDate
+                              ? new Date(
+                                  evaluation.frequencyCalendarDetail.endDate
                                 ).toLocaleDateString()
                               : "TBD"}
                           </span>

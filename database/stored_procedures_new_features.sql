@@ -14,20 +14,20 @@ BEGIN
     SET NOCOUNT ON;
 
     SELECT 
-        dg.Id,
-        dg.EmployeeId,
-        dg.EvaluationId,
-        dg.Description,
-        dg.PlannedOutcome,
-        dg.TargetDate,
-        dg.Progress,
-        dg.Status,
-        dg.CreatedAt,
-        dg.UpdatedAt
-    FROM DevelopmentGoals dg
-    INNER JOIN Users emp ON dg.EmployeeId = emp.Id
-    WHERE emp.ManagerId = @ManagerId
-    ORDER BY dg.CreatedAt DESC;
+        dg.id AS Id,
+        dg.employee_id AS EmployeeId,
+        dg.evaluation_id AS EvaluationId,
+        dg.description AS Description,
+        dg.planned_outcome AS PlannedOutcome,
+        dg.target_date AS TargetDate,
+        dg.progress AS Progress,
+        dg.status AS Status,
+        dg.created_at AS CreatedAt,
+        dg.updated_at AS UpdatedAt
+    FROM development_goals dg
+    INNER JOIN users emp ON dg.employee_id = emp.id
+    WHERE emp.reporting_manager_id = @ManagerId
+    ORDER BY dg.created_at DESC;
 END
 GO
 

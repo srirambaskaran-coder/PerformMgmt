@@ -332,7 +332,12 @@ export default function Meetings() {
                     className="text-2xl font-bold"
                     data-testid="total-meetings"
                   >
-                    {(evaluations || []).length}
+                    {
+                      (evaluations || []).filter(
+                        (e: EvaluationWithDetails) =>
+                          e.meetingScheduledAt || e.meetingCompletedAt
+                      ).length
+                    }
                   </p>
                 </div>
               </div>

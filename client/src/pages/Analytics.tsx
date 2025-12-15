@@ -1,5 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -99,20 +105,28 @@ interface AnalyticsData {
   }[];
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
+const COLORS = [
+  "#0088FE",
+  "#00C49F",
+  "#FFBB28",
+  "#FF8042",
+  "#8884d8",
+  "#82ca9d",
+  "#ffc658",
+];
 const RATING_COLORS: Record<number, string> = {
-  1: '#fca5a5',
-  2: '#fdba74',
-  3: '#fde047',
-  4: '#86efac',
-  5: '#93c5fd',
+  1: "#fca5a5",
+  2: "#fdba74",
+  3: "#fde047",
+  4: "#86efac",
+  5: "#93c5fd",
 };
 const RATING_LABELS: Record<number, string> = {
-  1: 'Needs Improvement',
-  2: 'Below Expectations',
-  3: 'Meets Expectations',
-  4: 'Exceeds Expectations',
-  5: 'Outstanding',
+  1: "Needs Improvement",
+  2: "Below Expectations",
+  3: "Meets Expectations",
+  4: "Exceeds Expectations",
+  5: "Outstanding",
 };
 
 export default function Analytics() {
@@ -123,7 +137,7 @@ export default function Analytics() {
   if (isLoading) {
     return (
       <RoleGuard allowedRoles={["hr_manager", "admin", "super_admin"]}>
-        <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div className="p-6 w-full space-y-6">
           <div className="flex items-center gap-3">
             <BarChart3 className="h-8 w-8 text-primary" />
             <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
@@ -145,11 +159,13 @@ export default function Analytics() {
   if (error || !data) {
     return (
       <RoleGuard allowedRoles={["hr_manager", "admin", "super_admin"]}>
-        <div className="p-6 max-w-7xl mx-auto">
+        <div className="p-6 w-full">
           <Card>
             <CardContent className="py-12 text-center">
               <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-              <p className="text-muted-foreground">Failed to load analytics data</p>
+              <p className="text-muted-foreground">
+                Failed to load analytics data
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -157,24 +173,39 @@ export default function Analytics() {
     );
   }
 
-  const { summary, ratingDistribution, cyclePerformance, departmentStats, locationStats, levelStats, gradeStats, managerStats } = data;
+  const {
+    summary,
+    ratingDistribution,
+    cyclePerformance,
+    departmentStats,
+    locationStats,
+    levelStats,
+    gradeStats,
+    managerStats,
+  } = data;
 
-  const pieData = ratingDistribution.map((item) => ({
-    name: RATING_LABELS[item.rating] || `Rating ${item.rating}`,
-    value: item.count,
-    rating: item.rating,
-    color: RATING_COLORS[item.rating] || '#8884d8',
-  })).filter(item => item.value > 0);
+  const pieData = ratingDistribution
+    .map((item) => ({
+      name: RATING_LABELS[item.rating] || `Rating ${item.rating}`,
+      value: item.count,
+      rating: item.rating,
+      color: RATING_COLORS[item.rating] || "#8884d8",
+    }))
+    .filter((item) => item.value > 0);
 
   return (
     <RoleGuard allowedRoles={["hr_manager", "admin", "super_admin"]}>
-      <div className="p-6 max-w-7xl mx-auto space-y-6" data-testid="analytics-dashboard">
+      <div className="p-6 w-full space-y-6" data-testid="analytics-dashboard">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <BarChart3 className="h-8 w-8 text-primary" />
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Analytics Dashboard</h1>
-              <p className="text-muted-foreground">Performance trends and insights</p>
+              <h1 className="text-3xl font-bold text-foreground">
+                Analytics Dashboard
+              </h1>
+              <p className="text-muted-foreground">
+                Performance trends and insights
+              </p>
             </div>
           </div>
         </div>
@@ -187,7 +218,9 @@ export default function Analytics() {
                   <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Employees</p>
+                  <p className="text-sm text-muted-foreground">
+                    Total Employees
+                  </p>
                   <p className="text-2xl font-bold">{summary.totalEmployees}</p>
                 </div>
               </div>
@@ -201,8 +234,12 @@ export default function Analytics() {
                   <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Completed Evaluations</p>
-                  <p className="text-2xl font-bold">{summary.completedEvaluations}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Completed Evaluations
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {summary.completedEvaluations}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -215,7 +252,9 @@ export default function Analytics() {
                   <Star className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Average Rating</p>
+                  <p className="text-sm text-muted-foreground">
+                    Average Rating
+                  </p>
                   <p className="text-2xl font-bold">{summary.averageRating}</p>
                 </div>
               </div>
@@ -229,8 +268,12 @@ export default function Analytics() {
                   <Target className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Calibration Rate</p>
-                  <p className="text-2xl font-bold">{summary.calibrationRate}%</p>
+                  <p className="text-sm text-muted-foreground">
+                    Calibration Rate
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {summary.calibrationRate}%
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -243,7 +286,9 @@ export default function Analytics() {
                   <Award className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Top Performers</p>
+                  <p className="text-sm text-muted-foreground">
+                    Top Performers
+                  </p>
                   <p className="text-2xl font-bold">{summary.topPerformers}</p>
                   <p className="text-xs text-muted-foreground">Rating 5</p>
                 </div>
@@ -258,8 +303,12 @@ export default function Analytics() {
                   <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Needs Improvement</p>
-                  <p className="text-2xl font-bold">{summary.needsImprovement}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Needs Improvement
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {summary.needsImprovement}
+                  </p>
                   <p className="text-xs text-muted-foreground">Rating 1-2</p>
                 </div>
               </div>
@@ -273,8 +322,12 @@ export default function Analytics() {
                   <Calendar className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Meetings Completed</p>
-                  <p className="text-2xl font-bold">{summary.meetingsCompletedRate}%</p>
+                  <p className="text-sm text-muted-foreground">
+                    Meetings Completed
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {summary.meetingsCompletedRate}%
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -287,8 +340,12 @@ export default function Analytics() {
                   <TrendingUp className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Avg Calibrated Rating</p>
-                  <p className="text-2xl font-bold">{summary.averageCalibratedRating || '-'}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Avg Calibrated Rating
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {summary.averageCalibratedRating || "-"}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -297,12 +354,24 @@ export default function Analytics() {
 
         <Tabs defaultValue="distribution" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="distribution" data-testid="tab-distribution">Rating Distribution</TabsTrigger>
-            <TabsTrigger value="trends" data-testid="tab-trends">Performance Trends</TabsTrigger>
-            <TabsTrigger value="departments" data-testid="tab-departments">By Department</TabsTrigger>
-            <TabsTrigger value="locations" data-testid="tab-locations">By Location</TabsTrigger>
-            <TabsTrigger value="levels" data-testid="tab-levels">By Level/Grade</TabsTrigger>
-            <TabsTrigger value="managers" data-testid="tab-managers">By Manager</TabsTrigger>
+            <TabsTrigger value="distribution" data-testid="tab-distribution">
+              Rating Distribution
+            </TabsTrigger>
+            <TabsTrigger value="trends" data-testid="tab-trends">
+              Performance Trends
+            </TabsTrigger>
+            <TabsTrigger value="departments" data-testid="tab-departments">
+              By Department
+            </TabsTrigger>
+            <TabsTrigger value="locations" data-testid="tab-locations">
+              By Location
+            </TabsTrigger>
+            <TabsTrigger value="levels" data-testid="tab-levels">
+              By Level/Grade
+            </TabsTrigger>
+            <TabsTrigger value="managers" data-testid="tab-managers">
+              By Manager
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="distribution" className="space-y-4">
@@ -313,22 +382,44 @@ export default function Analytics() {
                     <BarChart3 className="h-5 w-5" />
                     Rating Distribution
                   </CardTitle>
-                  <CardDescription>Count of employees by rating</CardDescription>
+                  <CardDescription>
+                    Count of employees by rating
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={ratingDistribution}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="rating" tickFormatter={(val) => `${val} Star${val !== 1 ? 's' : ''}`} />
+                        <XAxis
+                          dataKey="rating"
+                          tickFormatter={(val) =>
+                            `${val} Star${val !== 1 ? "s" : ""}`
+                          }
+                        />
                         <YAxis />
-                        <Tooltip 
-                          formatter={(value: number, name: string) => [value, name === 'count' ? 'Manager Rating' : 'Calibrated Rating']}
+                        <Tooltip
+                          formatter={(value: number, name: string) => [
+                            value,
+                            name === "count"
+                              ? "Manager Rating"
+                              : "Calibrated Rating",
+                          ]}
                           labelFormatter={(label) => `Rating: ${label}`}
                         />
                         <Legend />
-                        <Bar dataKey="count" name="Manager Rating" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="calibratedCount" name="Calibrated Rating" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                        <Bar
+                          dataKey="count"
+                          name="Manager Rating"
+                          fill="#3b82f6"
+                          radius={[4, 4, 0, 0]}
+                        />
+                        <Bar
+                          dataKey="calibratedCount"
+                          name="Calibrated Rating"
+                          fill="#8b5cf6"
+                          radius={[4, 4, 0, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -341,7 +432,9 @@ export default function Analytics() {
                     <Star className="h-5 w-5" />
                     Rating Breakdown
                   </CardTitle>
-                  <CardDescription>Percentage of employees by rating category</CardDescription>
+                  <CardDescription>
+                    Percentage of employees by rating category
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="h-80">
@@ -349,10 +442,10 @@ export default function Analytics() {
                       <PieChart>
                         <Pie
                           data={pieData}
-                          cx="35%"
-                          cy="50%"
+                          cx="50%"
+                          cy="45%"
                           labelLine={false}
-                          outerRadius={90}
+                          outerRadius={80}
                           fill="#8884d8"
                           dataKey="value"
                         >
@@ -360,15 +453,27 @@ export default function Analytics() {
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value: number) => [`${value} employees`, 'Count']} />
-                        <Legend 
-                          layout="vertical" 
-                          verticalAlign="middle" 
-                          align="right"
+                        <Tooltip
+                          formatter={(value: number) => [
+                            `${value} employees`,
+                            "Count",
+                          ]}
+                        />
+                        <Legend
+                          layout="horizontal"
+                          verticalAlign="bottom"
+                          align="center"
+                          wrapperStyle={{ paddingTop: "20px" }}
                           formatter={(value: string, entry: any) => {
-                            const item = pieData.find(p => p.name === value);
-                            const total = pieData.reduce((sum, p) => sum + p.value, 0);
-                            const percent = item && total > 0 ? Math.round((item.value / total) * 100) : 0;
+                            const item = pieData.find((p) => p.name === value);
+                            const total = pieData.reduce(
+                              (sum, p) => sum + p.value,
+                              0
+                            );
+                            const percent =
+                              item && total > 0
+                                ? Math.round((item.value / total) * 100)
+                                : 0;
                             return `${value} (${percent}%)`;
                           }}
                         />
@@ -386,25 +491,38 @@ export default function Analytics() {
               <CardContent>
                 <div className="space-y-4">
                   {ratingDistribution.map((item) => {
-                    const total = ratingDistribution.reduce((sum, r) => sum + r.count, 0);
-                    const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
+                    const total = ratingDistribution.reduce(
+                      (sum, r) => sum + r.count,
+                      0
+                    );
+                    const percentage =
+                      total > 0 ? Math.round((item.count / total) * 100) : 0;
                     return (
-                      <div key={item.rating} className="flex items-center gap-4">
+                      <div
+                        key={item.rating}
+                        className="flex items-center gap-4"
+                      >
                         <div className="w-48 flex items-center gap-2">
-                          <Badge 
-                            className="w-8 h-8 flex items-center justify-center text-white" 
-                            style={{ backgroundColor: RATING_COLORS[item.rating] }}
+                          <Badge
+                            className="w-8 h-8 flex items-center justify-center text-white"
+                            style={{
+                              backgroundColor: RATING_COLORS[item.rating],
+                            }}
                           >
                             {item.rating}
                           </Badge>
-                          <span className="text-sm font-medium">{RATING_LABELS[item.rating]}</span>
+                          <span className="text-sm font-medium">
+                            {RATING_LABELS[item.rating]}
+                          </span>
                         </div>
                         <div className="flex-1">
                           <Progress value={percentage} className="h-2" />
                         </div>
                         <div className="w-24 text-right">
                           <span className="font-medium">{item.count}</span>
-                          <span className="text-muted-foreground ml-1">({percentage}%)</span>
+                          <span className="text-muted-foreground ml-1">
+                            ({percentage}%)
+                          </span>
                         </div>
                       </div>
                     );
@@ -421,7 +539,9 @@ export default function Analytics() {
                   <TrendingUp className="h-5 w-5" />
                   Performance Trends by Appraisal Cycle
                 </CardTitle>
-                <CardDescription>Average ratings and completion rates across appraisal cycles</CardDescription>
+                <CardDescription>
+                  Average ratings and completion rates across appraisal cycles
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {cyclePerformance.length > 0 ? (
@@ -431,18 +551,42 @@ export default function Analytics() {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="cycleName" />
                         <YAxis yAxisId="left" domain={[0, 5]} />
-                        <YAxis yAxisId="right" orientation="right" domain={[0, 100]} />
+                        <YAxis
+                          yAxisId="right"
+                          orientation="right"
+                          domain={[0, 100]}
+                        />
                         <Tooltip />
                         <Legend />
-                        <Bar yAxisId="left" dataKey="averageRating" name="Avg Rating" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar yAxisId="left" dataKey="averageCalibratedRating" name="Avg Calibrated" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                        <Bar yAxisId="right" dataKey="completionRate" name="Completion %" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                        <Bar
+                          yAxisId="left"
+                          dataKey="averageRating"
+                          name="Avg Rating"
+                          fill="#3b82f6"
+                          radius={[4, 4, 0, 0]}
+                        />
+                        <Bar
+                          yAxisId="left"
+                          dataKey="averageCalibratedRating"
+                          name="Avg Calibrated"
+                          fill="#8b5cf6"
+                          radius={[4, 4, 0, 0]}
+                        />
+                        <Bar
+                          yAxisId="right"
+                          dataKey="completionRate"
+                          name="Completion %"
+                          fill="#22c55e"
+                          radius={[4, 4, 0, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 ) : (
                   <div className="h-80 flex items-center justify-center">
-                    <p className="text-muted-foreground">No appraisal cycle data available</p>
+                    <p className="text-muted-foreground">
+                      No appraisal cycle data available
+                    </p>
                   </div>
                 )}
               </CardContent>
@@ -458,23 +602,40 @@ export default function Analytics() {
                   <CardContent>
                     <div className="space-y-3">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Total Evaluations</span>
-                        <span className="font-medium">{cycle.totalEvaluations}</span>
+                        <span className="text-muted-foreground">
+                          Total Evaluations
+                        </span>
+                        <span className="font-medium">
+                          {cycle.totalEvaluations}
+                        </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Average Rating</span>
+                        <span className="text-muted-foreground">
+                          Average Rating
+                        </span>
                         <Badge variant="secondary">{cycle.averageRating}</Badge>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Calibrated Rating</span>
-                        <Badge variant="secondary">{cycle.averageCalibratedRating || '-'}</Badge>
+                        <span className="text-muted-foreground">
+                          Calibrated Rating
+                        </span>
+                        <Badge variant="secondary">
+                          {cycle.averageCalibratedRating || "-"}
+                        </Badge>
                       </div>
                       <div>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-muted-foreground">Completion Rate</span>
-                          <span className="font-medium">{cycle.completionRate}%</span>
+                          <span className="text-muted-foreground">
+                            Completion Rate
+                          </span>
+                          <span className="font-medium">
+                            {cycle.completionRate}%
+                          </span>
                         </div>
-                        <Progress value={cycle.completionRate} className="h-2" />
+                        <Progress
+                          value={cycle.completionRate}
+                          className="h-2"
+                        />
                       </div>
                     </div>
                   </CardContent>
@@ -499,16 +660,27 @@ export default function Analytics() {
                       <BarChart data={departmentStats} layout="vertical">
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis type="number" domain={[0, 5]} />
-                        <YAxis dataKey="department" type="category" width={150} />
+                        <YAxis
+                          dataKey="department"
+                          type="category"
+                          width={150}
+                        />
                         <Tooltip />
                         <Legend />
-                        <Bar dataKey="averageRating" name="Average Rating" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                        <Bar
+                          dataKey="averageRating"
+                          name="Average Rating"
+                          fill="#3b82f6"
+                          radius={[0, 4, 4, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 ) : (
                   <div className="h-80 flex items-center justify-center">
-                    <p className="text-muted-foreground">No department data available</p>
+                    <p className="text-muted-foreground">
+                      No department data available
+                    </p>
                   </div>
                 )}
               </CardContent>
@@ -520,15 +692,23 @@ export default function Analytics() {
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div 
-                          className="w-10 h-10 rounded-lg flex items-center justify-center" 
-                          style={{ backgroundColor: COLORS[index % COLORS.length] + '20' }}
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center"
+                          style={{
+                            backgroundColor:
+                              COLORS[index % COLORS.length] + "20",
+                          }}
                         >
-                          <Building2 className="h-5 w-5" style={{ color: COLORS[index % COLORS.length] }} />
+                          <Building2
+                            className="h-5 w-5"
+                            style={{ color: COLORS[index % COLORS.length] }}
+                          />
                         </div>
                         <div>
                           <p className="font-medium">{dept.department}</p>
-                          <p className="text-sm text-muted-foreground">{dept.employeeCount} employees</p>
+                          <p className="text-sm text-muted-foreground">
+                            {dept.employeeCount} employees
+                          </p>
                         </div>
                       </div>
                       <Badge variant="secondary" className="text-lg px-3 py-1">
@@ -560,14 +740,26 @@ export default function Analytics() {
                         <YAxis domain={[0, 5]} />
                         <Tooltip />
                         <Legend />
-                        <Bar dataKey="averageRating" name="Average Rating" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="employeeCount" name="Employee Count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        <Bar
+                          dataKey="averageRating"
+                          name="Average Rating"
+                          fill="#22c55e"
+                          radius={[4, 4, 0, 0]}
+                        />
+                        <Bar
+                          dataKey="employeeCount"
+                          name="Employee Count"
+                          fill="#3b82f6"
+                          radius={[4, 4, 0, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 ) : (
                   <div className="h-80 flex items-center justify-center">
-                    <p className="text-muted-foreground">No location data available</p>
+                    <p className="text-muted-foreground">
+                      No location data available
+                    </p>
                   </div>
                 )}
               </CardContent>
@@ -582,7 +774,9 @@ export default function Analytics() {
                     <Layers className="h-5 w-5" />
                     Performance by Level
                   </CardTitle>
-                  <CardDescription>Average ratings across organizational levels</CardDescription>
+                  <CardDescription>
+                    Average ratings across organizational levels
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {levelStats.length > 0 ? (
@@ -593,13 +787,20 @@ export default function Analytics() {
                           <XAxis type="number" domain={[0, 5]} />
                           <YAxis dataKey="level" type="category" width={120} />
                           <Tooltip />
-                          <Bar dataKey="averageRating" name="Average Rating" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                          <Bar
+                            dataKey="averageRating"
+                            name="Average Rating"
+                            fill="#8b5cf6"
+                            radius={[0, 4, 4, 0]}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                   ) : (
                     <div className="h-80 flex items-center justify-center">
-                      <p className="text-muted-foreground">No level data available</p>
+                      <p className="text-muted-foreground">
+                        No level data available
+                      </p>
                     </div>
                   )}
                 </CardContent>
@@ -611,7 +812,9 @@ export default function Analytics() {
                     <Award className="h-5 w-5" />
                     Performance by Grade
                   </CardTitle>
-                  <CardDescription>Average ratings across job grades</CardDescription>
+                  <CardDescription>
+                    Average ratings across job grades
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {gradeStats.length > 0 ? (
@@ -622,13 +825,20 @@ export default function Analytics() {
                           <XAxis type="number" domain={[0, 5]} />
                           <YAxis dataKey="grade" type="category" width={120} />
                           <Tooltip />
-                          <Bar dataKey="averageRating" name="Average Rating" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                          <Bar
+                            dataKey="averageRating"
+                            name="Average Rating"
+                            fill="#f59e0b"
+                            radius={[0, 4, 4, 0]}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                   ) : (
                     <div className="h-80 flex items-center justify-center">
-                      <p className="text-muted-foreground">No grade data available</p>
+                      <p className="text-muted-foreground">
+                        No grade data available
+                      </p>
                     </div>
                   )}
                 </CardContent>
@@ -643,7 +853,9 @@ export default function Analytics() {
                   <UserCheck className="h-5 w-5" />
                   Manager Rating Patterns
                 </CardTitle>
-                <CardDescription>Average ratings given by each manager (sorted by team size)</CardDescription>
+                <CardDescription>
+                  Average ratings given by each manager (sorted by team size)
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {managerStats.length > 0 ? (
@@ -651,19 +863,38 @@ export default function Analytics() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={managerStats.slice(0, 10)}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="managerName" angle={-45} textAnchor="end" height={80} />
+                        <XAxis
+                          dataKey="managerName"
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                        />
                         <YAxis yAxisId="left" domain={[0, 5]} />
                         <YAxis yAxisId="right" orientation="right" />
                         <Tooltip />
                         <Legend />
-                        <Bar yAxisId="left" dataKey="averageRatingGiven" name="Avg Rating Given" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar yAxisId="right" dataKey="teamSize" name="Team Size" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                        <Bar
+                          yAxisId="left"
+                          dataKey="averageRatingGiven"
+                          name="Avg Rating Given"
+                          fill="#3b82f6"
+                          radius={[4, 4, 0, 0]}
+                        />
+                        <Bar
+                          yAxisId="right"
+                          dataKey="teamSize"
+                          name="Team Size"
+                          fill="#22c55e"
+                          radius={[4, 4, 0, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 ) : (
                   <div className="h-80 flex items-center justify-center">
-                    <p className="text-muted-foreground">No manager data available</p>
+                    <p className="text-muted-foreground">
+                      No manager data available
+                    </p>
                   </div>
                 )}
               </CardContent>
@@ -674,20 +905,34 @@ export default function Analytics() {
                 <Card key={manager.managerId}>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
-                      <div 
+                      <div
                         className="w-10 h-10 rounded-full flex items-center justify-center text-white font-medium"
-                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                        style={{
+                          backgroundColor: COLORS[index % COLORS.length],
+                        }}
                       >
-                        {manager.managerName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        {manager.managerName
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .slice(0, 2)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{manager.managerName}</p>
-                        <p className="text-sm text-muted-foreground">{manager.teamSize} direct reports</p>
+                        <p className="font-medium truncate">
+                          {manager.managerName}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {manager.teamSize} direct reports
+                        </p>
                       </div>
                     </div>
                     <div className="mt-3 flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Avg Rating Given</span>
-                      <Badge variant="secondary">{manager.averageRatingGiven}</Badge>
+                      <span className="text-sm text-muted-foreground">
+                        Avg Rating Given
+                      </span>
+                      <Badge variant="secondary">
+                        {manager.averageRatingGiven}
+                      </Badge>
                     </div>
                   </CardContent>
                 </Card>

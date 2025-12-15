@@ -510,6 +510,13 @@ export default function EmployeeManagement() {
     }
   }, [isAdmin, currentUser?.companyId, editingUser, form]);
 
+  // Clear form data when component unmounts (navigation/refresh)
+  useEffect(() => {
+    return () => {
+      form.reset();
+    };
+  }, []);
+
   const onSubmit = (data: InsertUser) => {
     // Convert "none" placeholder values to null
     const processedData = {
@@ -669,7 +676,10 @@ export default function EmployeeManagement() {
             >
               <DialogTrigger asChild>
                 <Button
-                  onClick={() => setIsCreateModalOpen(true)}
+                  onClick={() => {
+                    resetForm(); // Reset form to clear any previous data
+                    setIsCreateModalOpen(true);
+                  }}
                   data-testid="add-user-button"
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -739,6 +749,7 @@ export default function EmployeeManagement() {
                             <FormControl>
                               <Input
                                 type="email"
+                                autoComplete="off"
                                 {...field}
                                 value={field.value ?? ""}
                                 data-testid="input-email"
@@ -1150,6 +1161,7 @@ export default function EmployeeManagement() {
                                   <div className="relative">
                                     <Input
                                       type={showPassword ? "text" : "password"}
+                                      autoComplete="new-password"
                                       placeholder={
                                         editingUser &&
                                         canChangePassword(editingUser)
@@ -1208,6 +1220,7 @@ export default function EmployeeManagement() {
                                           ? "text"
                                           : "password"
                                       }
+                                      autoComplete="new-password"
                                       placeholder={
                                         editingUser &&
                                         canChangePassword(editingUser)

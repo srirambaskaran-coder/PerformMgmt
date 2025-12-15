@@ -3560,7 +3560,9 @@ export class DatabaseStorage implements IStorage {
     } catch {}
   }
 
-  async getTeamMemberDevelopmentGoals(managerId: string): Promise<DevelopmentGoal[]> {
+  async getTeamMemberDevelopmentGoals(
+    managerId: string
+  ): Promise<DevelopmentGoal[]> {
     const pool = await getPool();
     const req = pool.request().input("ManagerId", managerId);
     const result = await req.execute("dbo.GetTeamMemberDevelopmentGoals");

@@ -49,6 +49,17 @@ async function getUserCompanyId(userId: string): Promise<string | undefined> {
   return user?.companyId || undefined;
 }
 
+// Interface for employee dashboard tasks
+interface UpcomingTask {
+  id: string;
+  title: string;
+  type: "evaluation" | "meeting" | "goal" | "feedback";
+  dueDate: string;
+  priority: "high" | "medium" | "low";
+  description: string;
+  status: "pending" | "in_progress";
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup session-based authentication
   setupAuth(app);
@@ -653,44 +664,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const requestingUserId = req.user.id;
+        const companyId = await getUserCompanyId(requestingUserId);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User must belong to a company" });
+        }
+
+        // Get all initiated appraisals for the company
         const initiatedAppraisals = await storage.getInitiatedAppraisals(
-          requestingUserId
+          companyId
         );
-        const evaluations = await storage.getEvaluations();
         const activeAppraisals = initiatedAppraisals.filter(
           (a) => a.status === "active"
         );
 
-        const totalEmployeesInCycle = activeAppraisals.length * 10; // Placeholder
-
-        const completedEvaluations = evaluations.filter(
-          (e) => e.status === "completed"
-        );
-        const pendingEvaluations = evaluations.filter(
-          (e) => e.status === "in_progress"
-        );
-        const overdueEvaluations = evaluations.filter((e) => {
-          // Simple logic for overdue - in reality would check actual dates
-          return e.status === "in_progress" && Math.random() < 0.1;
+        // Get all evaluations for the company
+        const allEvaluations = await storage.getEvaluations();
+        const companyEvaluations = allEvaluations.filter((e: any) => {
+          // Filter by company through initiated appraisal link or get all for now
+          return true; // TODO: Filter by company when evaluation has companyId
         });
+
+        // Calculate total employees in active cycles using group members
+        let totalEmployeesInCycle = 0;
+        for (const appraisal of activeAppraisals) {
+          try {
+            const members = await storage.getAppraisalGroupMembers(
+              appraisal.appraisalGroupId,
+              requestingUserId
+            );
+            totalEmployeesInCycle += members.length;
+          } catch (e) {
+            console.error("Error counting group members:", e);
+          }
+        }
+
+        const completedEvaluations = companyEvaluations.filter(
+          (e: any) => e.status === "completed" || e.finalizedAt
+        );
+        const pendingEvaluations = companyEvaluations.filter(
+          (e: any) =>
+            e.status === "in_progress" ||
+            e.status === "not_started" ||
+            e.status === "reviewed"
+        );
+
+        // Calculate overdue evaluations (those without self evaluation after 7 days)
+        const now = new Date();
+        const overdueEvaluations = companyEvaluations.filter((e: any) => {
+          if (e.status === "completed" || e.finalizedAt) return false;
+          if (e.createdAt) {
+            const created = new Date(e.createdAt);
+            const daysSinceCreated = Math.floor(
+              (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
+            );
+            return daysSinceCreated > 7 && !e.selfEvaluationSubmittedAt;
+          }
+          return false;
+        });
+
+        // Calculate average rating from completed evaluations
+        const ratingsArray = completedEvaluations
+          .map((e: any) => e.overallRating)
+          .filter((r: any) => r !== null && r !== undefined);
+        const averageRating =
+          ratingsArray.length > 0
+            ? Number(
+                (
+                  ratingsArray.reduce((a: number, b: number) => a + b, 0) /
+                  ratingsArray.length
+                ).toFixed(2)
+              )
+            : 0;
 
         const metrics = {
           activeAppraisalCycles: activeAppraisals.length,
           totalEmployeesInCycle,
           completionRate:
-            evaluations.length > 0
+            companyEvaluations.length > 0
               ? Math.round(
-                  (completedEvaluations.length / evaluations.length) * 100
+                  (completedEvaluations.length / companyEvaluations.length) *
+                    100
                 )
               : 0,
           pendingEvaluations: pendingEvaluations.length,
           overdueEvaluations: overdueEvaluations.length,
-          upcomingDeadlines: pendingEvaluations.filter(
-            (e) => Math.random() < 0.3
-          ).length,
-          averageRating: 4.2, // Placeholder
-          managerReviewsPending: evaluations.filter(
-            (e) => e.selfEvaluationData && !e.managerEvaluationData
+          upcomingDeadlines: pendingEvaluations.filter((e: any) => {
+            if (e.createdAt) {
+              const created = new Date(e.createdAt);
+              const daysSinceCreated = Math.floor(
+                (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
+              );
+              return daysSinceCreated >= 5 && daysSinceCreated < 7;
+            }
+            return false;
+          }).length,
+          averageRating,
+          managerReviewsPending: companyEvaluations.filter(
+            (e: any) =>
+              e.selfEvaluationSubmittedAt && !e.managerEvaluationSubmittedAt
           ).length,
         };
 
@@ -709,22 +782,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const requestingUserId = req.user.id;
-        const initiatedAppraisals = await storage.getInitiatedAppraisals(
-          requestingUserId
-        );
+        const companyId = await getUserCompanyId(requestingUserId);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User must belong to a company" });
+        }
 
-        const cycles = initiatedAppraisals.map((appraisal) => ({
-          id: appraisal.id,
-          name: appraisal.appraisalType || "Appraisal Cycle",
-          startDate: appraisal.createdAt
-            ? new Date(appraisal.createdAt).toISOString().split("T")[0]
-            : "N/A",
-          endDate: "TBD", // Would need end date field
-          status: appraisal.status,
-          employeeCount: 0, // Placeholder
-          completionPercentage: Math.floor(Math.random() * 40) + 40,
-          overdueCount: Math.floor(Math.random() * 3),
-        }));
+        const initiatedAppraisals = await storage.getInitiatedAppraisals(
+          companyId
+        );
+        const allEvaluations = await storage.getEvaluations();
+        const now = new Date();
+
+        const cycles = await Promise.all(
+          initiatedAppraisals.map(async (appraisal) => {
+            // Get group members for employee count
+            let employeeCount = 0;
+            try {
+              const members = await storage.getAppraisalGroupMembers(
+                appraisal.appraisalGroupId,
+                requestingUserId
+              );
+              employeeCount = members.length;
+            } catch (e) {
+              console.error("Error fetching group members:", e);
+            }
+
+            // Get evaluations for this initiated appraisal
+            const cycleEvaluations = allEvaluations.filter(
+              (e: any) => e.initiatedAppraisalId === appraisal.id
+            );
+
+            const completedCount = cycleEvaluations.filter(
+              (e: any) => e.status === "completed" || e.finalizedAt
+            ).length;
+
+            const completionPercentage =
+              cycleEvaluations.length > 0
+                ? Math.round((completedCount / cycleEvaluations.length) * 100)
+                : 0;
+
+            // Count overdue evaluations (created > 7 days ago, no self evaluation)
+            const overdueCount = cycleEvaluations.filter((e: any) => {
+              if (e.status === "completed" || e.finalizedAt) return false;
+              if (e.createdAt) {
+                const created = new Date(e.createdAt);
+                const daysSinceCreated = Math.floor(
+                  (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
+                );
+                return daysSinceCreated > 7 && !e.selfEvaluationSubmittedAt;
+              }
+              return false;
+            }).length;
+
+            return {
+              id: appraisal.id,
+              name: appraisal.appraisalType || "Appraisal Cycle",
+              startDate: appraisal.createdAt
+                ? new Date(appraisal.createdAt).toISOString().split("T")[0]
+                : "N/A",
+              endDate: "TBD", // Would need end date field
+              status: appraisal.status,
+              employeeCount,
+              completionPercentage,
+              overdueCount,
+            };
+          })
+        );
 
         res.json(cycles);
       } catch (error: unknown) {
@@ -741,19 +866,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const requestingUserId = req.user.id;
-        const appraisalGroups = await storage.getAppraisalGroups(
-          requestingUserId
-        );
+        const companyId = await getUserCompanyId(requestingUserId);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User must belong to a company" });
+        }
 
-        const groupProgress = appraisalGroups.map((group) => ({
-          id: group.id,
-          name: group.name || "Appraisal Group",
-          employeeCount: Math.floor(Math.random() * 20) + 5,
-          selfCompleted: Math.floor(Math.random() * 15) + 3,
-          managerCompleted: Math.floor(Math.random() * 10) + 2,
-          overallProgress: Math.floor(Math.random() * 40) + 50,
-          deadline: "2024-01-31",
-        }));
+        const appraisalGroups = await storage.getAppraisalGroups(companyId);
+        const initiatedAppraisals = await storage.getInitiatedAppraisals(
+          companyId
+        );
+        const allEvaluations = await storage.getEvaluations();
+
+        const groupProgress = await Promise.all(
+          appraisalGroups.map(async (group) => {
+            // Get group members
+            let employeeCount = 0;
+            try {
+              const members = await storage.getAppraisalGroupMembers(
+                group.id,
+                requestingUserId
+              );
+              employeeCount = members.length;
+            } catch (e) {
+              console.error("Error fetching group members:", e);
+            }
+
+            // Find initiated appraisals for this group
+            const groupAppraisals = initiatedAppraisals.filter(
+              (a) => a.appraisalGroupId === group.id
+            );
+
+            // Get all evaluations for this group's appraisals
+            const groupEvaluations = allEvaluations.filter((e: any) =>
+              groupAppraisals.some((a) => a.id === e.initiatedAppraisalId)
+            );
+
+            const selfCompleted = groupEvaluations.filter(
+              (e: any) => e.selfEvaluationSubmittedAt
+            ).length;
+
+            const managerCompleted = groupEvaluations.filter(
+              (e: any) => e.managerEvaluationSubmittedAt
+            ).length;
+
+            const overallCompleted = groupEvaluations.filter(
+              (e: any) => e.status === "completed" || e.finalizedAt
+            ).length;
+
+            const overallProgress =
+              groupEvaluations.length > 0
+                ? Math.round((overallCompleted / groupEvaluations.length) * 100)
+                : 0;
+
+            // Calculate deadline from most recent appraisal
+            let deadline = "TBD";
+            if (groupAppraisals.length > 0 && groupAppraisals[0].createdAt) {
+              const created = new Date(groupAppraisals[0].createdAt);
+              created.setDate(created.getDate() + 30); // 30 days from creation
+              deadline = created.toISOString().split("T")[0];
+            }
+
+            return {
+              id: group.id,
+              name: group.name || "Appraisal Group",
+              employeeCount,
+              selfCompleted,
+              managerCompleted,
+              overallProgress,
+              deadline,
+            };
+          })
+        );
 
         res.json(groupProgress);
       } catch (error: unknown) {
@@ -769,38 +954,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["super_admin", "admin", "hr_manager"]),
     async (req: any, res) => {
       try {
-        const evaluations = await storage.getEvaluations();
         const requestingUserId = req.user.id;
-        const users = await storage.getUsers({}, requestingUserId);
+        const companyId = await getUserCompanyId(requestingUserId);
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User must belong to a company" });
+        }
+
+        const evaluations = await storage.getEvaluations();
+        // Get all users for the company explicitly
+        const users = await storage.getUsers({ companyId }, requestingUserId);
+        const now = new Date();
 
         const pendingEvaluations = evaluations.filter(
-          (e) => e.status === "in_progress"
+          (e: any) =>
+            e.status === "in_progress" ||
+            e.status === "not_started" ||
+            e.status === "reviewed"
         );
 
+        // Get unique employee IDs from evaluations that don't have matching users
+        const employeeIds = new Set(
+          pendingEvaluations.map((e: any) => e.employeeId)
+        );
+        const missingUserIds = Array.from(employeeIds).filter(
+          (empId) => !users.find((u) => u.id === empId)
+        );
+
+        // Fetch missing users individually if needed
+        const additionalUsers: any[] = [];
+        for (const userId of missingUserIds) {
+          try {
+            const user = await storage.getUser(userId);
+            if (user) {
+              additionalUsers.push(user);
+            }
+          } catch (e) {
+            console.error(`Could not fetch user ${userId}:`, e);
+          }
+        }
+
+        // Combine all users
+        const allUsers = [...users, ...additionalUsers];
+
         const upcomingDeadlines = pendingEvaluations
-          .slice(0, 10)
-          .map((evaluation) => {
-            const employee = users.find((u) => u.id === evaluation.employeeId);
-            const daysRemaining = Math.floor(Math.random() * 10) + 1;
+          .map((evaluation: any) => {
+            const employee = allUsers.find(
+              (u) => u.id === evaluation.employeeId
+            );
+
+            // Skip if employee not found
+            if (!employee) {
+              console.warn(
+                `Employee not found for evaluation ${evaluation.id}, employeeId: ${evaluation.employeeId}`
+              );
+            }
+
+            // Calculate deadline (7 days from creation for self, 14 days for manager review)
+            let dueDate = new Date();
+            let daysRemaining = 0;
+            let evaluationType: "self" | "manager" = "self";
+
+            if (evaluation.createdAt) {
+              const created = new Date(evaluation.createdAt);
+
+              if (!evaluation.selfEvaluationSubmittedAt) {
+                // Self evaluation deadline: 7 days from creation
+                dueDate = new Date(created);
+                dueDate.setDate(dueDate.getDate() + 7);
+                evaluationType = "self";
+              } else if (!evaluation.managerEvaluationSubmittedAt) {
+                // Manager evaluation deadline: 14 days from creation
+                dueDate = new Date(created);
+                dueDate.setDate(dueDate.getDate() + 14);
+                evaluationType = "manager";
+              } else {
+                // Meeting deadline: 21 days from creation
+                dueDate = new Date(created);
+                dueDate.setDate(dueDate.getDate() + 21);
+                evaluationType = "manager"; // Meeting is manager responsibility
+              }
+
+              daysRemaining = Math.ceil(
+                (dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+              );
+            }
+
+            const formattedDueDate = dueDate.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            });
 
             return {
               id: evaluation.id,
               employeeName: employee
                 ? `${employee.firstName} ${employee.lastName}`
                 : "Unknown",
-              evaluationType: evaluation.selfEvaluationData
-                ? "manager"
-                : "self",
-              dueDate: "Jan 31, 2024",
-              daysRemaining,
+              employeeId: evaluation.employeeId, // Include for debugging
+              evaluationType,
+              dueDate: formattedDueDate,
+              daysRemaining: Math.max(0, daysRemaining),
               priority:
-                daysRemaining <= 2
+                daysRemaining <= 0
+                  ? "high"
+                  : daysRemaining <= 2
                   ? "high"
                   : daysRemaining <= 5
                   ? "medium"
                   : "low",
             };
-          });
+          })
+          .filter((d) => d.daysRemaining >= 0 || d.daysRemaining > -7) // Show overdue up to 7 days
+          .sort((a, b) => a.daysRemaining - b.daysRemaining) // Sort by urgency
+          .slice(0, 15); // Limit to 15 items
 
         res.json(upcomingDeadlines);
       } catch (error: unknown) {
@@ -820,6 +1088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const requestingUserId = req.user.id;
         const users = await storage.getUsers({}, requestingUserId);
         const evaluations = await storage.getEvaluations();
+        const now = new Date();
 
         // Get direct reports
         const directReports = users.filter(
@@ -828,28 +1097,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const directReportIds = directReports.map((u) => u.id);
 
         // Get evaluations for direct reports
-        const teamEvaluations = evaluations.filter((e) =>
+        const teamEvaluations = evaluations.filter((e: any) =>
           directReportIds.includes(e.employeeId)
         );
 
+        // Pending reviews: self evaluation submitted but no manager review yet
         const pendingReviews = teamEvaluations.filter(
-          (e) => e.selfEvaluationData && !e.managerEvaluationData
+          (e: any) =>
+            e.selfEvaluationSubmittedAt && !e.managerEvaluationSubmittedAt
         );
+
+        // Completed reviews: manager review submitted
         const completedReviews = teamEvaluations.filter(
-          (e) => e.managerEvaluationData
+          (e: any) =>
+            e.managerEvaluationSubmittedAt ||
+            e.status === "completed" ||
+            e.finalizedAt
         );
-        const overdueReviews = teamEvaluations.filter(
-          (e) => e.status === "in_progress" && Math.random() < 0.1
-        );
+
+        // Overdue reviews: created >7 days ago without self evaluation, or self submitted >7 days ago without manager review
+        const overdueReviews = teamEvaluations.filter((e: any) => {
+          if (e.status === "completed" || e.finalizedAt) return false;
+          if (e.createdAt) {
+            const created = new Date(e.createdAt);
+            const daysSinceCreated = Math.floor(
+              (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
+            );
+
+            // Overdue if no self evaluation after 7 days
+            if (!e.selfEvaluationSubmittedAt && daysSinceCreated > 7)
+              return true;
+
+            // Overdue if self evaluation done but no manager review after 7 more days
+            if (
+              e.selfEvaluationSubmittedAt &&
+              !e.managerEvaluationSubmittedAt
+            ) {
+              const selfSubmitted = new Date(e.selfEvaluationSubmittedAt);
+              const daysSinceSelf = Math.floor(
+                (now.getTime() - selfSubmitted.getTime()) /
+                  (1000 * 60 * 60 * 24)
+              );
+              if (daysSinceSelf > 7) return true;
+            }
+          }
+          return false;
+        });
+
+        // Scheduled meetings: meetings that are scheduled but not yet completed
+        const scheduledMeetings = teamEvaluations.filter(
+          (e: any) => e.meetingScheduledAt && !e.meetingCompletedAt
+        ).length;
+
+        // Completed meetings
+        const meetingsCompleted = teamEvaluations.filter(
+          (e: any) => e.meetingCompletedAt
+        ).length;
+
+        // Calculate team average rating from completed evaluations with ratings
+        const ratingsArray = completedReviews
+          .map((e: any) => e.overallRating || e.calibratedRating)
+          .filter((r: any) => r !== null && r !== undefined);
+        const teamAverageRating =
+          ratingsArray.length > 0
+            ? Number(
+                (
+                  ratingsArray.reduce((a: number, b: number) => a + b, 0) /
+                  ratingsArray.length
+                ).toFixed(2)
+              )
+            : 0;
 
         const metrics = {
           directReports: directReports.length,
           pendingReviews: pendingReviews.length,
           completedReviews: completedReviews.length,
-          scheduledMeetings: Math.floor(Math.random() * 5) + 2,
+          scheduledMeetings,
           overdueReviews: overdueReviews.length,
-          teamAverageRating: 4.1,
-          meetingsCompleted: Math.floor(Math.random() * 8) + 3,
+          teamAverageRating,
+          meetingsCompleted,
           teamCompletionRate:
             teamEvaluations.length > 0
               ? Math.round(
@@ -875,6 +1201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const requestingUserId = req.user.id;
         const users = await storage.getUsers({}, requestingUserId);
         const evaluations = await storage.getEvaluations();
+        const now = new Date();
 
         const directReports = users.filter(
           (u) => u.reportingManagerId === requestingUserId
@@ -882,34 +1209,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const reportsWithStatus = directReports.map((report) => {
           const userEvaluations = evaluations.filter(
-            (e) => e.employeeId === report.id
+            (e: any) => e.employeeId === report.id
           );
-          const latestEvaluation = userEvaluations[0]; // Assuming latest first
+
+          // Get latest evaluation (most recent createdAt)
+          const latestEvaluation = userEvaluations.sort((a: any, b: any) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return dateB - dateA;
+          })[0];
+
+          // Calculate self evaluation status
+          let selfEvaluationStatus = "not_started";
+          if (latestEvaluation) {
+            if (latestEvaluation.selfEvaluationSubmittedAt) {
+              selfEvaluationStatus = "completed";
+            } else if (latestEvaluation.createdAt) {
+              const created = new Date(latestEvaluation.createdAt);
+              const daysSinceCreated = Math.floor(
+                (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
+              );
+              selfEvaluationStatus =
+                daysSinceCreated > 7 ? "overdue" : "pending";
+            } else {
+              selfEvaluationStatus = "pending";
+            }
+          }
+
+          // Calculate manager review status
+          let managerReviewStatus = "not_started";
+          if (latestEvaluation) {
+            if (latestEvaluation.managerEvaluationSubmittedAt) {
+              managerReviewStatus = "completed";
+            } else if (latestEvaluation.selfEvaluationSubmittedAt) {
+              const selfSubmitted = new Date(
+                latestEvaluation.selfEvaluationSubmittedAt
+              );
+              const daysSinceSelf = Math.floor(
+                (now.getTime() - selfSubmitted.getTime()) /
+                  (1000 * 60 * 60 * 24)
+              );
+              managerReviewStatus = daysSinceSelf > 7 ? "overdue" : "pending";
+            }
+          }
+
+          // Calculate meeting status
+          let meetingStatus = "not_scheduled";
+          if (latestEvaluation) {
+            if (latestEvaluation.meetingCompletedAt) {
+              meetingStatus = "completed";
+            } else if (latestEvaluation.meetingScheduledAt) {
+              meetingStatus = "scheduled";
+            }
+          }
+
+          // Calculate due date based on evaluation stage
+          let dueDate = "N/A";
+          if (latestEvaluation && latestEvaluation.createdAt) {
+            const created = new Date(latestEvaluation.createdAt);
+            let deadline = new Date(created);
+
+            if (!latestEvaluation.selfEvaluationSubmittedAt) {
+              // Self evaluation due in 7 days from creation
+              deadline.setDate(deadline.getDate() + 7);
+            } else if (!latestEvaluation.managerEvaluationSubmittedAt) {
+              // Manager review due in 14 days from creation
+              deadline.setDate(deadline.getDate() + 14);
+            } else if (!latestEvaluation.meetingCompletedAt) {
+              // Meeting due in 21 days from creation
+              deadline.setDate(deadline.getDate() + 21);
+            }
+
+            dueDate = deadline.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            });
+          }
+
+          // Get actual rating
+          const rating =
+            latestEvaluation?.overallRating ||
+            latestEvaluation?.calibratedRating ||
+            undefined;
 
           return {
             id: report.id,
             name: `${report.firstName} ${report.lastName}`,
             position: report.designation || "Employee",
-            selfEvaluationStatus: latestEvaluation?.selfEvaluationData
-              ? "completed"
-              : Math.random() < 0.2
-              ? "overdue"
-              : "pending",
-            managerReviewStatus: latestEvaluation?.managerEvaluationData
-              ? "completed"
-              : latestEvaluation?.selfEvaluationData
-              ? "pending"
-              : "not_started",
-            meetingStatus:
-              Math.random() < 0.3
-                ? "completed"
-                : Math.random() < 0.5
-                ? "scheduled"
-                : "not_scheduled",
-            dueDate: "2024-01-31",
-            rating: latestEvaluation?.managerEvaluationData
-              ? Math.floor(Math.random() * 2) + 4
-              : undefined,
+            selfEvaluationStatus,
+            managerReviewStatus,
+            meetingStatus,
+            dueDate,
+            rating,
+            evaluationId: latestEvaluation?.id,
           };
         });
 
@@ -929,27 +1322,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const requestingUserId = req.user.id;
         const users = await storage.getUsers({}, requestingUserId);
+        const evaluations = await storage.getEvaluations();
+        const now = new Date();
+
         const directReports = users.filter(
           (u) => u.reportingManagerId === requestingUserId
         );
+        const directReportIds = directReports.map((u) => u.id);
 
-        // Mock upcoming meetings
-        const upcomingMeetings = directReports
-          .slice(0, 5)
-          .map((report, index) => ({
-            id: `meeting-${index}`,
-            employeeName: `${report.firstName} ${report.lastName}`,
-            date: new Date(Date.now() + (index + 1) * 24 * 60 * 60 * 1000)
-              .toISOString()
-              .split("T")[0],
-            time: ["10:00 AM", "2:00 PM", "11:30 AM", "3:30 PM", "9:00 AM"][
-              index
-            ],
-            duration: [30, 45, 60, 30, 45][index],
-            location: index % 2 === 0 ? "Conference Room A" : "Video Call",
-            type: "performance_review",
-            status: Math.random() < 0.7 ? "confirmed" : "scheduled",
-          }));
+        // Get evaluations for direct reports that have meetings scheduled
+        const evaluationsWithMeetings = evaluations.filter(
+          (e: any) =>
+            directReportIds.includes(e.employeeId) &&
+            e.meetingScheduledAt &&
+            !e.meetingCompletedAt // Only upcoming/pending meetings
+        );
+
+        // Sort by meeting date (soonest first)
+        const upcomingMeetings = evaluationsWithMeetings
+          .map((evaluation: any) => {
+            const employee = users.find((u) => u.id === evaluation.employeeId);
+            const meetingDate = new Date(evaluation.meetingScheduledAt);
+            const isUpcoming = meetingDate.getTime() >= now.getTime();
+            const isPast = meetingDate.getTime() < now.getTime();
+
+            return {
+              id: evaluation.id,
+              employeeName: employee
+                ? `${employee.firstName} ${employee.lastName}`
+                : "Unknown",
+              employeeId: evaluation.employeeId,
+              date: meetingDate.toISOString().split("T")[0],
+              time: meetingDate.toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+              }),
+              dateTime: meetingDate,
+              duration: 60, // Default duration, could be stored in evaluation metadata
+              location: "Performance Review Meeting", // Could be enhanced with actual location data
+              type: "performance_review",
+              status: isPast
+                ? "overdue"
+                : isUpcoming
+                ? "scheduled"
+                : "scheduled",
+              evaluationStatus: evaluation.status,
+              hasManagerReview: !!evaluation.managerEvaluationSubmittedAt,
+            };
+          })
+          .sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime())
+          .slice(0, 10); // Limit to 10 upcoming meetings
 
         res.json(upcomingMeetings);
       } catch (error: unknown) {
@@ -965,33 +1388,191 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["super_admin", "admin", "manager"]),
     async (req: any, res) => {
       try {
+        const requestingUserId = req.user.id;
+        const users = await storage.getUsers({}, requestingUserId);
+        const evaluations = await storage.getEvaluations();
+        const now = new Date();
+
+        // Get direct reports
+        const directReports = users.filter(
+          (u) => u.reportingManagerId === requestingUserId
+        );
+        const directReportIds = directReports.map((u) => u.id);
+
+        // Get evaluations for direct reports
+        const teamEvaluations = evaluations.filter((e: any) =>
+          directReportIds.includes(e.employeeId)
+        );
+
+        // Separate evaluations by time period (last 30 days vs previous 30 days)
+        const thirtyDaysAgo = new Date(now);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const sixtyDaysAgo = new Date(now);
+        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+        const recentEvaluations = teamEvaluations.filter((e: any) => {
+          if (!e.createdAt) return false;
+          const created = new Date(e.createdAt);
+          return created >= thirtyDaysAgo;
+        });
+
+        const previousEvaluations = teamEvaluations.filter((e: any) => {
+          if (!e.createdAt) return false;
+          const created = new Date(e.createdAt);
+          return created >= sixtyDaysAgo && created < thirtyDaysAgo;
+        });
+
+        // Calculate average performance rating
+        const recentRatings = recentEvaluations
+          .map((e: any) => e.overallRating || e.calibratedRating)
+          .filter((r: any) => r !== null && r !== undefined);
+        const currentAvgRating =
+          recentRatings.length > 0
+            ? Number(
+                (
+                  recentRatings.reduce((a: number, b: number) => a + b, 0) /
+                  recentRatings.length
+                ).toFixed(2)
+              )
+            : 0;
+
+        const previousRatings = previousEvaluations
+          .map((e: any) => e.overallRating || e.calibratedRating)
+          .filter((r: any) => r !== null && r !== undefined);
+        const previousAvgRating =
+          previousRatings.length > 0
+            ? Number(
+                (
+                  previousRatings.reduce((a: number, b: number) => a + b, 0) /
+                  previousRatings.length
+                ).toFixed(2)
+              )
+            : currentAvgRating;
+
+        const ratingTrend =
+          currentAvgRating > previousAvgRating
+            ? "up"
+            : currentAvgRating < previousAvgRating
+            ? "down"
+            : "stable";
+
+        // Calculate review completion rate
+        const recentCompleted = recentEvaluations.filter(
+          (e: any) => e.status === "completed" || e.finalizedAt
+        ).length;
+        const currentCompletionRate =
+          recentEvaluations.length > 0
+            ? Math.round((recentCompleted / recentEvaluations.length) * 100)
+            : 0;
+
+        const previousCompleted = previousEvaluations.filter(
+          (e: any) => e.status === "completed" || e.finalizedAt
+        ).length;
+        const previousCompletionRate =
+          previousEvaluations.length > 0
+            ? Math.round((previousCompleted / previousEvaluations.length) * 100)
+            : currentCompletionRate;
+
+        const completionTrend =
+          currentCompletionRate > previousCompletionRate
+            ? "up"
+            : currentCompletionRate < previousCompletionRate
+            ? "down"
+            : "stable";
+
+        // Calculate on-time submission rate (goal achievement proxy)
+        const recentOnTime = recentEvaluations.filter((e: any) => {
+          if (!e.selfEvaluationSubmittedAt || !e.createdAt) return false;
+          const created = new Date(e.createdAt);
+          const submitted = new Date(e.selfEvaluationSubmittedAt);
+          const daysDiff = Math.floor(
+            (submitted.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
+          );
+          return daysDiff <= 7; // Submitted within 7 days
+        }).length;
+        const currentOnTimeRate =
+          recentEvaluations.length > 0
+            ? Math.round((recentOnTime / recentEvaluations.length) * 100)
+            : 0;
+
+        const previousOnTime = previousEvaluations.filter((e: any) => {
+          if (!e.selfEvaluationSubmittedAt || !e.createdAt) return false;
+          const created = new Date(e.createdAt);
+          const submitted = new Date(e.selfEvaluationSubmittedAt);
+          const daysDiff = Math.floor(
+            (submitted.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
+          );
+          return daysDiff <= 7;
+        }).length;
+        const previousOnTimeRate =
+          previousEvaluations.length > 0
+            ? Math.round((previousOnTime / previousEvaluations.length) * 100)
+            : currentOnTimeRate;
+
+        const onTimeTrend =
+          currentOnTimeRate > previousOnTimeRate
+            ? "up"
+            : currentOnTimeRate < previousOnTimeRate
+            ? "down"
+            : "stable";
+
+        // Calculate meeting completion rate (team engagement proxy)
+        const recentMeetings = recentEvaluations.filter(
+          (e: any) => e.meetingScheduledAt
+        ).length;
+        const recentMeetingsCompleted = recentEvaluations.filter(
+          (e: any) => e.meetingCompletedAt
+        ).length;
+        const currentMeetingRate =
+          recentMeetings > 0
+            ? Math.round((recentMeetingsCompleted / recentMeetings) * 100)
+            : 0;
+
+        const previousMeetings = previousEvaluations.filter(
+          (e: any) => e.meetingScheduledAt
+        ).length;
+        const previousMeetingsCompleted = previousEvaluations.filter(
+          (e: any) => e.meetingCompletedAt
+        ).length;
+        const previousMeetingRate =
+          previousMeetings > 0
+            ? Math.round((previousMeetingsCompleted / previousMeetings) * 100)
+            : currentMeetingRate;
+
+        const meetingTrend =
+          currentMeetingRate > previousMeetingRate
+            ? "up"
+            : currentMeetingRate < previousMeetingRate
+            ? "down"
+            : "stable";
+
         const teamMetrics = [
           {
             metric: "Avg Performance Rating",
-            current: 4.2,
-            previous: 4.0,
-            trend: "up",
+            current: currentAvgRating,
+            previous: previousAvgRating,
+            trend: ratingTrend,
             unit: "rating",
           },
           {
             metric: "Review Completion",
-            current: 85,
-            previous: 78,
-            trend: "up",
+            current: currentCompletionRate,
+            previous: previousCompletionRate,
+            trend: completionTrend,
             unit: "percentage",
           },
           {
-            metric: "Goal Achievement",
-            current: 92,
-            previous: 95,
-            trend: "down",
+            metric: "On-Time Submissions",
+            current: currentOnTimeRate,
+            previous: previousOnTimeRate,
+            trend: onTimeTrend,
             unit: "percentage",
           },
           {
-            metric: "Team Engagement",
-            current: 88,
-            previous: 88,
-            trend: "stable",
+            metric: "Meeting Completion",
+            current: currentMeetingRate,
+            previous: previousMeetingRate,
+            trend: meetingTrend,
             unit: "percentage",
           },
         ];
@@ -1012,30 +1593,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const requestingUserId = req.user.id;
+        const companyId = await getUserCompanyId(requestingUserId);
         const evaluations = await storage.getEvaluations();
 
+        // Get development goals for this employee
+        let developmentGoals: any[] = [];
+        try {
+          developmentGoals = await storage.getDevelopmentGoals(
+            requestingUserId
+          );
+        } catch (error) {
+          console.warn("Development goals table may not exist yet:", error);
+        }
+
+        // Filter evaluations for this employee only
         const userEvaluations = evaluations.filter(
           (e) => e.employeeId === requestingUserId
         );
+
+        // Calculate completion status
         const completedEvaluations = userEvaluations.filter(
-          (e) => e.status === "completed"
-        );
-        const pendingEvaluations = userEvaluations.filter(
-          (e) => e.status === "in_progress"
-        );
-        const overdueEvaluations = userEvaluations.filter(
-          (e) => e.status === "in_progress" && Math.random() < 0.1
+          (e) => e.status === "completed" && e.finalizedAt
         );
 
-        // Calculate average rating from completed evaluations
-        const ratingsSum = completedEvaluations.reduce((sum, evaluation) => {
-          // Mock rating calculation
-          return sum + (Math.floor(Math.random() * 2) + 4);
-        }, 0);
+        // Pending evaluations are those in progress or not started
+        const pendingEvaluations = userEvaluations.filter(
+          (e) => e.status === "in_progress" || e.status === "not_started"
+        );
+
+        // Calculate overdue evaluations based on actual dates
+        const now = new Date();
+        const overdueEvaluations = pendingEvaluations.filter((e) => {
+          // Check self-evaluation deadline (7 days from createdAt)
+          if (!e.selfEvaluationSubmittedAt && e.createdAt) {
+            const selfDeadline = new Date(e.createdAt);
+            selfDeadline.setDate(selfDeadline.getDate() + 7);
+            if (now > selfDeadline) return true;
+          }
+          // Check manager review deadline (14 days from createdAt or 7 days from self-eval)
+          if (e.selfEvaluationSubmittedAt && !e.managerEvaluationSubmittedAt) {
+            const managerDeadline = new Date(e.selfEvaluationSubmittedAt);
+            managerDeadline.setDate(managerDeadline.getDate() + 7);
+            if (now > managerDeadline) return true;
+          }
+          return false;
+        });
+
+        // Calculate average rating from completed evaluations with actual ratings
+        const evaluationsWithRatings = completedEvaluations.filter(
+          (e) => e.overallRating !== null && e.overallRating !== undefined
+        );
         const averageRating =
-          completedEvaluations.length > 0
-            ? ratingsSum / completedEvaluations.length
+          evaluationsWithRatings.length > 0
+            ? evaluationsWithRatings.reduce(
+                (sum, e) => sum + (e.overallRating || 0),
+                0
+              ) / evaluationsWithRatings.length
             : 0;
+
+        // Find last completed evaluation date
+        const completedWithDates = completedEvaluations
+          .filter((e) => e.finalizedAt)
+          .sort(
+            (a, b) =>
+              new Date(b.finalizedAt!).getTime() -
+              new Date(a.finalizedAt!).getTime()
+          );
+        const lastEvaluationDate =
+          completedWithDates.length > 0 && completedWithDates[0].finalizedAt
+            ? new Date(completedWithDates[0].finalizedAt)
+                .toISOString()
+                .split("T")[0]
+            : "N/A";
+
+        // Find next deadline from pending evaluations
+        let nextDeadline = "None";
+        if (pendingEvaluations.length > 0) {
+          const deadlines = pendingEvaluations
+            .map((e) => {
+              if (!e.selfEvaluationSubmittedAt && e.createdAt) {
+                const deadline = new Date(e.createdAt);
+                deadline.setDate(deadline.getDate() + 7);
+                return deadline;
+              } else if (
+                e.selfEvaluationSubmittedAt &&
+                !e.managerEvaluationSubmittedAt
+              ) {
+                const deadline = new Date(e.selfEvaluationSubmittedAt);
+                deadline.setDate(deadline.getDate() + 7);
+                return deadline;
+              }
+              return null;
+            })
+            .filter((d) => d !== null) as Date[];
+
+          if (deadlines.length > 0) {
+            deadlines.sort((a, b) => a.getTime() - b.getTime());
+            nextDeadline = deadlines[0].toISOString().split("T")[0];
+          }
+        }
+
+        // Count active development goals
+        const activeGoals = developmentGoals.filter(
+          (g) => g.employeeId === requestingUserId && g.status !== "completed"
+        );
 
         const metrics = {
           totalEvaluations: userEvaluations.length,
@@ -1043,15 +1704,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pendingEvaluations: pendingEvaluations.length,
           overdueEvaluations: overdueEvaluations.length,
           averageRating,
-          lastEvaluationDate:
-            completedEvaluations.length > 0 &&
-            completedEvaluations[0].managerEvaluationSubmittedAt
-              ? new Date(completedEvaluations[0].managerEvaluationSubmittedAt)
-                  .toISOString()
-                  .split("T")[0]
-              : "N/A",
-          nextDeadline: pendingEvaluations.length > 0 ? "2024-01-31" : "None",
-          improvementGoals: Math.floor(Math.random() * 5) + 2,
+          lastEvaluationDate,
+          nextDeadline,
+          improvementGoals: activeGoals.length,
         };
 
         res.json(metrics);
@@ -1069,43 +1724,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const requestingUserId = req.user.id;
+        const companyId = await getUserCompanyId(requestingUserId);
         const evaluations = await storage.getEvaluations();
-        const users = await storage.getUsers({}, requestingUserId);
+        const users = await storage.getUsers({ companyId }, requestingUserId);
+
+        if (!companyId) {
+          return res
+            .status(400)
+            .json({ message: "User must belong to a company" });
+        }
+
+        const initiatedAppraisals = await storage.getInitiatedAppraisals(
+          companyId
+        );
 
         const userEvaluations = evaluations.filter(
           (e) => e.employeeId === requestingUserId
         );
 
+        const now = new Date();
         const evaluationHistory = userEvaluations.map((evaluation) => {
           const manager = users.find((u) => u.id === evaluation.managerId);
 
+          // Find the initiated appraisal to get the period
+          const initiatedAppraisal = initiatedAppraisals.find(
+            (ia) => ia.id === evaluation.initiatedAppraisalId
+          );
+          const period = initiatedAppraisal?.appraisalType || "N/A";
+
+          // Determine status based on actual dates and deadlines
+          let status: "completed" | "pending" | "overdue" | "not_started" =
+            "not_started";
+          let dueDate = "N/A";
+
+          if (evaluation.status === "completed" && evaluation.finalizedAt) {
+            status = "completed";
+            dueDate = evaluation.finalizedAt
+              ? new Date(evaluation.finalizedAt).toISOString().split("T")[0]
+              : "N/A";
+          } else {
+            // Check self-evaluation deadline
+            if (!evaluation.selfEvaluationSubmittedAt && evaluation.createdAt) {
+              const selfDeadline = new Date(evaluation.createdAt);
+              selfDeadline.setDate(selfDeadline.getDate() + 7);
+              dueDate = selfDeadline.toISOString().split("T")[0];
+              status = now > selfDeadline ? "overdue" : "pending";
+            }
+            // Check manager review deadline
+            else if (
+              evaluation.selfEvaluationSubmittedAt &&
+              !evaluation.managerEvaluationSubmittedAt
+            ) {
+              const managerDeadline = new Date(
+                evaluation.selfEvaluationSubmittedAt
+              );
+              managerDeadline.setDate(managerDeadline.getDate() + 7);
+              dueDate = managerDeadline.toISOString().split("T")[0];
+              status = "pending"; // Waiting for manager
+            }
+            // Check meeting deadline
+            else if (
+              evaluation.managerEvaluationSubmittedAt &&
+              !evaluation.meetingCompletedAt
+            ) {
+              if (evaluation.meetingScheduledAt) {
+                dueDate = new Date(evaluation.meetingScheduledAt)
+                  .toISOString()
+                  .split("T")[0];
+                status = "pending";
+              } else {
+                const meetingDeadline = new Date(
+                  evaluation.managerEvaluationSubmittedAt
+                );
+                meetingDeadline.setDate(meetingDeadline.getDate() + 7);
+                dueDate = meetingDeadline.toISOString().split("T")[0];
+                status = now > meetingDeadline ? "overdue" : "pending";
+              }
+            }
+          }
+
           return {
             id: evaluation.id,
-            period: "Q4 2023", // Mock period
-            type: "self",
-            status:
-              evaluation.status === "completed"
-                ? "completed"
-                : Math.random() < 0.1
-                ? "overdue"
-                : "pending",
-            dueDate: "2024-01-31",
+            period,
+            type: "self" as const,
+            status,
+            dueDate,
             submittedDate: evaluation.selfEvaluationSubmittedAt
               ? new Date(evaluation.selfEvaluationSubmittedAt)
                   .toISOString()
                   .split("T")[0]
               : undefined,
-            rating:
-              evaluation.status === "completed"
-                ? Math.floor(Math.random() * 2) + 4
-                : undefined,
+            rating: evaluation.overallRating || undefined,
             managerName: manager
               ? `${manager.firstName} ${manager.lastName}`
               : undefined,
-            managerFeedback: evaluation.managerEvaluationData
-              ? "Feedback provided"
-              : undefined,
+            managerFeedback:
+              evaluation.managerEvaluationData &&
+              evaluation.managerEvaluationData.toString().trim() !== ""
+                ? "Feedback provided"
+                : undefined,
           };
+        });
+
+        // Sort by most recent first
+        evaluationHistory.sort((a, b) => {
+          const dateA = a.submittedDate || a.dueDate;
+          const dateB = b.submittedDate || b.dueDate;
+          return new Date(dateB).getTime() - new Date(dateA).getTime();
         });
 
         res.json(evaluationHistory);
@@ -1123,47 +1848,157 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const requestingUserId = req.user.id;
+        const companyId = await getUserCompanyId(requestingUserId);
         const evaluations = await storage.getEvaluations();
 
         const userEvaluations = evaluations.filter(
           (e) => e.employeeId === requestingUserId
         );
+
+        // Filter for pending/in-progress evaluations only
         const pendingEvaluations = userEvaluations.filter(
-          (e) => e.status === "in_progress"
+          (e) => e.status === "in_progress" || e.status === "not_started"
         );
 
-        const upcomingTasks = pendingEvaluations.map((evaluation, index) => ({
-          id: evaluation.id,
-          title: "Complete Self-Evaluation",
-          type: "evaluation",
-          dueDate: "2024-01-31",
-          priority: index < 2 ? "high" : "medium",
-          description: "Complete your quarterly performance self-evaluation",
-          status: "pending",
-        }));
+        const now = new Date();
+        const upcomingTasks: UpcomingTask[] = [];
 
-        // Add some mock additional tasks
-        upcomingTasks.push(
-          {
-            id: "goal-1",
-            title: "Update Development Goals",
-            type: "goal",
-            dueDate: "2024-02-15",
-            priority: "medium",
-            description:
-              "Review and update your professional development goals",
-            status: "pending",
-          },
-          {
-            id: "meeting-1",
-            title: "One-on-One with Manager",
-            type: "meeting",
-            dueDate: "2024-01-25",
-            priority: "high",
-            description: "Quarterly performance review meeting",
-            status: "pending",
+        pendingEvaluations.forEach((evaluation) => {
+          // Task 1: Self-evaluation not submitted
+          if (!evaluation.selfEvaluationSubmittedAt && evaluation.createdAt) {
+            const selfDeadline = new Date(evaluation.createdAt);
+            selfDeadline.setDate(selfDeadline.getDate() + 7);
+            const isOverdue = now > selfDeadline;
+            const daysUntilDue = Math.ceil(
+              (selfDeadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+            );
+
+            upcomingTasks.push({
+              id: `self-eval-${evaluation.id}`,
+              title: "Complete Self-Evaluation",
+              type: "evaluation",
+              dueDate: selfDeadline.toISOString().split("T")[0],
+              priority:
+                isOverdue || daysUntilDue <= 2
+                  ? "high"
+                  : daysUntilDue <= 5
+                  ? "medium"
+                  : "low",
+              description: "Complete your performance self-evaluation",
+              status: "pending",
+            });
           }
-        );
+
+          // Task 2: Waiting for manager review (informational)
+          else if (
+            evaluation.selfEvaluationSubmittedAt &&
+            !evaluation.managerEvaluationSubmittedAt
+          ) {
+            const managerDeadline = new Date(
+              evaluation.selfEvaluationSubmittedAt
+            );
+            managerDeadline.setDate(managerDeadline.getDate() + 7);
+
+            upcomingTasks.push({
+              id: `waiting-manager-${evaluation.id}`,
+              title: "Waiting for Manager Review",
+              type: "evaluation",
+              dueDate: managerDeadline.toISOString().split("T")[0],
+              priority: "low",
+              description: "Your manager is reviewing your self-evaluation",
+              status: "in_progress",
+            });
+          }
+
+          // Task 3: Meeting scheduled or needed
+          else if (
+            evaluation.managerEvaluationSubmittedAt &&
+            !evaluation.meetingCompletedAt
+          ) {
+            if (evaluation.meetingScheduledAt) {
+              const meetingDate = new Date(evaluation.meetingScheduledAt);
+              const daysUntilMeeting = Math.ceil(
+                (meetingDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+              );
+
+              upcomingTasks.push({
+                id: `meeting-${evaluation.id}`,
+                title: "Performance Review Meeting",
+                type: "meeting",
+                dueDate: meetingDate.toISOString().split("T")[0],
+                priority: daysUntilMeeting <= 3 ? "high" : "medium",
+                description:
+                  "Scheduled performance review meeting with manager",
+                status: "pending",
+              });
+            } else {
+              // Meeting not yet scheduled
+              const meetingDeadline = new Date(
+                evaluation.managerEvaluationSubmittedAt
+              );
+              meetingDeadline.setDate(meetingDeadline.getDate() + 7);
+
+              upcomingTasks.push({
+                id: `schedule-meeting-${evaluation.id}`,
+                title: "Schedule Review Meeting",
+                type: "meeting",
+                dueDate: meetingDeadline.toISOString().split("T")[0],
+                priority: "medium",
+                description: "Schedule your performance review meeting",
+                status: "pending",
+              });
+            }
+          }
+        });
+
+        // Get development goals that need updates
+        try {
+          const developmentGoals = await storage.getDevelopmentGoals(
+            requestingUserId
+          );
+          const activeGoals = developmentGoals.filter(
+            (g) => g.employeeId === requestingUserId && g.status !== "completed"
+          );
+
+          // Add tasks for goals approaching target dates
+          activeGoals.forEach((goal) => {
+            if (goal.targetDate) {
+              const targetDate = new Date(goal.targetDate);
+              const daysUntilTarget = Math.ceil(
+                (targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+              );
+
+              // Only add if approaching deadline (within 30 days)
+              if (daysUntilTarget <= 30 && daysUntilTarget > 0) {
+                upcomingTasks.push({
+                  id: `goal-${goal.id}`,
+                  title: `Update Goal`,
+                  type: "goal",
+                  dueDate: targetDate.toISOString().split("T")[0],
+                  priority:
+                    daysUntilTarget <= 7
+                      ? "high"
+                      : daysUntilTarget <= 14
+                      ? "medium"
+                      : "low",
+                  description: `Review progress on: ${goal.description}`,
+                  status: "pending",
+                });
+              }
+            }
+          });
+        } catch (error) {
+          console.warn("Development goals table may not exist yet:", error);
+        }
+
+        // Sort by priority and due date
+        upcomingTasks.sort((a, b) => {
+          const priorityOrder = { high: 0, medium: 1, low: 2 };
+          if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+            return priorityOrder[a.priority] - priorityOrder[b.priority];
+          }
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        });
 
         res.json(upcomingTasks);
       } catch (error: unknown) {
@@ -1179,49 +2014,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRoles(["super_admin", "admin", "hr_manager", "manager", "employee"]),
     async (req: any, res) => {
       try {
-        // Mock goals for now - in a real app these would be stored in database
-        const goals = [
-          {
-            id: "1",
-            title: "Improve JavaScript Skills",
-            description:
-              "Complete advanced JavaScript course and build 3 projects",
-            progress: 75,
-            targetDate: "2024-03-31",
-            status: "on_track",
-            category: "technical",
-          },
-          {
-            id: "2",
-            title: "Team Leadership",
-            description:
-              "Lead 2 cross-functional projects and mentor junior developers",
-            progress: 50,
-            targetDate: "2024-06-30",
-            status: "on_track",
-            category: "leadership",
-          },
-          {
-            id: "3",
-            title: "Communication Skills",
-            description:
-              "Present at team meetings and improve stakeholder communication",
-            progress: 30,
-            targetDate: "2024-04-30",
-            status: "at_risk",
-            category: "communication",
-          },
-          {
-            id: "4",
-            title: "Productivity Improvement",
-            description:
-              "Increase sprint velocity by 20% through better planning",
-            progress: 90,
-            targetDate: "2024-02-28",
-            status: "on_track",
-            category: "productivity",
-          },
-        ];
+        const requestingUserId = req.user.id;
+
+        let goals: any[] = [];
+
+        try {
+          // Get development goals from database
+          const developmentGoals = await storage.getDevelopmentGoals(
+            requestingUserId
+          );
+
+          // Filter for goals belonging to this employee
+          const employeeGoals = developmentGoals.filter(
+            (g) => g.employeeId === requestingUserId
+          );
+
+          const now = new Date();
+
+          // Transform goals into dashboard format
+          goals = employeeGoals.map((goal) => {
+            let status: "on_track" | "at_risk" | "behind" = "on_track";
+            let progress = 0;
+
+            // Determine status based on target date and current progress
+            if (goal.targetDate && goal.progress !== null) {
+              const targetDate = new Date(goal.targetDate);
+              const totalDays =
+                targetDate.getTime() -
+                new Date(goal.createdAt || now).getTime();
+              const elapsedDays =
+                now.getTime() - new Date(goal.createdAt || now).getTime();
+              const expectedProgress =
+                totalDays > 0 ? (elapsedDays / totalDays) * 100 : 0;
+
+              progress = goal.progress || 0;
+
+              // At risk if behind schedule by more than 15%
+              if (progress < expectedProgress - 15) {
+                status = "at_risk";
+              }
+              // Behind if behind schedule by more than 30%
+              if (
+                progress < expectedProgress - 30 ||
+                (targetDate < now && progress < 100)
+              ) {
+                status = "behind";
+              }
+              // Completed goals are on track
+              if (goal.status === "completed" || progress >= 100) {
+                status = "on_track";
+              }
+            } else if (goal.progress !== null) {
+              progress = goal.progress || 0;
+            }
+
+            return {
+              id: goal.id,
+              title: goal.description
+                ? goal.description.substring(0, 50)
+                : "Development Goal",
+              description: goal.plannedOutcome || goal.description || "",
+              progress,
+              targetDate: goal.targetDate
+                ? new Date(goal.targetDate).toISOString().split("T")[0]
+                : "No target date",
+              status,
+              category: "technical" as const,
+            };
+          });
+
+          // Sort by status (behind first) and then by target date
+          goals.sort((a, b) => {
+            const statusOrder: Record<string, number> = {
+              behind: 0,
+              at_risk: 1,
+              on_track: 2,
+            };
+            if (statusOrder[a.status] !== statusOrder[b.status]) {
+              return statusOrder[a.status] - statusOrder[b.status];
+            }
+            if (a.targetDate === "No target date") return 1;
+            if (b.targetDate === "No target date") return -1;
+            return (
+              new Date(a.targetDate).getTime() -
+              new Date(b.targetDate).getTime()
+            );
+          });
+        } catch (error) {
+          console.warn("Development goals table may not exist yet:", error);
+          // Return empty array if table doesn't exist
+          goals = [];
+        }
 
         res.json(goals);
       } catch (error: unknown) {
@@ -3001,6 +3884,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const employee = await storage.getUser(evaluation.employeeId);
         const manager = await storage.getUser(evaluation.managerId);
 
+        // Get appraisal cycle information from initiated appraisal
+        let appraisalInfo: any = { name: "N/A", description: "" };
+        if (evaluation.initiatedAppraisalId) {
+          try {
+            const initiatedAppraisal = await storage.getInitiatedAppraisal(
+              evaluation.initiatedAppraisalId
+            );
+            if (initiatedAppraisal) {
+              appraisalInfo = {
+                name:
+                  initiatedAppraisal.appraisalType || "Performance Appraisal",
+                description: initiatedAppraisal.status || "",
+              };
+            }
+          } catch (error) {
+            console.warn("Could not fetch initiated appraisal:", error);
+          }
+        }
+
         // Helper function to check if user has a specific role
         const hasRole = (role: string) => {
           return (
@@ -3055,18 +3957,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .status(403)
             .json({ message: "Access denied: Insufficient permissions" });
         }
-        const reviewCycle = evaluation.reviewCycleId
-          ? await storage.getReviewCycle(evaluation.reviewCycleId)
-          : null;
 
         // Extract responses and calculate average from stored data
         const selfEvaluationData = evaluation.selfEvaluationData as any;
-        // Ensure responses is always an array
-        const responses = Array.isArray(selfEvaluationData?.responses)
-          ? selfEvaluationData.responses
-          : Array.isArray(selfEvaluationData)
-          ? selfEvaluationData
-          : [];
+        // responses is an object with composite keys (questionnaireId_questionId)
+        const responses = selfEvaluationData?.responses || {};
         const averageRating = selfEvaluationData?.averageRating || 0;
 
         // Get questionnaires associated with this evaluation from database
@@ -3111,9 +4006,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             50
           );
           doc.text(`Manager: ${manager?.firstName} ${manager?.lastName}`, 50);
-          doc.text(`Review Cycle: ${reviewCycle?.name || "N/A"}`, 50);
+          doc.text(`Appraisal Cycle: ${appraisalInfo.name}`, 50);
           doc.text(
             `Average Rating: ${averageRating?.toFixed(1) || "N/A"}/5.0`,
+            50
+          );
+          doc.text(
+            `Status: ${
+              evaluation.selfEvaluationSubmittedAt ? "Submitted" : "Draft"
+            }`,
             50
           );
           doc.moveDown();
@@ -3131,9 +4032,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     const questionKey = `${questionnaire.id}_${
                       question.id || index
                     }`;
-                    const response = responses?.find(
-                      (r: any) => r.questionId === questionKey
-                    );
+                    // responses is an object with keys, not an array
+                    const response = responses?.[questionKey];
 
                     doc
                       .fontSize(12)
@@ -3177,8 +4077,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           Employee: ${employee?.firstName} ${employee?.lastName}
           Manager: ${manager?.firstName} ${manager?.lastName}
-          Review Cycle: ${reviewCycle?.name || "N/A"}
+          Appraisal Cycle: ${appraisalInfo.name}
           Average Rating: ${averageRating?.toFixed(1) || "N/A"}/5.0
+          Status: ${
+            evaluation.selfEvaluationSubmittedAt ? "Submitted" : "Draft"
+          }
           
           ${
             questionnaires
@@ -3193,9 +4096,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const questionKey = `${questionnaire.id}_${
                     question.id || index
                   }`;
-                  const response = responses?.find(
-                    (r: any) => r.questionId === questionKey
-                  );
+                  // responses is an object with keys, not an array
+                  const response = responses?.[questionKey];
 
                   return `Q${index + 1}: ${question.text}
               ${response?.rating ? `Rating: ${response.rating}/5` : ""}
@@ -6327,8 +7229,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const companyId = requestingUser.companyId;
 
         // Get all evaluations for the company with ratings
-        const allEvaluations =
-          await storage.getEvaluationsForCalibration(companyId);
+        const allEvaluations = await storage.getEvaluationsForCalibration(
+          companyId
+        );
         const completedEvaluations = allEvaluations.filter(
           (e: any) => e.overallRating !== null && e.overallRating !== undefined
         );
@@ -6340,24 +7243,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const locations = await storage.getLocations(companyId);
         const levels = await storage.getLevels(companyId);
         const grades = await storage.getGrades(companyId);
-        const appraisalCycles = await storage.getAllAppraisalCycles(companyId);
+        const initiatedAppraisals = await storage.getInitiatedAppraisals(
+          companyId
+        );
 
         // 1. Rating Distribution
         const ratingDistribution = [1, 2, 3, 4, 5].map((rating) => ({
           rating,
           count: completedEvaluations.filter(
-            (e: any) => e.overallRating === rating
+            (e: any) => Math.round(e.overallRating) === rating
           ).length,
           calibratedCount: completedEvaluations.filter(
-            (e: any) => e.calibratedRating === rating
+            (e: any) =>
+              e.calibratedRating && Math.round(e.calibratedRating) === rating
           ).length,
         }));
 
-        // 2. Performance Trends by Appraisal Cycle
-        const cyclePerformance = appraisalCycles
-          .map((cycle: any) => {
+        // 2. Performance Trends by Initiated Appraisal
+        const cyclePerformance = initiatedAppraisals
+          .map((appraisal: any) => {
             const cycleEvaluations = completedEvaluations.filter(
-              (e: any) => e.appraisalCycleId === cycle.id
+              (e: any) => e.initiatedAppraisalId === appraisal.id
             );
             const ratings = cycleEvaluations.map(
               (e: any) => e.overallRating as number
@@ -6367,9 +7273,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .map((e: any) => e.calibratedRating as number);
 
             return {
-              cycleId: cycle.id,
-              cycleName: cycle.code,
-              cycleDescription: cycle.description,
+              cycleId: appraisal.id,
+              cycleName: appraisal.appraisalType || "Appraisal",
+              cycleDescription: appraisal.status || "",
               totalEvaluations: cycleEvaluations.length,
               averageRating:
                 ratings.length > 0
@@ -6394,9 +7300,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               completionRate:
                 cycleEvaluations.length > 0
                   ? Math.round(
-                      (cycleEvaluations.filter(
-                        (e: any) => e.meetingCompletedAt
-                      ).length /
+                      (cycleEvaluations.filter((e: any) => e.meetingCompletedAt)
+                        .length /
                         cycleEvaluations.length) *
                         100
                     )
@@ -6405,18 +7310,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
           .filter((c: any) => c.totalEvaluations > 0);
 
-        // 3. Department Performance Comparison
+        // 3. Department Performance Comparison (using departmentName from SP or user data)
         const departmentPerformance: Record<
           string,
           { count: number; totalRating: number; name: string }
         > = {};
         completedEvaluations.forEach((e: any) => {
-          const dept = e.department || "Unknown";
-          if (!departmentPerformance[dept]) {
-            departmentPerformance[dept] = { count: 0, totalRating: 0, name: dept };
+          // Get department from evaluation's departmentName field (from SP) or find user
+          let deptName = e.departmentName || "Unknown";
+          if (!deptName || deptName === "Unknown") {
+            const employee = users.find((u: any) => u.id === e.employeeId);
+            deptName = employee?.department || "Unknown";
           }
-          departmentPerformance[dept].count++;
-          departmentPerformance[dept].totalRating += (e.overallRating as number) || 0;
+
+          if (!departmentPerformance[deptName]) {
+            departmentPerformance[deptName] = {
+              count: 0,
+              totalRating: 0,
+              name: deptName,
+            };
+          }
+          departmentPerformance[deptName].count++;
+          departmentPerformance[deptName].totalRating +=
+            (e.overallRating as number) || 0;
         });
 
         const departmentStats = Object.values(departmentPerformance)
@@ -6445,7 +7361,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
           }
           locationPerformance[locId].count++;
-          locationPerformance[locId].totalRating += (e.overallRating as number) || 0;
+          locationPerformance[locId].totalRating +=
+            (e.overallRating as number) || 0;
         });
 
         const locationStats = Object.values(locationPerformance)
@@ -6476,7 +7393,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
           }
           levelPerformance[levId].count++;
-          levelPerformance[levId].totalRating += (e.overallRating as number) || 0;
+          levelPerformance[levId].totalRating +=
+            (e.overallRating as number) || 0;
         });
 
         const levelStats = Object.values(levelPerformance)
@@ -6507,7 +7425,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
           }
           gradePerformance[grdId].count++;
-          gradePerformance[grdId].totalRating += (e.overallRating as number) || 0;
+          gradePerformance[grdId].totalRating +=
+            (e.overallRating as number) || 0;
         });
 
         const gradeStats = Object.values(gradePerformance)
@@ -6597,7 +7516,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
           }
           managerPerformance[mgrId].count++;
-          managerPerformance[mgrId].totalRating += (e.overallRating as number) || 0;
+          managerPerformance[mgrId].totalRating +=
+            (e.overallRating as number) || 0;
         });
 
         const managerStats = Object.values(managerPerformance)

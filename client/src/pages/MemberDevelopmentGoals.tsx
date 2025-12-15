@@ -1,17 +1,34 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { useAuth } from "@/hooks/useAuth";
 import { RoleGuard } from "@/components/RoleGuard";
 import { format } from "date-fns";
-import { 
-  Target, 
+import {
+  Target,
   Search,
   Calendar,
   TrendingUp,
@@ -21,7 +38,7 @@ import {
   Flag,
   User,
   Filter,
-  Users
+  Users,
 } from "lucide-react";
 import type { DevelopmentGoal } from "@shared/schema";
 
@@ -83,117 +100,199 @@ export default function MemberDevelopmentGoals() {
     grade: "all",
     manager: "all",
   });
-  const [searchApplied, setSearchApplied] = useState(false);
 
   const { user } = useAuth();
 
-  const { data: goals = [], isLoading: isLoadingGoals } = useQuery<GoalWithDetails[]>({
+  const { data: goals = [], isLoading: isLoadingGoals } = useQuery<
+    GoalWithDetails[]
+  >({
     queryKey: ["/api/development-goals/team"],
   });
 
-  const { data: appraisalCycles = [] } = useQuery<any[]>({
-    queryKey: ["/api/appraisal-cycles"],
-  });
+  // Extract unique values from goals data instead of making separate API calls
+  const appraisalCycles = useMemo(() => {
+    const cycles = new Map();
+    goals.forEach((goal) => {
+      if (goal.appraisalCycle) {
+        cycles.set(goal.appraisalCycle.id, goal.appraisalCycle);
+      }
+    });
+    return Array.from(cycles.values());
+  }, [goals]);
 
-  const { data: appraisalGroups = [] } = useQuery<any[]>({
-    queryKey: ["/api/appraisal-groups"],
-  });
+  const appraisalGroups = useMemo(() => {
+    const groups = new Map();
+    goals.forEach((goal) => {
+      if (goal.appraisalGroup) {
+        groups.set(goal.appraisalGroup.id, goal.appraisalGroup);
+      }
+    });
+    return Array.from(groups.values());
+  }, [goals]);
 
-  const { data: locations = [] } = useQuery<any[]>({
-    queryKey: ["/api/locations"],
-  });
+  // For these filters, we only have IDs, so we'll just show unique IDs
+  // In a future enhancement, we could add these details to the goals API response
+  const locations = useMemo(() => {
+    const locs = new Set<string>();
+    goals.forEach((goal) => {
+      if (goal.employee?.locationId) {
+        locs.add(goal.employee.locationId);
+      }
+    });
+    return Array.from(locs).map((id) => ({
+      id,
+      name: `Location ${id.substring(0, 8)}...`,
+    }));
+  }, [goals]);
 
-  const { data: departments = [] } = useQuery<any[]>({
-    queryKey: ["/api/departments"],
-  });
+  const levels = useMemo(() => {
+    const lvls = new Set<string>();
+    goals.forEach((goal) => {
+      if (goal.employee?.levelId) {
+        lvls.add(goal.employee.levelId);
+      }
+    });
+    return Array.from(lvls).map((id) => ({
+      id,
+      name: `Level ${id.substring(0, 8)}...`,
+    }));
+  }, [goals]);
 
-  const { data: levels = [] } = useQuery<any[]>({
-    queryKey: ["/api/levels"],
-  });
+  const grades = useMemo(() => {
+    const grds = new Set<string>();
+    goals.forEach((goal) => {
+      if (goal.employee?.gradeId) {
+        grds.add(goal.employee.gradeId);
+      }
+    });
+    return Array.from(grds).map((id) => ({
+      id,
+      name: `Grade ${id.substring(0, 8)}...`,
+    }));
+  }, [goals]);
 
-  const { data: grades = [] } = useQuery<any[]>({
-    queryKey: ["/api/grades"],
-  });
-
-  const { data: managers = [] } = useQuery<any[]>({
-    queryKey: ["/api/users", { role: "manager" }],
-  });
+  const managers = useMemo(() => {
+    const mgrs = new Set<string>();
+    goals.forEach((goal) => {
+      if (goal.employee?.managerId) {
+        mgrs.add(goal.employee.managerId);
+      }
+    });
+    return Array.from(mgrs).map((id) => ({
+      id,
+      name: `Manager ${id.substring(0, 8)}...`,
+    }));
+  }, [goals]);
 
   const filteredGoals = useMemo(() => {
-    if (!searchApplied) return [];
-    
     return goals.filter((goal) => {
-      if (filters.appraisalCycle !== "all" && goal.appraisalCycle?.id !== filters.appraisalCycle) {
+      if (
+        filters.appraisalCycle !== "all" &&
+        goal.appraisalCycle?.id !== filters.appraisalCycle
+      ) {
         return false;
       }
-      
-      if (filters.appraisalGroup !== "all" && goal.appraisalGroup?.id !== filters.appraisalGroup) {
+
+      if (
+        filters.appraisalGroup !== "all" &&
+        goal.appraisalGroup?.id !== filters.appraisalGroup
+      ) {
         return false;
       }
-      
+
       if (filters.employeeSearch) {
         const searchLower = filters.employeeSearch.toLowerCase();
-        const matchesName = `${goal.employee?.firstName} ${goal.employee?.lastName}`.toLowerCase().includes(searchLower);
-        const matchesCode = goal.employee?.code?.toLowerCase().includes(searchLower);
+        const matchesName =
+          `${goal.employee?.firstName} ${goal.employee?.lastName}`
+            .toLowerCase()
+            .includes(searchLower);
+        const matchesCode = goal.employee?.code
+          ?.toLowerCase()
+          .includes(searchLower);
         if (!matchesName && !matchesCode) {
           return false;
         }
       }
-      
-      if (filters.location !== "all" && goal.employee?.locationId !== filters.location) {
+
+      if (
+        filters.location !== "all" &&
+        goal.employee?.locationId !== filters.location
+      ) {
         return false;
       }
-      
-      if (filters.department !== "all" && goal.employee?.department !== filters.department) {
+
+      if (
+        filters.department !== "all" &&
+        goal.employee?.department !== filters.department
+      ) {
         return false;
       }
-      
+
       if (filters.level !== "all" && goal.employee?.levelId !== filters.level) {
         return false;
       }
-      
+
       if (filters.grade !== "all" && goal.employee?.gradeId !== filters.grade) {
         return false;
       }
-      
-      if (filters.manager !== "all" && goal.employee?.managerId !== filters.manager) {
+
+      if (
+        filters.manager !== "all" &&
+        goal.employee?.managerId !== filters.manager
+      ) {
         return false;
       }
-      
+
       return true;
     });
-  }, [goals, filters, searchApplied]);
+  }, [goals, filters]);
 
   const groupedGoals = useMemo(() => {
     const grouped: Record<string, GoalWithDetails[]> = {};
-    
+
     filteredGoals.forEach((goal) => {
-      const employeeId = goal.employee?.id || 'unknown';
+      const employeeId = goal.employee?.id || "unknown";
       if (!grouped[employeeId]) {
         grouped[employeeId] = [];
       }
       grouped[employeeId].push(goal);
     });
-    
+
     return grouped;
   }, [filteredGoals]);
 
   const getStatusBadge = (status: string | null) => {
     switch (status) {
-      case 'completed':
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
-      case 'on_track':
-        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"><TrendingUp className="h-3 w-3 mr-1" />On Track</Badge>;
-      case 'delayed':
-        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"><AlertCircle className="h-3 w-3 mr-1" />Delayed</Badge>;
-      case 'not_started':
+      case "completed":
+        return (
+          <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Completed
+          </Badge>
+        );
+      case "on_track":
+        return (
+          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+            <TrendingUp className="h-3 w-3 mr-1" />
+            On Track
+          </Badge>
+        );
+      case "delayed":
+        return (
+          <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+            <AlertCircle className="h-3 w-3 mr-1" />
+            Delayed
+          </Badge>
+        );
+      case "not_started":
       default:
-        return <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"><Clock className="h-3 w-3 mr-1" />Not Started</Badge>;
+        return (
+          <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+            <Clock className="h-3 w-3 mr-1" />
+            Not Started
+          </Badge>
+        );
     }
-  };
-
-  const handleSearch = () => {
-    setSearchApplied(true);
   };
 
   const handleClearFilters = () => {
@@ -207,12 +306,11 @@ export default function MemberDevelopmentGoals() {
       grade: "all",
       manager: "all",
     });
-    setSearchApplied(false);
   };
 
   const uniqueDepartments = useMemo(() => {
     const depts = new Set<string>();
-    goals.forEach(goal => {
+    goals.forEach((goal) => {
       if (goal.employee?.department) {
         depts.add(goal.employee.department);
       }
@@ -225,7 +323,10 @@ export default function MemberDevelopmentGoals() {
       <div className="p-6 max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-2" data-testid="page-title">
+            <h1
+              className="text-3xl font-bold text-foreground flex items-center gap-2"
+              data-testid="page-title"
+            >
               <Users className="h-8 w-8 text-primary" />
               Member Development Goals
             </h1>
@@ -245,10 +346,14 @@ export default function MemberDevelopmentGoals() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label className="text-sm font-medium mb-2 block">Appraisal Cycle</label>
+                <label className="text-sm font-medium mb-2 block">
+                  Appraisal Cycle
+                </label>
                 <Select
                   value={filters.appraisalCycle}
-                  onValueChange={(value) => setFilters({ ...filters, appraisalCycle: value })}
+                  onValueChange={(value) =>
+                    setFilters({ ...filters, appraisalCycle: value })
+                  }
                 >
                   <SelectTrigger data-testid="filter-appraisal-cycle">
                     <SelectValue placeholder="All Cycles" />
@@ -265,10 +370,14 @@ export default function MemberDevelopmentGoals() {
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Appraisal Group</label>
+                <label className="text-sm font-medium mb-2 block">
+                  Appraisal Group
+                </label>
                 <Select
                   value={filters.appraisalGroup}
-                  onValueChange={(value) => setFilters({ ...filters, appraisalGroup: value })}
+                  onValueChange={(value) =>
+                    setFilters({ ...filters, appraisalGroup: value })
+                  }
                 >
                   <SelectTrigger data-testid="filter-appraisal-group">
                     <SelectValue placeholder="All Groups" />
@@ -285,20 +394,28 @@ export default function MemberDevelopmentGoals() {
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Employee Name/Code</label>
+                <label className="text-sm font-medium mb-2 block">
+                  Employee Name/Code
+                </label>
                 <Input
                   placeholder="Search by name or code"
                   value={filters.employeeSearch}
-                  onChange={(e) => setFilters({ ...filters, employeeSearch: e.target.value })}
+                  onChange={(e) =>
+                    setFilters({ ...filters, employeeSearch: e.target.value })
+                  }
                   data-testid="filter-employee-search"
                 />
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Location</label>
+                <label className="text-sm font-medium mb-2 block">
+                  Location
+                </label>
                 <Select
                   value={filters.location}
-                  onValueChange={(value) => setFilters({ ...filters, location: value })}
+                  onValueChange={(value) =>
+                    setFilters({ ...filters, location: value })
+                  }
                 >
                   <SelectTrigger data-testid="filter-location">
                     <SelectValue placeholder="All Locations" />
@@ -315,10 +432,14 @@ export default function MemberDevelopmentGoals() {
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Department</label>
+                <label className="text-sm font-medium mb-2 block">
+                  Department
+                </label>
                 <Select
                   value={filters.department}
-                  onValueChange={(value) => setFilters({ ...filters, department: value })}
+                  onValueChange={(value) =>
+                    setFilters({ ...filters, department: value })
+                  }
                 >
                   <SelectTrigger data-testid="filter-department">
                     <SelectValue placeholder="All Departments" />
@@ -338,7 +459,9 @@ export default function MemberDevelopmentGoals() {
                 <label className="text-sm font-medium mb-2 block">Level</label>
                 <Select
                   value={filters.level}
-                  onValueChange={(value) => setFilters({ ...filters, level: value })}
+                  onValueChange={(value) =>
+                    setFilters({ ...filters, level: value })
+                  }
                 >
                   <SelectTrigger data-testid="filter-level">
                     <SelectValue placeholder="All Levels" />
@@ -347,7 +470,7 @@ export default function MemberDevelopmentGoals() {
                     <SelectItem value="all">All Levels</SelectItem>
                     {levels.map((level: any) => (
                       <SelectItem key={level.id} value={level.id}>
-                        {level.code} - {level.description}
+                        {level.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -358,7 +481,9 @@ export default function MemberDevelopmentGoals() {
                 <label className="text-sm font-medium mb-2 block">Grade</label>
                 <Select
                   value={filters.grade}
-                  onValueChange={(value) => setFilters({ ...filters, grade: value })}
+                  onValueChange={(value) =>
+                    setFilters({ ...filters, grade: value })
+                  }
                 >
                   <SelectTrigger data-testid="filter-grade">
                     <SelectValue placeholder="All Grades" />
@@ -367,7 +492,7 @@ export default function MemberDevelopmentGoals() {
                     <SelectItem value="all">All Grades</SelectItem>
                     {grades.map((grade: any) => (
                       <SelectItem key={grade.id} value={grade.id}>
-                        {grade.code} - {grade.description}
+                        {grade.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -375,10 +500,14 @@ export default function MemberDevelopmentGoals() {
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Reporting Manager</label>
+                <label className="text-sm font-medium mb-2 block">
+                  Reporting Manager
+                </label>
                 <Select
                   value={filters.manager}
-                  onValueChange={(value) => setFilters({ ...filters, manager: value })}
+                  onValueChange={(value) =>
+                    setFilters({ ...filters, manager: value })
+                  }
                 >
                   <SelectTrigger data-testid="filter-manager">
                     <SelectValue placeholder="All Managers" />
@@ -387,7 +516,7 @@ export default function MemberDevelopmentGoals() {
                     <SelectItem value="all">All Managers</SelectItem>
                     {managers.map((manager: any) => (
                       <SelectItem key={manager.id} value={manager.id}>
-                        {manager.firstName} {manager.lastName}
+                        {manager.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -396,11 +525,11 @@ export default function MemberDevelopmentGoals() {
             </div>
 
             <div className="flex gap-4 mt-6">
-              <Button onClick={handleSearch} data-testid="btn-search">
-                <Search className="h-4 w-4 mr-2" />
-                Search
-              </Button>
-              <Button variant="outline" onClick={handleClearFilters} data-testid="btn-clear-filters">
+              <Button
+                variant="outline"
+                onClick={handleClearFilters}
+                data-testid="btn-clear-filters"
+              >
                 Clear Filters
               </Button>
             </div>
@@ -411,15 +540,8 @@ export default function MemberDevelopmentGoals() {
           <Card>
             <CardContent className="py-12 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground mt-4">Loading development goals...</p>
-            </CardContent>
-          </Card>
-        ) : !searchApplied ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Filter className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                Please select filters and click Search to view team member development goals.
+              <p className="text-muted-foreground mt-4">
+                Loading development goals...
               </p>
             </CardContent>
           </Card>
@@ -435,83 +557,121 @@ export default function MemberDevelopmentGoals() {
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Found {filteredGoals.length} goal(s) for {Object.keys(groupedGoals).length} team member(s)
+              Found {filteredGoals.length} goal(s) for{" "}
+              {Object.keys(groupedGoals).length} team member(s)
             </p>
-            
+
             <Accordion type="multiple" className="space-y-4">
-              {Object.entries(groupedGoals).map(([employeeId, employeeGoals]) => {
-                const employee = employeeGoals[0]?.employee;
-                if (!employee) return null;
-                
-                return (
-                  <AccordionItem key={employeeId} value={employeeId} className="border rounded-lg">
-                    <AccordionTrigger className="px-4 hover:no-underline">
-                      <div className="flex items-center gap-4 w-full">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
-                          <User className="h-5 w-5 text-primary" />
+              {Object.entries(groupedGoals).map(
+                ([employeeId, employeeGoals]) => {
+                  const employee = employeeGoals[0]?.employee;
+                  if (!employee) return null;
+
+                  return (
+                    <AccordionItem
+                      key={employeeId}
+                      value={employeeId}
+                      className="border rounded-lg"
+                    >
+                      <AccordionTrigger className="px-4 hover:no-underline">
+                        <div className="flex items-center gap-4 w-full">
+                          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
+                            <User className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="text-left flex-1">
+                            <p className="font-semibold">
+                              {employee.firstName} {employee.lastName}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {employee.code} | {employee.designation || "N/A"}{" "}
+                              | {employee.department || "N/A"}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="mr-4">
+                            {employeeGoals.length} Goal
+                            {employeeGoals.length !== 1 ? "s" : ""}
+                          </Badge>
                         </div>
-                        <div className="text-left flex-1">
-                          <p className="font-semibold">{employee.firstName} {employee.lastName}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {employee.code} | {employee.designation || 'N/A'} | {employee.department || 'N/A'}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className="mr-4">
-                          {employeeGoals.length} Goal{employeeGoals.length !== 1 ? 's' : ''}
-                        </Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4">
-                      <div className="space-y-4 mt-2">
-                        {employeeGoals.map((goal) => (
-                          <Card key={goal.id} className="border-l-4 border-l-primary">
-                            <CardContent className="pt-4">
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <Target className="h-5 w-5 text-primary" />
-                                  <span className="font-medium">{goal.description}</span>
-                                </div>
-                                {getStatusBadge(goal.status)}
-                              </div>
-                              
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                <div>
-                                  <span className="text-muted-foreground">Planned Outcome:</span>
-                                  <p className="mt-1">{goal.plannedOutcome}</p>
-                                </div>
-                                
-                                <div className="space-y-2">
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4">
+                        <div className="space-y-4 mt-2">
+                          {employeeGoals.map((goal) => (
+                            <Card
+                              key={goal.id}
+                              className="border-l-4 border-l-primary"
+                            >
+                              <CardContent className="pt-4">
+                                <div className="flex items-start justify-between mb-3">
                                   <div className="flex items-center gap-2">
-                                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-muted-foreground">Target Date:</span>
-                                    <span>{goal.targetDate ? format(new Date(goal.targetDate), 'MMM d, yyyy') : 'Not set'}</span>
+                                    <Target className="h-5 w-5 text-primary" />
+                                    <span className="font-medium">
+                                      {goal.description}
+                                    </span>
                                   </div>
-                                  
-                                  {goal.appraisalCycle && (
+                                  {getStatusBadge(goal.status)}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                  <div>
+                                    <span className="text-muted-foreground">
+                                      Planned Outcome:
+                                    </span>
+                                    <p className="mt-1">
+                                      {goal.plannedOutcome}
+                                    </p>
+                                  </div>
+
+                                  <div className="space-y-2">
                                     <div className="flex items-center gap-2">
-                                      <Flag className="h-4 w-4 text-muted-foreground" />
-                                      <span className="text-muted-foreground">Appraisal Cycle:</span>
-                                      <span>{goal.appraisalCycle.code}</span>
+                                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                                      <span className="text-muted-foreground">
+                                        Target Date:
+                                      </span>
+                                      <span>
+                                        {goal.targetDate
+                                          ? format(
+                                              new Date(goal.targetDate),
+                                              "MMM d, yyyy"
+                                            )
+                                          : "Not set"}
+                                      </span>
                                     </div>
-                                  )}
+
+                                    {goal.appraisalCycle && (
+                                      <div className="flex items-center gap-2">
+                                        <Flag className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-muted-foreground">
+                                          Appraisal Cycle:
+                                        </span>
+                                        <span>{goal.appraisalCycle.code}</span>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                              
-                              <div className="mt-4">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-sm text-muted-foreground">Progress</span>
-                                  <span className="text-sm font-medium">{goal.progress || 0}%</span>
+
+                                <div className="mt-4">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm text-muted-foreground">
+                                      Progress
+                                    </span>
+                                    <span className="text-sm font-medium">
+                                      {goal.progress || 0}%
+                                    </span>
+                                  </div>
+                                  <Progress
+                                    value={goal.progress || 0}
+                                    className="h-2"
+                                  />
                                 </div>
-                                <Progress value={goal.progress || 0} className="h-2" />
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                );
-              })}
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                }
+              )}
             </Accordion>
           </div>
         )}
