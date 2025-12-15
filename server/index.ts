@@ -1,8 +1,14 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { log } from "./vite";
+import { getCorsOptions } from "./config/cors.config";
 
 const app = express();
+
+// CORS configuration - must be before other middleware
+app.use(cors(getCorsOptions()));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -47,26 +53,16 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
   // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Use port 3000 for development, 5000 for production
   const port = parseInt(
-    process.env.PORT ||
-      (process.env.NODE_ENV === "production" ? "5000" : "3000"),
+    process.env.PORT || "3000",
     10
   );
 
   server.listen(port, () => {
-    log(`🚀 Server running on http://localhost:${port}`);
-    log(`📱 Frontend: http://localhost:${port}`);
+    log(`🚀 Backend Server running on http://localhost:${port}`);
     log(`🔌 API: http://localhost:${port}/api`);
+    log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    log(`🗄️  Database: Connected`);
   });
 })();
