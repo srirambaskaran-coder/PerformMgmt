@@ -1,8 +1,18 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
-import { registerRoutes } from "./routes";
-import { log } from "./vite";
-import { getCorsOptions } from "./config/cors.config";
+import { registerRoutes } from "./src/routes";
+import { getCorsOptions } from "./src/config/cors.config";
+
+// Simple logging function
+function log(message: string, source = "express") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
 
 const app = express();
 

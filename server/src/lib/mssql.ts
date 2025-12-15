@@ -1,6 +1,6 @@
 import "dotenv/config";
 import sql from "mssql";
-import { getDatabaseConfig } from "./config/database.config";
+import { getDatabaseConfig } from "../config/database.config";
 
 let poolPromise: Promise<sql.ConnectionPool> | null = null;
 

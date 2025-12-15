@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { setupAuth, isAuthenticated, requireRoles } from "./auth";
+import { storage } from "./lib/storage";
+import { setupAuth, isAuthenticated, requireRoles } from "./lib/auth";
 import { z } from "zod";
 import {
   insertUserSchema,
@@ -35,9 +35,9 @@ import {
   sendReviewCompletion,
   generateRegistrationNotificationEmail,
   sendEmployeeSubmissionNotification,
-} from "./emailService";
-import { ObjectStorageService } from "./objectStorage";
-import { seedTestUsers, testUsers } from "./seedUsers";
+} from "./lib/emailService";
+import { ObjectStorageService } from "./lib/objectStorage";
+import { seedTestUsers, testUsers } from "./lib/seedUsers";
 import * as XLSX from "xlsx";
 import PDFDocument from "pdfkit";
 import PizZip from "pizzip";
