@@ -1,11 +1,8 @@
 import express from "express";
-import { createServer } from "http";
 import cors from "cors";
-import session from "express-session";
 import { getCorsOptions } from "./config/cors.config";
-import { errorHandler } from "./middleware/error.middleware";
+import { registerRoutes } from "./routes";
 import { logger } from "./utils/logger";
-import routes from "./routes";
 
 const app = express();
 
@@ -15,21 +12,6 @@ app.use(cors(getCorsOptions()));
 // Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
-// Session configuration
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "performance-mgmt-secret-key",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-    },
-  })
-);
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -48,21 +30,19 @@ app.use((req, res, next) => {
   next();
 });
 
-// Mount API routes
-app.use("/api", routes);
+// Setup all routes using the existing registerRoutes function
+// This includes session setup and all API endpoints
+(async () => {
+  const server = await registerRoutes(app);
 
-// Error handling middleware (must be last)
-app.use(errorHandler);
+  // Start server
+  const port = parseInt(process.env.PORT || "3000", 10);
 
-// Create HTTP server
-const server = createServer(app);
-
-// Start server
-const port = parseInt(process.env.PORT || "3000", 10);
-
-server.listen(port, () => {
-  logger.info(`🚀 Backend Server running on http://localhost:${port}`);
-  logger.info(`🔌 API: http://localhost:${port}/api`);
-  logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`🗄️  Database: Connected`);
-});
+  server.listen(port, () => {
+    logger.info(`🚀 Backend Server running on http://localhost:${port}`);
+    logger.info(`🔌 API: http://localhost:${port}/api`);
+    logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`🗄️  Database: Connected`);
+    logger.info(`📚 Architecture: Layered (Controllers, Services, Repositories available)`);
+  });
+})();
