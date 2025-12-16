@@ -53,6 +53,7 @@ import { z } from "zod";
 import { insertUserSchema, type User, type InsertUser } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { API_BASE_URL } from "@/config/api.config";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -305,7 +306,7 @@ export default function EmployeeManagement() {
 
   const handleDownloadTemplate = async () => {
     try {
-      const response = await fetch("/api/users/bulk-upload/template", {
+      const response = await fetch(`${API_BASE_URL}/api/users/bulk-upload/template`, {
         method: "GET",
         credentials: "include",
       });

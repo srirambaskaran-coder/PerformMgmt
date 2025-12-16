@@ -13,6 +13,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/components/SidebarContext";
+import { API_BASE_URL } from "@/config/api.config";
 
 export function Header() {
   const { user } = useAuth();
@@ -50,7 +51,7 @@ export function Header() {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", {
+      await fetch(`${API_BASE_URL}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
       });

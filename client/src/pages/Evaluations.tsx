@@ -44,6 +44,7 @@ import { useForm } from "react-hook-form";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { API_BASE_URL } from "@/config/api.config";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import {
@@ -141,7 +142,9 @@ export default function Evaluations() {
         employeeId: user?.id || "",
         includeQuestionnaires: "true",
       });
-      const response = await fetch(`/api/evaluations?${params}`);
+      const response = await fetch(`${API_BASE_URL}/api/evaluations?${params}`, {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to fetch evaluations");
       return response.json();
     },
@@ -315,7 +318,7 @@ export default function Evaluations() {
         format,
       };
 
-      const response = await fetch("/api/evaluations/export", {
+      const response = await fetch(`${API_BASE_URL}/api/evaluations/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

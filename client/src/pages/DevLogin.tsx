@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Users, Building, Shield, UserCheck, User } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { API_BASE_URL } from "@/config/api.config";
 
 interface TestUser {
   id: string;
@@ -39,16 +40,18 @@ export default function DevLogin() {
 
   // Seed users mutation
   const seedUsersMutation = useMutation({
-    mutationFn: () => fetch("/api/dev/seed-users", {
+    mutationFn: () => fetch(`${API_BASE_URL}/api/dev/seed-users`, {
       method: "POST",
+      credentials: "include",
     }).then(res => res.json()),
   });
 
   // Login as user mutation
   const loginMutation = useMutation({
-    mutationFn: (userId: string) => fetch("/api/dev/login", {
+    mutationFn: (userId: string) => fetch(`${API_BASE_URL}/api/dev/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ userId }),
     }).then(res => res.json()),
     onSuccess: () => {

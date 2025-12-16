@@ -11,6 +11,7 @@ import { z } from "zod";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useParams } from "wouter";
+import { API_BASE_URL } from "@/config/api.config";
 
 const registrationSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -66,9 +67,10 @@ export default function Landing() {
 
   const onRegisterSubmit = async (data: RegistrationForm) => {
     try {
-      const response = await fetch('/api/registration', {
+      const response = await fetch(`${API_BASE_URL}/api/registration`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(data)
       });
 
@@ -93,9 +95,10 @@ export default function Landing() {
 
   const onLoginSubmit = async (data: LoginForm) => {
     try {
-      const response = await fetch('/api/login/company', {
+      const response = await fetch(`${API_BASE_URL}/api/login/company`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(data)
       });
 

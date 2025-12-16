@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { API_BASE_URL } from "@/config/api.config";
 import { Settings as SettingsIcon, Key, Mail, User, Shield, ChevronRight, Image, Upload } from "lucide-react";
 import type { Company } from "@shared/schema";
 
@@ -169,7 +170,7 @@ export default function Settings() {
     try {
       console.log('Starting upload...');
       // Get signed upload URL
-      const urlResponse = await fetch('/api/objects/upload', {
+      const urlResponse = await fetch(`${API_BASE_URL}/api/objects/upload`, {
         method: 'POST',
         credentials: 'include',
       });

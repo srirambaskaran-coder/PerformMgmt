@@ -49,6 +49,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { API_BASE_URL } from "@/config/api.config";
 import type { SafeUser, AppraisalGroup, QuestionnaireTemplate, FrequencyCalendar, FrequencyCalendarDetails, AppraisalCycle } from "@shared/schema";
 
 interface AppraisalGroupWithMembers extends AppraisalGroup {
@@ -219,7 +220,7 @@ export default function InitiateAppraisal() {
     queryKey: ['/api/frequency-calendars', selectedCalendarId, 'details'],
     queryFn: async () => {
       if (!selectedCalendarId) return [];
-      const response = await fetch(`/api/frequency-calendars/${selectedCalendarId}/details`, {
+      const response = await fetch(`${API_BASE_URL}/api/frequency-calendars/${selectedCalendarId}/details`, {
         credentials: 'include',
       });
       if (!response.ok) {
@@ -235,7 +236,7 @@ export default function InitiateAppraisal() {
     mutationFn: async (data: InitiateAppraisalForm & { appraisalGroupId: string }) => {
       // For now, send as JSON since file upload is not fully implemented
       // TODO: Implement proper file upload with FormData when needed
-      const response = await fetch('/api/initiate-appraisal', {
+      const response = await fetch(`${API_BASE_URL}/api/initiate-appraisal`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
