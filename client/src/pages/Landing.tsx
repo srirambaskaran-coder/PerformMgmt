@@ -1,10 +1,38 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Building, Users, ClipboardList, BarChart3, Shield, Globe, Clock } from "lucide-react";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Building,
+  Users,
+  ClipboardList,
+  BarChart3,
+  Shield,
+  Globe,
+  Clock,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -59,7 +87,7 @@ export default function Landing() {
   // Pre-fill company URL if accessed via /company/:companyUrl
   useEffect(() => {
     if (params.companyUrl) {
-      loginForm.setValue('companyUrl', params.companyUrl);
+      loginForm.setValue("companyUrl", params.companyUrl);
       // Auto-open login modal if accessed via company URL
       setIsLoginOpen(true);
     }
@@ -68,10 +96,10 @@ export default function Landing() {
   const onRegisterSubmit = async (data: RegistrationForm) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/registration`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(data)
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
       });
 
       if (response.ok) {
@@ -82,13 +110,13 @@ export default function Landing() {
         setIsRegisterOpen(false);
         registerForm.reset();
       } else {
-        throw new Error('Registration failed');
+        throw new Error("Registration failed");
       }
     } catch (error) {
       toast({
         title: "Registration Failed",
         description: "Please try again later.",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -96,10 +124,10 @@ export default function Landing() {
   const onLoginSubmit = async (data: LoginForm) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/login/company`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(data)
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
       });
 
       if (response.ok) {
@@ -112,21 +140,23 @@ export default function Landing() {
         loginForm.reset();
         // Use setTimeout to allow toast to show before redirect
         setTimeout(() => {
-          window.location.href = '/';
+          window.location.href = "/";
         }, 1000);
       } else {
         const errorData = await response.json();
         toast({
           title: "Login Failed",
-          description: errorData.message || "Please check your company URL, email, and password.",
-          variant: "destructive"
+          description:
+            errorData.message ||
+            "Please check your company URL, email, and password.",
+          variant: "destructive",
         });
       }
     } catch (error) {
       toast({
         title: "Login Error",
         description: "Please try again later.",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -145,17 +175,23 @@ export default function Landing() {
           <div className="flex items-center space-x-4">
             <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
               <DialogTrigger asChild>
-                <Button variant="ghost" data-testid="login-btn">Login</Button>
+                <Button variant="ghost" data-testid="login-btn">
+                  Login
+                </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Company Login</DialogTitle>
                   <DialogDescription>
-                    Enter your company URL and credentials to access your Performance Hub.
+                    Enter your company URL and credentials to access your
+                    Performance Hub.
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...loginForm}>
-                  <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
+                  <form
+                    onSubmit={loginForm.handleSubmit(onLoginSubmit)}
+                    className="space-y-4"
+                  >
                     <FormField
                       control={loginForm.control}
                       name="companyUrl"
@@ -163,7 +199,11 @@ export default function Landing() {
                         <FormItem>
                           <FormLabel>Company URL</FormLabel>
                           <FormControl>
-                            <Input placeholder="your-company" {...field} data-testid="input-company-url" />
+                            <Input
+                              placeholder="your-company"
+                              {...field}
+                              data-testid="input-company-url"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -176,7 +216,12 @@ export default function Landing() {
                         <FormItem>
                           <FormLabel>Email</FormLabel>
                           <FormControl>
-                            <Input type="email" placeholder="your.email@company.com" {...field} data-testid="input-login-email" />
+                            <Input
+                              type="email"
+                              placeholder="your.email@company.com"
+                              {...field}
+                              data-testid="input-login-email"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -189,20 +234,28 @@ export default function Landing() {
                         <FormItem>
                           <FormLabel>Password</FormLabel>
                           <FormControl>
-                            <Input type="password" {...field} data-testid="input-login-password" />
+                            <Input
+                              type="password"
+                              {...field}
+                              data-testid="input-login-password"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="w-full" data-testid="button-login-submit">
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      data-testid="button-login-submit"
+                    >
                       Login to Performance Hub
                     </Button>
                   </form>
                 </Form>
               </DialogContent>
             </Dialog>
-            
+
             <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
               <DialogTrigger asChild>
                 <Button data-testid="register-btn">Get Started</Button>
@@ -211,11 +264,15 @@ export default function Landing() {
                 <DialogHeader>
                   <DialogTitle>Register Your Interest</DialogTitle>
                   <DialogDescription>
-                    Fill out this form and we'll contact you to set up your Performance Hub.
+                    Fill out this form and we'll contact you to set up your
+                    Performance Hub.
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...registerForm}>
-                  <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
+                  <form
+                    onSubmit={registerForm.handleSubmit(onRegisterSubmit)}
+                    className="space-y-4"
+                  >
                     <FormField
                       control={registerForm.control}
                       name="name"
@@ -223,7 +280,11 @@ export default function Landing() {
                         <FormItem>
                           <FormLabel>Full Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="John Doe" {...field} data-testid="input-register-name" />
+                            <Input
+                              placeholder="John Doe"
+                              {...field}
+                              data-testid="input-register-name"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -236,7 +297,11 @@ export default function Landing() {
                         <FormItem>
                           <FormLabel>Company Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Acme Corporation" {...field} data-testid="input-register-company" />
+                            <Input
+                              placeholder="Acme Corporation"
+                              {...field}
+                              data-testid="input-register-company"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -249,7 +314,11 @@ export default function Landing() {
                         <FormItem>
                           <FormLabel>Designation</FormLabel>
                           <FormControl>
-                            <Input placeholder="HR Manager" {...field} data-testid="input-register-designation" />
+                            <Input
+                              placeholder="HR Manager"
+                              {...field}
+                              data-testid="input-register-designation"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -262,7 +331,12 @@ export default function Landing() {
                         <FormItem>
                           <FormLabel>Email Address</FormLabel>
                           <FormControl>
-                            <Input type="email" placeholder="john@acme.com" {...field} data-testid="input-register-email" />
+                            <Input
+                              type="email"
+                              placeholder="john@acme.com"
+                              {...field}
+                              data-testid="input-register-email"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -275,13 +349,22 @@ export default function Landing() {
                         <FormItem>
                           <FormLabel>Mobile Number</FormLabel>
                           <FormControl>
-                            <Input type="tel" placeholder="+1 (555) 123-4567" {...field} data-testid="input-register-mobile" />
+                            <Input
+                              type="tel"
+                              placeholder="+1 (555) 123-4567"
+                              {...field}
+                              data-testid="input-register-mobile"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="w-full" data-testid="button-register-submit">
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      data-testid="button-register-submit"
+                    >
                       Submit Registration
                     </Button>
                   </form>
@@ -300,26 +383,30 @@ export default function Landing() {
               <Building className="h-8 w-8 text-primary-foreground" />
             </div>
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold mb-6" data-testid="hero-title">
+          <h1
+            className="text-4xl md:text-6xl font-bold mb-6"
+            data-testid="hero-title"
+          >
             Performance Hub
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-            Transform your organization with our comprehensive SaaS Performance Management platform. 
-            Streamline evaluations, track progress, and drive employee growth with powerful analytics and automation.
+            Transform your organization with our comprehensive SaaS Performance
+            Management platform. Streamline evaluations, track progress, and
+            drive employee growth with powerful analytics and automation.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button 
-              size="lg" 
-              onClick={() => setIsRegisterOpen(true)} 
+            <Button
+              size="lg"
+              onClick={() => setIsRegisterOpen(true)}
               data-testid="hero-register-btn"
               className="min-w-[180px]"
             >
               Start Free Trial
             </Button>
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               variant="outline"
-              onClick={() => setIsLoginOpen(true)} 
+              onClick={() => setIsLoginOpen(true)}
               data-testid="hero-login-btn"
               className="min-w-[180px]"
             >
@@ -338,11 +425,14 @@ export default function Landing() {
               <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
                 <Users className="h-6 w-6 text-primary" />
               </div>
-              <CardTitle className="text-lg">Multi-Tenant Architecture</CardTitle>
+              <CardTitle className="text-lg">
+                Multi-Tenant Architecture
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription>
-                Secure, isolated environments for each company with custom branding and configurations.
+                Secure, isolated environments for each company with custom
+                branding and configurations.
               </CardDescription>
             </CardContent>
           </Card>
@@ -356,7 +446,8 @@ export default function Landing() {
             </CardHeader>
             <CardContent>
               <CardDescription>
-                Customizable questionnaires with real-time calculations, self-assessments, and automated workflows.
+                Customizable questionnaires with real-time calculations,
+                self-assessments, and automated workflows.
               </CardDescription>
             </CardContent>
           </Card>
@@ -370,7 +461,8 @@ export default function Landing() {
             </CardHeader>
             <CardContent>
               <CardDescription>
-                Real-time progress tracking, completion rates, and comprehensive reporting across all levels.
+                Real-time progress tracking, completion rates, and comprehensive
+                reporting across all levels.
               </CardDescription>
             </CardContent>
           </Card>
@@ -384,7 +476,8 @@ export default function Landing() {
             </CardHeader>
             <CardContent>
               <CardDescription>
-                Role-based access control, data encryption, and compliance with industry standards.
+                Role-based access control, data encryption, and compliance with
+                industry standards.
               </CardDescription>
             </CardContent>
           </Card>
@@ -398,7 +491,8 @@ export default function Landing() {
             </CardHeader>
             <CardContent>
               <CardDescription>
-                Cloud-based infrastructure that scales with your organization, from startups to enterprises.
+                Cloud-based infrastructure that scales with your organization,
+                from startups to enterprises.
               </CardDescription>
             </CardContent>
           </Card>
@@ -412,7 +506,8 @@ export default function Landing() {
             </CardHeader>
             <CardContent>
               <CardDescription>
-                Smart notifications, reminder systems, and meeting scheduling to streamline HR processes.
+                Smart notifications, reminder systems, and meeting scheduling to
+                streamline HR processes.
               </CardDescription>
             </CardContent>
           </Card>
@@ -420,26 +515,31 @@ export default function Landing() {
 
         {/* Benefits Section */}
         <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold mb-8">Trusted by Organizations Worldwide</h2>
+          <h2 className="text-3xl font-bold mb-8">
+            Trusted by Organizations Worldwide
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <h3 className="text-xl font-semibold mb-4">Deploy in Minutes</h3>
               <p className="text-muted-foreground">
-                Get your Performance Hub set up instantly with our guided onboarding. 
-                No technical expertise required - we handle everything for you.
+                Get your Performance Hub set up instantly with our guided
+                onboarding. No technical expertise required - we handle
+                everything for you.
               </p>
             </div>
             <div>
               <h3 className="text-xl font-semibold mb-4">ROI in 30 Days</h3>
               <p className="text-muted-foreground">
-                See immediate improvements in review completion rates, employee engagement, 
-                and performance visibility across your organization.
+                See immediate improvements in review completion rates, employee
+                engagement, and performance visibility across your organization.
               </p>
             </div>
             <div>
-              <h3 className="text-xl font-semibold mb-4">Scale Without Limits</h3>
+              <h3 className="text-xl font-semibold mb-4">
+                Scale Without Limits
+              </h3>
               <p className="text-muted-foreground">
-                From 10 employees to 10,000+, our platform grows with you. 
+                From 10 employees to 10,000+, our platform grows with you.
                 Enterprise-grade infrastructure with 99.9% uptime guarantee.
               </p>
             </div>
@@ -448,23 +548,26 @@ export default function Landing() {
 
         {/* Pricing CTA Section */}
         <div className="bg-muted/50 rounded-2xl p-8 text-center">
-          <h2 className="text-2xl font-bold mb-4">Ready to Transform Your Performance Management?</h2>
+          <h2 className="text-2xl font-bold mb-4">
+            Ready to Transform Your Performance Management?
+          </h2>
           <p className="text-lg text-muted-foreground mb-6">
-            Join hundreds of forward-thinking companies using Performance Hub to drive employee growth.
+            Join hundreds of forward-thinking companies using Performance Hub to
+            drive employee growth.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button 
-              size="lg" 
-              onClick={() => setIsRegisterOpen(true)} 
+            <Button
+              size="lg"
+              onClick={() => setIsRegisterOpen(true)}
               data-testid="cta-register-btn"
               className="min-w-[200px]"
             >
               Start Your Free Trial
             </Button>
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               variant="ghost"
-              onClick={() => setIsLoginOpen(true)} 
+              onClick={() => setIsLoginOpen(true)}
               data-testid="cta-login-btn"
               className="min-w-[200px]"
             >

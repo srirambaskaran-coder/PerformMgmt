@@ -1,11 +1,11 @@
 // Environment detection and API configuration
-export type Environment = 'development' | 'qc' | 'production';
+export type Environment = "development" | "qc" | "production";
 
 // Helper function to get environment type based on current URL or env variable
 export function getEnvType(): Environment {
   // First check if VITE_APP_ENV is set (build-time configuration)
   const envVar = import.meta.env.VITE_APP_ENV as Environment | undefined;
-  if (envVar && ['development', 'qc', 'production'].includes(envVar)) {
+  if (envVar && ["development", "qc", "production"].includes(envVar)) {
     return envVar;
   }
 
@@ -14,17 +14,21 @@ export function getEnvType(): Environment {
   const hostname = window.location.hostname;
 
   // Development: localhost or 127.0.0.1
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'development';
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "development";
   }
-  
+
   // QC: check for qc/staging in hostname or specific domains
-  if (hostname.includes('qc') || hostname.includes('staging') || hostname.includes('test')) {
-    return 'qc';
+  if (
+    hostname.includes("qc") ||
+    hostname.includes("staging") ||
+    hostname.includes("test")
+  ) {
+    return "qc";
   }
 
   // Production: everything else
-  return 'production';
+  return "production";
 }
 
 // API Configuration for different environments
@@ -44,9 +48,10 @@ function getBaseUrl(env: Environment): string {
 
   // Default URLs for each environment
   const defaultUrls: Record<Environment, string> = {
-    development: 'http://localhost:3000',
-    qc: import.meta.env.VITE_QC_API_URL || 'http://your-qc-backend-url.com',
-    production: import.meta.env.VITE_PROD_API_URL || 'https://your-prod-backend-url.com',
+    development: "http://localhost:3000",
+    qc: import.meta.env.VITE_QC_API_URL || "http://your-qc-backend-url.com",
+    production:
+      import.meta.env.VITE_PROD_API_URL || "https://your-prod-backend-url.com",
   };
 
   return defaultUrls[env];
@@ -54,15 +59,15 @@ function getBaseUrl(env: Environment): string {
 
 const apiConfigs: Record<Environment, ApiConfig> = {
   development: {
-    baseUrl: getBaseUrl('development'),
+    baseUrl: getBaseUrl("development"),
     timeout: 30000,
   },
   qc: {
-    baseUrl: getBaseUrl('qc'),
+    baseUrl: getBaseUrl("qc"),
     timeout: 30000,
   },
   production: {
-    baseUrl: getBaseUrl('production'),
+    baseUrl: getBaseUrl("production"),
     timeout: 30000,
   },
 };
@@ -81,11 +86,13 @@ export const CURRENT_ENV = getEnvType();
 // API endpoints helper
 export function getApiUrl(endpoint: string): string {
   const baseUrl = API_BASE_URL;
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   return `${baseUrl}${cleanEndpoint}`;
 }
 
 // Debug logging (only in development)
 if (import.meta.env.DEV) {
-  console.log(`[API Config] Environment: ${CURRENT_ENV}, Base URL: ${API_BASE_URL}`);
+  console.log(
+    `[API Config] Environment: ${CURRENT_ENV}, Base URL: ${API_BASE_URL}`
+  );
 }

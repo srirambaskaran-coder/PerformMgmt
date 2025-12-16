@@ -3,10 +3,10 @@ import { API_BASE_URL } from "@/config/api.config";
 
 // Helper to build full API URL
 function buildApiUrl(url: string): string {
-  if (url.startsWith('http://') || url.startsWith('https://')) {
+  if (url.startsWith("http://") || url.startsWith("https://")) {
     return url;
   }
-  const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+  const cleanUrl = url.startsWith("/") ? url : `/${url}`;
   return `${API_BASE_URL}${cleanUrl}`;
 }
 
@@ -20,7 +20,7 @@ async function throwIfResNotOk(res: Response) {
 export async function apiRequest(
   method: string,
   url: string,
-  data?: unknown | undefined,
+  data?: unknown | undefined
 ): Promise<Response> {
   const res = await fetch(buildApiUrl(url), {
     method,

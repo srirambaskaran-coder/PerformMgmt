@@ -3,30 +3,54 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { API_BASE_URL } from "@/config/api.config";
-import { Settings as SettingsIcon, Key, Mail, User, Shield, ChevronRight, Image, Upload } from "lucide-react";
+import {
+  Settings as SettingsIcon,
+  Key,
+  Mail,
+  User,
+  Shield,
+  ChevronRight,
+  Image,
+  Upload,
+} from "lucide-react";
 import type { Company } from "@shared/schema";
 
 // Schema for password change - current password optional for OIDC accounts
-const passwordChangeSchema = z.object({
-  currentPassword: z.string().optional(),
-  newPassword: z.string().min(6, "Password must be at least 6 characters"),
-  confirmPassword: z.string().min(6, "Password confirmation is required"),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+const passwordChangeSchema = z
+  .object({
+    currentPassword: z.string().optional(),
+    newPassword: z.string().min(6, "Password must be at least 6 characters"),
+    confirmPassword: z.string().min(6, "Password confirmation is required"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
 // Schema for email service configuration
 const emailServiceSchema = z.object({
@@ -49,12 +73,13 @@ export default function Settings() {
   const [showEmailServiceForm, setShowEmailServiceForm] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
-  const isSuperAdmin = user?.role === 'super_admin';
-  const isAdmin = user?.role === 'admin';
-  const isHRManager = user?.role === 'hr_manager';
-  const isEmployee = user?.role === 'employee';
-  const isManager = user?.role === 'manager';
-  const canChangePassword = isSuperAdmin || isAdmin || isHRManager || isEmployee || isManager;
+  const isSuperAdmin = user?.role === "super_admin";
+  const isAdmin = user?.role === "admin";
+  const isHRManager = user?.role === "hr_manager";
+  const isEmployee = user?.role === "employee";
+  const isManager = user?.role === "manager";
+  const canChangePassword =
+    isSuperAdmin || isAdmin || isHRManager || isEmployee || isManager;
   const canConfigureEmail = isAdmin; // Only Administrators can configure email
   const canUploadLogo = isAdmin; // Only Administrators can upload company logo
 
@@ -141,12 +166,14 @@ export default function Settings() {
   });
 
   // Company logo upload handler
-  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file || !company) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith("image/")) {
       toast({
         title: "Invalid File",
         description: "Please upload an image file",
@@ -168,64 +195,68 @@ export default function Settings() {
     setUploadingLogo(true);
 
     try {
-      console.log('Starting upload...');
+      console.log("Starting upload...");
       // Get signed upload URL
       const urlResponse = await fetch(`${API_BASE_URL}/api/objects/upload`, {
-        method: 'POST',
-        credentials: 'include',
+        method: "POST",
+        credentials: "include",
       });
-      
+
       if (!urlResponse.ok) {
-        throw new Error('Failed to get upload URL');
+        throw new Error("Failed to get upload URL");
       }
-      
+
       const { uploadURL } = await urlResponse.json();
-      console.log('Got upload URL, uploading file...');
-      
+      console.log("Got upload URL, uploading file...");
+
       // Upload file to signed URL
       const uploadResponse = await fetch(uploadURL, {
-        method: 'PUT',
+        method: "PUT",
         body: file,
         headers: {
-          'Content-Type': file.type,
+          "Content-Type": file.type,
         },
       });
 
       if (!uploadResponse.ok) {
-        throw new Error('Failed to upload logo');
+        throw new Error("Failed to upload logo");
       }
 
       // Extract the public URL from the upload URL (remove query params)
-      const url = uploadURL.split('?')[0];
-      console.log('File uploaded, URL:', url);
+      const url = uploadURL.split("?")[0];
+      console.log("File uploaded, URL:", url);
 
       // Set the logo to be publicly accessible
-      console.log('Making logo public...');
-      const aclResponse = await apiRequest('PUT', '/api/company-logos', {
+      console.log("Making logo public...");
+      const aclResponse = await apiRequest("PUT", "/api/company-logos", {
         logoURL: url,
       });
-      
-      const { objectPath } = await aclResponse.json();
-      console.log('Logo is now public, path:', objectPath);
 
-      console.log('Updating company with logo URL...');
+      const { objectPath } = await aclResponse.json();
+      console.log("Logo is now public, path:", objectPath);
+
+      console.log("Updating company with logo URL...");
       // Update company with new logo URL using dedicated logo endpoint
       // Note: apiRequest already throws on non-ok responses
-      const updateResponse = await apiRequest('PUT', `/api/companies/current/logo`, {
-        logoUrl: objectPath,
-      });
-      
-      console.log('PUT request successful');
-      
+      const updateResponse = await apiRequest(
+        "PUT",
+        `/api/companies/current/logo`,
+        {
+          logoUrl: objectPath,
+        }
+      );
+
+      console.log("PUT request successful");
+
       // Invalidate queries to refresh the logo
-      queryClient.invalidateQueries({ queryKey: ['/api/companies/current'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies/current"] });
 
       toast({
         title: "Success",
         description: "Company logo updated successfully",
       });
     } catch (error: any) {
-      console.error('Logo upload error:', error);
+      console.error("Logo upload error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to upload logo",
@@ -234,7 +265,7 @@ export default function Settings() {
     } finally {
       setUploadingLogo(false);
       // Reset the file input
-      event.target.value = '';
+      event.target.value = "";
     }
   };
 
@@ -294,13 +325,22 @@ export default function Settings() {
               <div>
                 <Label className="text-sm font-medium">Role</Label>
                 <div>
-                  <Badge variant={isSuperAdmin ? "default" : "secondary"} className="flex items-center gap-1 w-fit">
+                  <Badge
+                    variant={isSuperAdmin ? "default" : "secondary"}
+                    className="flex items-center gap-1 w-fit"
+                  >
                     <Shield className="h-3 w-3" />
-                    {user?.role === 'super_admin' ? 'Super Administrator' : 
-                     user?.role === 'admin' ? 'Administrator' : 
-                     user?.role === 'hr_manager' ? 'HR Manager' :
-                     user?.role === 'manager' ? 'Manager' :
-                     user?.role === 'employee' ? 'Employee' : user?.role}
+                    {user?.role === "super_admin"
+                      ? "Super Administrator"
+                      : user?.role === "admin"
+                      ? "Administrator"
+                      : user?.role === "hr_manager"
+                      ? "HR Manager"
+                      : user?.role === "manager"
+                      ? "Manager"
+                      : user?.role === "employee"
+                      ? "Employee"
+                      : user?.role}
                   </Badge>
                 </div>
               </div>
@@ -322,7 +362,7 @@ export default function Settings() {
             </CardHeader>
             <CardContent>
               {!showPasswordForm ? (
-                <Button 
+                <Button
                   onClick={() => setShowPasswordForm(true)}
                   className="flex items-center gap-2"
                   data-testid="button-change-password"
@@ -333,24 +373,33 @@ export default function Settings() {
                 </Button>
               ) : (
                 <Form {...passwordForm}>
-                  <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+                  <form
+                    onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}
+                    className="space-y-4"
+                  >
                     <FormField
                       control={passwordForm.control}
                       name="currentPassword"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Current Password <span className="text-muted-foreground">(optional if none set)</span></FormLabel>
+                          <FormLabel>
+                            Current Password{" "}
+                            <span className="text-muted-foreground">
+                              (optional if none set)
+                            </span>
+                          </FormLabel>
                           <FormControl>
-                            <Input 
-                              type="password" 
+                            <Input
+                              type="password"
                               placeholder="Enter current password (leave blank if none set)"
                               data-testid="input-current-password"
-                              {...field} 
+                              {...field}
                             />
                           </FormControl>
                           <FormMessage />
                           <p className="text-sm text-muted-foreground">
-                            Leave current password blank if this is your first time setting a password
+                            Leave current password blank if this is your first
+                            time setting a password
                           </p>
                         </FormItem>
                       )}
@@ -362,11 +411,11 @@ export default function Settings() {
                         <FormItem>
                           <FormLabel>New Password</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="password" 
+                            <Input
+                              type="password"
                               placeholder="Enter new password"
                               data-testid="input-new-password"
-                              {...field} 
+                              {...field}
                             />
                           </FormControl>
                           <FormMessage />
@@ -380,11 +429,11 @@ export default function Settings() {
                         <FormItem>
                           <FormLabel>Confirm New Password</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="password" 
+                            <Input
+                              type="password"
                               placeholder="Confirm new password"
                               data-testid="input-confirm-password"
-                              {...field} 
+                              {...field}
                             />
                           </FormControl>
                           <FormMessage />
@@ -397,7 +446,9 @@ export default function Settings() {
                         disabled={changePasswordMutation.isPending}
                         data-testid="button-submit-password"
                       >
-                        {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
+                        {changePasswordMutation.isPending
+                          ? "Changing..."
+                          : "Change Password"}
                       </Button>
                       <Button
                         type="button"
@@ -435,36 +486,47 @@ export default function Settings() {
                 <div className="space-y-4">
                   {emailConfig && (
                     <div className="p-4 bg-muted/50 rounded-lg">
-                      <h4 className="font-medium mb-2">Current Configuration</h4>
+                      <h4 className="font-medium mb-2">
+                        Current Configuration
+                      </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                         <div>
-                          <span className="font-medium">Host:</span> {emailConfig.host}
+                          <span className="font-medium">Host:</span>{" "}
+                          {emailConfig.host}
                         </div>
                         <div>
-                          <span className="font-medium">Port:</span> {emailConfig.port}
+                          <span className="font-medium">Port:</span>{" "}
+                          {emailConfig.port}
                         </div>
                         <div>
-                          <span className="font-medium">From Email:</span> {emailConfig.fromEmail}
+                          <span className="font-medium">From Email:</span>{" "}
+                          {emailConfig.fromEmail}
                         </div>
                         <div>
-                          <span className="font-medium">From Name:</span> {emailConfig.fromName}
+                          <span className="font-medium">From Name:</span>{" "}
+                          {emailConfig.fromName}
                         </div>
                       </div>
                     </div>
                   )}
-                  <Button 
+                  <Button
                     onClick={() => setShowEmailServiceForm(true)}
                     className="flex items-center gap-2"
                     data-testid="button-configure-email"
                   >
                     <Mail className="h-4 w-4" />
-                    {emailConfig ? "Update Email Service" : "Configure Email Service"}
+                    {emailConfig
+                      ? "Update Email Service"
+                      : "Configure Email Service"}
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
               ) : (
                 <Form {...emailForm}>
-                  <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
+                  <form
+                    onSubmit={emailForm.handleSubmit(onEmailSubmit)}
+                    className="space-y-4"
+                  >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
                         control={emailForm.control}
@@ -473,10 +535,10 @@ export default function Settings() {
                           <FormItem>
                             <FormLabel>SMTP Host</FormLabel>
                             <FormControl>
-                              <Input 
+                              <Input
                                 placeholder="smtp.gmail.com"
                                 data-testid="input-smtp-host"
-                                {...field} 
+                                {...field}
                               />
                             </FormControl>
                             <FormMessage />
@@ -490,12 +552,16 @@ export default function Settings() {
                           <FormItem>
                             <FormLabel>Port</FormLabel>
                             <FormControl>
-                              <Input 
+                              <Input
                                 type="number"
                                 placeholder="587"
                                 data-testid="input-smtp-port"
                                 {...field}
-                                onChange={(e) => field.onChange(parseInt(e.target.value) || 587)}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    parseInt(e.target.value) || 587
+                                  )
+                                }
                               />
                             </FormControl>
                             <FormMessage />
@@ -509,10 +575,10 @@ export default function Settings() {
                           <FormItem>
                             <FormLabel>Username</FormLabel>
                             <FormControl>
-                              <Input 
+                              <Input
                                 placeholder="your-email@example.com"
                                 data-testid="input-smtp-username"
-                                {...field} 
+                                {...field}
                               />
                             </FormControl>
                             <FormMessage />
@@ -526,11 +592,11 @@ export default function Settings() {
                           <FormItem>
                             <FormLabel>Password</FormLabel>
                             <FormControl>
-                              <Input 
+                              <Input
                                 type="password"
                                 placeholder="SMTP password or app password"
                                 data-testid="input-smtp-password"
-                                {...field} 
+                                {...field}
                               />
                             </FormControl>
                             <FormMessage />
@@ -544,11 +610,11 @@ export default function Settings() {
                           <FormItem>
                             <FormLabel>From Email</FormLabel>
                             <FormControl>
-                              <Input 
+                              <Input
                                 type="email"
                                 placeholder="noreply@yourcompany.com"
                                 data-testid="input-from-email"
-                                {...field} 
+                                {...field}
                               />
                             </FormControl>
                             <FormMessage />
@@ -562,10 +628,10 @@ export default function Settings() {
                           <FormItem>
                             <FormLabel>From Name</FormLabel>
                             <FormControl>
-                              <Input 
+                              <Input
                                 placeholder="Your Company Name"
                                 data-testid="input-from-name"
-                                {...field} 
+                                {...field}
                               />
                             </FormControl>
                             <FormMessage />
@@ -573,7 +639,7 @@ export default function Settings() {
                         )}
                       />
                     </div>
-                    
+
                     {/* SSL/TLS Security Option */}
                     <FormField
                       control={emailForm.control}
@@ -592,20 +658,23 @@ export default function Settings() {
                               Use SSL/TLS (Secure Connection)
                             </FormLabel>
                             <p className="text-sm text-muted-foreground">
-                              Enable secure connection for SMTP. Usually enabled for port 465 or 587 with STARTTLS.
+                              Enable secure connection for SMTP. Usually enabled
+                              for port 465 or 587 with STARTTLS.
                             </p>
                           </div>
                         </FormItem>
                       )}
                     />
-                    
+
                     <div className="flex gap-2">
                       <Button
                         type="submit"
                         disabled={emailServiceMutation.isPending}
                         data-testid="button-save-email-config"
                       >
-                        {emailServiceMutation.isPending ? "Saving..." : "Save Configuration"}
+                        {emailServiceMutation.isPending
+                          ? "Saving..."
+                          : "Save Configuration"}
                       </Button>
                       <Button
                         type="button"
@@ -645,8 +714,8 @@ export default function Settings() {
                   <div className="flex items-center gap-4">
                     <div className="p-4 bg-muted rounded-lg">
                       <p className="text-sm font-medium mb-2">Current Logo</p>
-                      <img 
-                        src={company.logoUrl} 
+                      <img
+                        src={company.logoUrl}
                         alt={`${company.name} logo`}
                         className="max-w-[150px] max-h-20 object-contain"
                       />
@@ -658,7 +727,10 @@ export default function Settings() {
                 <div className="p-4 bg-muted/50 rounded-lg">
                   <h4 className="font-medium mb-2">Upload Guidelines</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>ΓÇó Recommended: PNG or SVG format with transparent background</li>
+                    <li>
+                      ΓÇó Recommended: PNG or SVG format with transparent
+                      background
+                    </li>
                     <li>ΓÇó Maximum file size: 2MB</li>
                     <li>ΓÇó Logo will display at 60% of sidebar width</li>
                     <li>ΓÇó For best results, use a horizontal logo layout</li>
@@ -667,20 +739,23 @@ export default function Settings() {
 
                 {/* Upload Button */}
                 <div>
-                  <Label 
-                    htmlFor="logo-upload" 
-                    className="cursor-pointer"
-                  >
+                  <Label htmlFor="logo-upload" className="cursor-pointer">
                     <div className="flex items-center gap-2">
-                      <Button 
-                        type="button" 
+                      <Button
+                        type="button"
                         disabled={uploadingLogo}
                         className="flex items-center gap-2"
-                        onClick={() => document.getElementById('logo-upload')?.click()}
+                        onClick={() =>
+                          document.getElementById("logo-upload")?.click()
+                        }
                         data-testid="button-upload-logo"
                       >
                         <Upload className="h-4 w-4" />
-                        {uploadingLogo ? "Uploading..." : company.logoUrl ? "Update Logo" : "Upload Logo"}
+                        {uploadingLogo
+                          ? "Uploading..."
+                          : company.logoUrl
+                          ? "Update Logo"
+                          : "Upload Logo"}
                       </Button>
                     </div>
                   </Label>
@@ -707,7 +782,8 @@ export default function Settings() {
                 <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">Limited Access</h3>
                 <p className="text-muted-foreground">
-                  Settings are only available for Administrators and Super Administrators.
+                  Settings are only available for Administrators and Super
+                  Administrators.
                 </p>
               </div>
             </CardContent>

@@ -142,9 +142,12 @@ export default function Evaluations() {
         employeeId: user?.id || "",
         includeQuestionnaires: "true",
       });
-      const response = await fetch(`${API_BASE_URL}/api/evaluations?${params}`, {
-        credentials: "include",
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/evaluations?${params}`,
+        {
+          credentials: "include",
+        }
+      );
       if (!response.ok) throw new Error("Failed to fetch evaluations");
       return response.json();
     },
