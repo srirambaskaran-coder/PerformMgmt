@@ -28,6 +28,14 @@ export type CalendarProvider = typeof CalendarProviderValues[number];
 export const GoalStatusValues = ["on_track", "delayed", "completed", "not_started"] as const;
 export type GoalStatus = typeof GoalStatusValues[number];
 
+// Feedback rating enum for 360 degree feedback
+export const FeedbackRatingValues = ["excellent", "good", "average", "needs_improvement", "poor", "not_applicable"] as const;
+export type FeedbackRating = typeof FeedbackRatingValues[number];
+
+// Feedback request status enum
+export const FeedbackRequestStatusValues = ["pending", "submitted", "cancelled"] as const;
+export type FeedbackRequestStatus = typeof FeedbackRequestStatusValues[number];
+
 // ============================================
 // INTERFACES - Pure TypeScript types
 // ============================================
@@ -408,6 +416,35 @@ export interface DevelopmentGoal {
   updatedAt?: Date | null;
 }
 
+// Feedback Request interface for 360 degree feedback
+export interface FeedbackRequest {
+  id: string;
+  requesterId: string; // Manager who requested the feedback
+  reviewerId?: string | null; // Employee who needs to provide feedback (null for external reviewers)
+  externalEmail?: string | null; // Email for external reviewers
+  subjectId: string; // Employee being reviewed (the manager's team member)
+  evaluationId?: string | null; // Optional link to evaluation
+  appraisalCycleId?: string | null;
+  status?: FeedbackRequestStatus | null;
+  // Feedback response fields (filled when submitted)
+  relationshipWithPeer?: string | null;
+  collaborationRating?: FeedbackRating | null;
+  communicationRating?: FeedbackRating | null;
+  reliabilityRating?: FeedbackRating | null;
+  problemSolvingRating?: FeedbackRating | null;
+  ownershipRating?: FeedbackRating | null;
+  opennessToFeedbackRating?: FeedbackRating | null;
+  conflictHandlingRating?: FeedbackRating | null;
+  jobSpecificCompetencies?: string | null;
+  strengths?: string | null;
+  developmentAreas?: string | null;
+  overallSummary?: string | null;
+  recommendedRating?: number | null; // 1-5
+  submittedAt?: Date | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
+
 // ============================================
 // INSERT TYPES - Types for creating records
 // ============================================
@@ -441,6 +478,29 @@ export type InsertInitiatedAppraisal = Omit<InitiatedAppraisal, "id" | "createdA
 export type InsertInitiatedAppraisalDetailTiming = Omit<InitiatedAppraisalDetailTiming, "id" | "createdAt" | "updatedAt">;
 export type InsertScheduledAppraisalTask = Omit<ScheduledAppraisalTask, "id" | "createdAt" | "updatedAt">;
 export type InsertDevelopmentGoal = Omit<DevelopmentGoal, "id" | "createdAt" | "updatedAt" | "status">;
+
+// Feedback Request insert type (for creating new feedback requests)
+export type InsertFeedbackRequest = Omit<FeedbackRequest, "id" | "createdAt" | "updatedAt" | "submittedAt" | "status" | 
+  "relationshipWithPeer" | "collaborationRating" | "communicationRating" | "reliabilityRating" | 
+  "problemSolvingRating" | "ownershipRating" | "opennessToFeedbackRating" | "conflictHandlingRating" | 
+  "jobSpecificCompetencies" | "strengths" | "developmentAreas" | "overallSummary" | "recommendedRating">;
+
+// Submit Feedback type (for submitting feedback response)
+export interface SubmitFeedback {
+  relationshipWithPeer: string;
+  collaborationRating: "excellent" | "good" | "average" | "needs_improvement" | "poor";
+  communicationRating: "excellent" | "good" | "average" | "needs_improvement" | "poor";
+  reliabilityRating: "excellent" | "good" | "average" | "needs_improvement" | "poor";
+  problemSolvingRating: "excellent" | "good" | "average" | "needs_improvement" | "poor";
+  ownershipRating: "excellent" | "good" | "average" | "needs_improvement" | "poor" | "not_applicable";
+  opennessToFeedbackRating: "excellent" | "good" | "average" | "needs_improvement" | "poor";
+  conflictHandlingRating: "excellent" | "good" | "average" | "needs_improvement" | "poor" | "not_applicable";
+  jobSpecificCompetencies: string;
+  strengths: string;
+  developmentAreas: string;
+  overallSummary: string;
+  recommendedRating: number;
+}
 
 // ============================================
 // ZOD VALIDATION SCHEMAS - Pure Zod without drizzle-zod
@@ -738,6 +798,35 @@ export const insertDevelopmentGoalSchema = z.object({
   plannedOutcome: z.string().min(1),
   targetDate: z.preprocess((val) => new Date(val as string), z.date()),
   progress: z.number().min(0).max(100).optional().default(0),
+});
+
+// Feedback request schemas
+const feedbackRatingSchema = z.enum(["excellent", "good", "average", "needs_improvement", "poor"]);
+const feedbackRatingWithNASchema = z.enum(["excellent", "good", "average", "needs_improvement", "poor", "not_applicable"]);
+
+export const insertFeedbackRequestSchema = z.object({
+  appraisalId: z.string().min(1, "Appraisal ID is required"),
+  requesterId: z.string().min(1, "Requester ID is required"),
+  subjectEmployeeId: z.string().min(1, "Subject employee ID is required"),
+  respondentEmployeeId: z.string().optional().nullable(),
+  externalEmail: z.string().email().optional().nullable(),
+  dueDate: z.preprocess((val) => new Date(val as string), z.date()),
+});
+
+export const submitFeedbackSchema = z.object({
+  relationshipWithPeer: z.string().min(1, "Please describe your relationship with this employee"),
+  collaborationRating: feedbackRatingSchema,
+  communicationRating: feedbackRatingSchema,
+  reliabilityRating: feedbackRatingSchema,
+  problemSolvingRating: feedbackRatingSchema,
+  ownershipRating: feedbackRatingWithNASchema,
+  opennessToFeedbackRating: feedbackRatingSchema,
+  conflictHandlingRating: feedbackRatingWithNASchema,
+  jobSpecificCompetencies: z.string().min(1, "Please describe their job-specific competencies"),
+  strengths: z.string().min(1, "Please describe their strengths"),
+  developmentAreas: z.string().min(1, "Please describe areas for development"),
+  overallSummary: z.string().min(1, "Please provide an overall summary"),
+  recommendedRating: z.number().min(1).max(5),
 });
 
 // Update schema for development goals

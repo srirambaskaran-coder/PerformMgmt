@@ -184,16 +184,13 @@ const initiateAppraisalSchema = z
   })
   .refine(
     (data) => {
-      if (data.appraisalType === "questionnaire_based") {
+      if (data.appraisalType === "questionnaire_based" || data.appraisalType === "mbo_based") {
         return (
           data.questionnaireTemplateIds &&
           data.questionnaireTemplateIds.length > 0
         );
       }
-      if (
-        data.appraisalType === "kpi_based" ||
-        data.appraisalType === "mbo_based"
-      ) {
+      if (data.appraisalType === "kpi_based") {
         return !!data.documentFile;
       }
       return true;
@@ -638,13 +635,13 @@ export default function InitiateAppraisal() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="questionnaire_based">
-                                Questionnaire Based
+                                SMART Objectives
                               </SelectItem>
                               <SelectItem value="kpi_based">
                                 KPI Based
                               </SelectItem>
                               <SelectItem value="mbo_based">
-                                MBO Based
+                                360 Degree Feedback
                               </SelectItem>
                               <SelectItem value="okr_based">
                                 OKR Based
@@ -659,8 +656,8 @@ export default function InitiateAppraisal() {
                       )}
                     />
 
-                    {/* Questionnaire Template Selection (for questionnaire_based) */}
-                    {appraisalType === "questionnaire_based" && (
+                    {/* Questionnaire Template Selection (for questionnaire_based and mbo_based/360 feedback) */}
+                    {(appraisalType === "questionnaire_based" || appraisalType === "mbo_based") && (
                       <FormField
                         control={form.control}
                         name="questionnaireTemplateIds"
@@ -691,9 +688,8 @@ export default function InitiateAppraisal() {
                       />
                     )}
 
-                    {/* Document Upload (for KPI/MBO based) */}
-                    {(appraisalType === "kpi_based" ||
-                      appraisalType === "mbo_based") && (
+                    {/* Document Upload (for KPI based only) */}
+                    {appraisalType === "kpi_based" && (
                       <div className="space-y-2">
                         <Label>Upload Document*</Label>
                         <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">

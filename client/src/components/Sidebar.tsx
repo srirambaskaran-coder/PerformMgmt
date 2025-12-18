@@ -23,6 +23,7 @@ import {
   CalendarCheck,
   Target,
   BarChart3,
+  MessageSquare,
 } from "lucide-react";
 
 interface NavItem {
@@ -159,6 +160,12 @@ const navItems: NavItem[] = [
     href: "/development-goals",
     label: "My Development Goals",
     icon: Target,
+    roles: ["employee"],
+  },
+  {
+    href: "/feedback-requests",
+    label: "Feedback Requests",
+    icon: MessageSquare,
     roles: ["employee"],
   },
   { href: "/settings", label: "Settings", icon: Settings },
