@@ -45,4 +45,13 @@ export class AnalyticsController {
     const analytics = await this.analyticsService.getManagerAnalytics(managerId as string);
     return ApiResponse.success(res, analytics);
   });
+
+  /**
+   * Get comprehensive performance trends for HR Manager analytics dashboard
+   */
+  getPerformanceTrends = asyncHandler(async (req: Request, res: Response) => {
+    const requestingUserId = (req as any).user?.id || (req as any).user?.claims?.sub;
+    const trends = await this.analyticsService.getPerformanceTrends(requestingUserId);
+    return ApiResponse.success(res, trends);
+  });
 }

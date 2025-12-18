@@ -84,4 +84,46 @@ export class EmailService {
       throw new AppError('Failed to update email configuration', 500);
     }
   }
+
+  /**
+   * Send feedback request notification email
+   */
+  async sendFeedbackRequestEmail(
+    recipientEmail: string,
+    recipientName: string,
+    subjectEmployeeName: string,
+    requesterId: string
+  ) {
+    try {
+      const requester = await storage.getUser(requesterId);
+      const requesterName = requester 
+        ? `${requester.firstName} ${requester.lastName}` 
+        : 'Your Manager';
+
+      const subject = `360 Degree Feedback Request for ${subjectEmployeeName}`;
+      const body = `
+Hello ${recipientName},
+
+You have been requested to provide 360-degree feedback for ${subjectEmployeeName}.
+
+Please log in to the Performance Management System to complete your feedback. Your input is valuable and will help in the professional development of ${subjectEmployeeName}.
+
+This feedback will be kept anonymous.
+
+Requested by: ${requesterName}
+
+Best regards,
+Performance Management Team
+      `.trim();
+
+      return await emailService.sendEmail(recipientEmail, subject, body);
+    } catch (error) {
+      logger.error('Failed to send feedback request email', { 
+        recipientEmail, 
+        subjectEmployeeName, 
+        error 
+      });
+      throw new AppError('Failed to send feedback request email', 500);
+    }
+  }
 }

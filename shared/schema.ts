@@ -409,6 +409,79 @@ export interface DevelopmentGoal {
 }
 
 // ============================================
+// 360 DEGREE FEEDBACK TYPES
+// ============================================
+
+export const FeedbackRatingValues = ["excellent", "good", "average", "needs_improvement", "poor"] as const;
+export type FeedbackRating = typeof FeedbackRatingValues[number];
+
+export const FeedbackRatingWithNAValues = ["excellent", "good", "average", "needs_improvement", "poor", "not_applicable"] as const;
+export type FeedbackRatingWithNA = typeof FeedbackRatingWithNAValues[number];
+
+export const FeedbackRequestStatusValues = ["pending", "submitted", "expired", "cancelled"] as const;
+export type FeedbackRequestStatus = typeof FeedbackRequestStatusValues[number];
+
+// Feedback Request interface
+export interface FeedbackRequest {
+  id: string;
+  requesterId: string;
+  reviewerId: string | null;
+  subjectId: string;
+  evaluationId: string | null;
+  appraisalCycleId: string | null;
+  externalEmail: string | null;
+  status: FeedbackRequestStatus;
+  dueDate?: Date | null;
+  
+  // Feedback Response Fields
+  relationshipWithPeer: string | null;
+  collaborationRating: FeedbackRating | null;
+  communicationRating: FeedbackRating | null;
+  reliabilityRating: FeedbackRating | null;
+  problemSolvingRating: FeedbackRating | null;
+  ownershipRating: FeedbackRatingWithNA | null;
+  opennessToFeedbackRating: FeedbackRating | null;
+  conflictHandlingRating: FeedbackRatingWithNA | null;
+  jobSpecificCompetencies: string | null;
+  strengths: string | null;
+  developmentAreas: string | null;
+  overallSummary: string | null;
+  recommendedRating: number | null;
+  
+  // Timestamps
+  submittedAt?: Date | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
+
+// Feedback Request insert type
+export type InsertFeedbackRequest = {
+  requesterId: string;
+  reviewerId: string | null;
+  subjectId: string;
+  evaluationId?: string | null;
+  appraisalCycleId?: string | null;
+  externalEmail?: string | null;
+};
+
+// Submit Feedback type (for submitting feedback response)
+export interface SubmitFeedback {
+  relationshipWithPeer: string;
+  collaborationRating: FeedbackRating;
+  communicationRating: FeedbackRating;
+  reliabilityRating: FeedbackRating;
+  problemSolvingRating: FeedbackRating;
+  ownershipRating: FeedbackRatingWithNA;
+  opennessToFeedbackRating: FeedbackRating;
+  conflictHandlingRating: FeedbackRatingWithNA;
+  jobSpecificCompetencies: string;
+  strengths: string;
+  developmentAreas: string;
+  overallSummary: string;
+  recommendedRating: number;
+}
+
+// ============================================
 // INSERT TYPES - Types for creating records
 // ============================================
 

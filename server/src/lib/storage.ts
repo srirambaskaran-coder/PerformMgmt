@@ -61,6 +61,9 @@ import type {
   DevelopmentGoal,
   InsertDevelopmentGoal,
   UpdateDevelopmentGoal,
+  FeedbackRequest,
+  InsertFeedbackRequest,
+  SubmitFeedback,
 } from "@shared/schema";
 import {
   saveInitiatedAppraisalAugmentation,
@@ -583,6 +586,36 @@ function mapRawDevelopmentGoal(raw: any): DevelopmentGoal {
   } as DevelopmentGoal;
 }
 
+function mapRawFeedbackRequest(raw: any): FeedbackRequest {
+  return {
+    id: raw.Id ?? raw.id,
+    requesterId: raw.RequesterId ?? raw.requester_id ?? raw.requesterId,
+    reviewerId: raw.ReviewerId ?? raw.reviewer_id ?? raw.reviewerId ?? null,
+    subjectId: raw.SubjectId ?? raw.subject_id ?? raw.subjectId,
+    evaluationId: raw.EvaluationId ?? raw.evaluation_id ?? raw.evaluationId ?? null,
+    appraisalCycleId: raw.AppraisalCycleId ?? raw.appraisal_cycle_id ?? raw.appraisalCycleId ?? null,
+    externalEmail: raw.ExternalEmail ?? raw.external_email ?? raw.externalEmail ?? null,
+    status: raw.Status ?? raw.status ?? "pending",
+    dueDate: raw.DueDate ? new Date(raw.DueDate) : raw.due_date ? new Date(raw.due_date) : null,
+    relationshipWithPeer: raw.RelationshipWithPeer ?? raw.relationship_with_peer ?? raw.relationshipWithPeer ?? null,
+    collaborationRating: raw.CollaborationRating ?? raw.collaboration_rating ?? raw.collaborationRating ?? null,
+    communicationRating: raw.CommunicationRating ?? raw.communication_rating ?? raw.communicationRating ?? null,
+    reliabilityRating: raw.ReliabilityRating ?? raw.reliability_rating ?? raw.reliabilityRating ?? null,
+    problemSolvingRating: raw.ProblemSolvingRating ?? raw.problem_solving_rating ?? raw.problemSolvingRating ?? null,
+    ownershipRating: raw.OwnershipRating ?? raw.ownership_rating ?? raw.ownershipRating ?? null,
+    opennessToFeedbackRating: raw.OpennessToFeedbackRating ?? raw.openness_to_feedback_rating ?? raw.opennessToFeedbackRating ?? null,
+    conflictHandlingRating: raw.ConflictHandlingRating ?? raw.conflict_handling_rating ?? raw.conflictHandlingRating ?? null,
+    jobSpecificCompetencies: raw.JobSpecificCompetencies ?? raw.job_specific_competencies ?? raw.jobSpecificCompetencies ?? null,
+    strengths: raw.Strengths ?? raw.strengths ?? null,
+    developmentAreas: raw.DevelopmentAreas ?? raw.development_areas ?? raw.developmentAreas ?? null,
+    overallSummary: raw.OverallSummary ?? raw.overall_summary ?? raw.overallSummary ?? null,
+    recommendedRating: raw.RecommendedRating ?? raw.recommended_rating ?? raw.recommendedRating ?? null,
+    submittedAt: raw.SubmittedAt ? new Date(raw.SubmittedAt) : raw.submitted_at ? new Date(raw.submitted_at) : null,
+    createdAt: raw.CreatedAt ?? raw.created_at ?? raw.createdAt ?? null,
+    updatedAt: raw.UpdatedAt ?? raw.updated_at ?? raw.updatedAt ?? null,
+  } as FeedbackRequest;
+}
+
 function mapRawEvaluation(raw: any): Evaluation {
   return {
     id: raw.Id ?? raw.id,
@@ -1037,6 +1070,13 @@ export interface IStorage {
   ): Promise<DevelopmentGoal>;
   deleteDevelopmentGoal(id: string): Promise<void>;
   getTeamMemberDevelopmentGoals(managerId: string): Promise<DevelopmentGoal[]>;
+
+  // Feedback Request operations
+  getFeedbackRequestsForReviewer(reviewerId: string): Promise<FeedbackRequest[]>;
+  getFeedbackRequestsForSubject(subjectId: string): Promise<FeedbackRequest[]>;
+  getFeedbackRequest(id: string): Promise<FeedbackRequest | undefined>;
+  createFeedbackRequest(request: InsertFeedbackRequest): Promise<FeedbackRequest>;
+  submitFeedbackRequest(id: string, reviewerId: string, feedback: SubmitFeedback): Promise<FeedbackRequest>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3567,6 +3607,100 @@ export class DatabaseStorage implements IStorage {
     const req = pool.request().input("ManagerId", managerId);
     const result = await req.execute("dbo.GetTeamMemberDevelopmentGoals");
     return result.recordset.map(mapRawDevelopmentGoal);
+  }
+
+  // ---------- Feedback Request Operations ----------
+  async getFeedbackRequestsForReviewer(reviewerId: string): Promise<FeedbackRequest[]> {
+    const pool = await getPool();
+    try {
+      const result = await pool
+        .request()
+        .input("ReviewerId", reviewerId)
+        .execute("dbo.GetFeedbackRequestsForReviewer");
+      return (result.recordset || []).map(mapRawFeedbackRequest);
+    } catch {
+      return [];
+    }
+  }
+
+  async getFeedbackRequestsForSubject(subjectId: string): Promise<FeedbackRequest[]> {
+    const pool = await getPool();
+    try {
+      const result = await pool
+        .request()
+        .input("SubjectId", subjectId)
+        .execute("dbo.GetFeedbackRequestsForSubject");
+      return (result.recordset || []).map(mapRawFeedbackRequest);
+    } catch {
+      return [];
+    }
+  }
+
+  async getFeedbackRequest(id: string): Promise<FeedbackRequest | undefined> {
+    const pool = await getPool();
+    try {
+      const result = await pool
+        .request()
+        .input("Id", id)
+        .execute("dbo.GetFeedbackRequest");
+      const raw = result.recordset[0];
+      return raw ? mapRawFeedbackRequest(raw) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async createFeedbackRequest(request: InsertFeedbackRequest): Promise<FeedbackRequest> {
+    const pool = await getPool();
+    const req = pool
+      .request()
+      .input("RequesterId", request.requesterId)
+      .input("ReviewerId", request.reviewerId || null)
+      .input("SubjectId", request.subjectId)
+      .input("EvaluationId", request.evaluationId || null)
+      .input("AppraisalCycleId", request.appraisalCycleId || null)
+      .input("ExternalEmail", request.externalEmail || null);
+    const result = await req.execute("dbo.CreateFeedbackRequest");
+    return mapRawFeedbackRequest(result.recordset[0]);
+  }
+
+  async submitFeedbackRequest(
+    id: string,
+    reviewerId: string,
+    feedback: SubmitFeedback
+  ): Promise<FeedbackRequest> {
+    // First verify the request exists and belongs to this reviewer
+    const existingRequest = await this.getFeedbackRequest(id);
+    if (!existingRequest) {
+      throw new Error("Feedback request not found");
+    }
+    if (existingRequest.reviewerId !== reviewerId) {
+      throw new Error("You are not authorized to submit this feedback");
+    }
+    if (existingRequest.status === "submitted") {
+      throw new Error("This feedback has already been submitted");
+    }
+
+    const pool = await getPool();
+    const req = pool
+      .request()
+      .input("Id", id)
+      .input("ReviewerId", reviewerId)
+      .input("RelationshipWithPeer", feedback.relationshipWithPeer)
+      .input("CollaborationRating", feedback.collaborationRating)
+      .input("CommunicationRating", feedback.communicationRating)
+      .input("ReliabilityRating", feedback.reliabilityRating)
+      .input("ProblemSolvingRating", feedback.problemSolvingRating)
+      .input("OwnershipRating", feedback.ownershipRating)
+      .input("OpennessToFeedbackRating", feedback.opennessToFeedbackRating)
+      .input("ConflictHandlingRating", feedback.conflictHandlingRating)
+      .input("JobSpecificCompetencies", feedback.jobSpecificCompetencies)
+      .input("Strengths", feedback.strengths)
+      .input("DevelopmentAreas", feedback.developmentAreas)
+      .input("OverallSummary", feedback.overallSummary)
+      .input("RecommendedRating", feedback.recommendedRating);
+    const result = await req.execute("dbo.SubmitFeedbackRequest");
+    return mapRawFeedbackRequest(result.recordset[0]);
   }
 }
 

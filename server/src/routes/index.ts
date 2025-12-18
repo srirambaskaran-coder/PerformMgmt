@@ -15,6 +15,7 @@ import developmentGoalRoutes from './development-goal.routes';
 import analyticsRoutes from './analytics.routes';
 import emailRoutes from './email.routes';
 import settingsRoutes from './settings.routes';
+import feedbackRequestRoutes from './feedback-request.routes';
 
 const router = Router();
 
@@ -35,6 +36,7 @@ router.use('/development-goals', developmentGoalRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/email', emailRoutes);
 router.use('/settings', settingsRoutes);
+router.use('/feedback-requests', feedbackRequestRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {
