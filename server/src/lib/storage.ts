@@ -3659,7 +3659,8 @@ export class DatabaseStorage implements IStorage {
       .input("SubjectId", request.subjectId)
       .input("EvaluationId", request.evaluationId || null)
       .input("AppraisalCycleId", request.appraisalCycleId || null)
-      .input("ExternalEmail", request.externalEmail || null);
+      .input("ExternalEmail", request.externalEmail || null)
+      .input("DueDate", request.dueDate || null);
     const result = await req.execute("dbo.CreateFeedbackRequest");
     return mapRawFeedbackRequest(result.recordset[0]);
   }
