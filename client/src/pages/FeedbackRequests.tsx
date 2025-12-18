@@ -1,9 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MessageSquare, Clock, CheckCircle, User, Mail, Building } from "lucide-react";
+import {
+  MessageSquare,
+  Clock,
+  CheckCircle,
+  User,
+  Mail,
+  Building,
+} from "lucide-react";
 import { Link } from "wouter";
 import { RoleGuard } from "@/components/RoleGuard";
 import { format } from "date-fns";
@@ -36,17 +49,25 @@ export default function FeedbackRequests() {
     queryKey: ["/api/feedback-requests"],
   });
 
-  const pendingRequests = requests?.filter(r => r.status === "pending") || [];
-  const submittedRequests = requests?.filter(r => r.status === "submitted") || [];
+  const pendingRequests = requests?.filter((r) => r.status === "pending") || [];
+  const submittedRequests =
+    requests?.filter((r) => r.status === "submitted") || [];
 
   return (
     <RoleGuard allowedRoles={["employee", "manager"]}>
-      <div className="p-6 max-w-6xl mx-auto space-y-6" data-testid="feedback-requests-page">
+      <div
+        className="p-6 max-w-6xl mx-auto space-y-6"
+        data-testid="feedback-requests-page"
+      >
         <div className="flex items-center gap-3">
           <MessageSquare className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Feedback Requests</h1>
-            <p className="text-muted-foreground">Provide feedback for your colleagues</p>
+            <h1 className="text-3xl font-bold text-foreground">
+              Feedback Requests
+            </h1>
+            <p className="text-muted-foreground">
+              Provide feedback for your colleagues
+            </p>
           </div>
         </div>
 
@@ -72,22 +93,32 @@ export default function FeedbackRequests() {
                 <Card>
                   <CardContent className="py-12 text-center">
                     <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No pending feedback requests</p>
+                    <p className="text-muted-foreground">
+                      No pending feedback requests
+                    </p>
                   </CardContent>
                 </Card>
               ) : (
                 <div className="grid gap-4">
                   {pendingRequests.map((request) => (
-                    <Card key={request.id} className="hover:shadow-md transition-shadow" data-testid={`feedback-request-${request.id}`}>
+                    <Card
+                      key={request.id}
+                      className="hover:shadow-md transition-shadow"
+                      data-testid={`feedback-request-${request.id}`}
+                    >
                       <CardContent className="p-6">
                         <div className="flex items-start justify-between">
                           <div className="space-y-3">
                             <div className="flex items-center gap-2">
                               <User className="h-5 w-5 text-primary" />
                               <span className="font-semibold text-lg">
-                                {request.subject?.firstName} {request.subject?.lastName}
+                                {request.subject?.firstName}{" "}
+                                {request.subject?.lastName}
                               </span>
-                              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                              <Badge
+                                variant="outline"
+                                className="bg-amber-50 text-amber-700 border-amber-200"
+                              >
                                 Pending
                               </Badge>
                             </div>
@@ -104,13 +135,19 @@ export default function FeedbackRequests() {
                             </div>
 
                             <p className="text-sm text-muted-foreground">
-                              Requested by: {request.requester?.firstName} {request.requester?.lastName} on{" "}
-                              {format(new Date(request.createdAt), "MMM dd, yyyy")}
+                              Requested by: {request.requester?.firstName}{" "}
+                              {request.requester?.lastName} on{" "}
+                              {format(
+                                new Date(request.createdAt),
+                                "MMM dd, yyyy"
+                              )}
                             </p>
                           </div>
 
                           <Link href={`/feedback-requests/${request.id}`}>
-                            <Button data-testid={`btn-provide-feedback-${request.id}`}>
+                            <Button
+                              data-testid={`btn-provide-feedback-${request.id}`}
+                            >
                               Provide Feedback
                             </Button>
                           </Link>
@@ -131,22 +168,36 @@ export default function FeedbackRequests() {
 
                 <div className="grid gap-4">
                   {submittedRequests.map((request) => (
-                    <Card key={request.id} className="opacity-75" data-testid={`feedback-submitted-${request.id}`}>
+                    <Card
+                      key={request.id}
+                      className="opacity-75"
+                      data-testid={`feedback-submitted-${request.id}`}
+                    >
                       <CardContent className="p-6">
                         <div className="flex items-start justify-between">
                           <div className="space-y-2">
                             <div className="flex items-center gap-2">
                               <User className="h-5 w-5 text-muted-foreground" />
                               <span className="font-semibold">
-                                {request.subject?.firstName} {request.subject?.lastName}
+                                {request.subject?.firstName}{" "}
+                                {request.subject?.lastName}
                               </span>
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              <Badge
+                                variant="outline"
+                                className="bg-green-50 text-green-700 border-green-200"
+                              >
                                 Submitted
                               </Badge>
                             </div>
 
                             <p className="text-sm text-muted-foreground">
-                              Submitted on: {request.submittedAt ? format(new Date(request.submittedAt), "MMM dd, yyyy") : "N/A"}
+                              Submitted on:{" "}
+                              {request.submittedAt
+                                ? format(
+                                    new Date(request.submittedAt),
+                                    "MMM dd, yyyy"
+                                  )
+                                : "N/A"}
                             </p>
                           </div>
                         </div>

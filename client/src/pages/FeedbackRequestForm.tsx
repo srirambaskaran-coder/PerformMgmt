@@ -3,30 +3,106 @@ import { useParams, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, User, Mail, Building, MapPin, UserCheck, MessageSquare } from "lucide-react";
+import {
+  ArrowLeft,
+  User,
+  Mail,
+  Building,
+  MapPin,
+  UserCheck,
+  MessageSquare,
+} from "lucide-react";
 import { Link } from "wouter";
 import { RoleGuard } from "@/components/RoleGuard";
 
 const feedbackFormSchema = z.object({
-  relationshipWithPeer: z.string().min(1, "Please describe your relationship with this person"),
-  collaborationRating: z.enum(["excellent", "good", "average", "needs_improvement", "poor"]),
-  communicationRating: z.enum(["excellent", "good", "average", "needs_improvement", "poor"]),
-  reliabilityRating: z.enum(["excellent", "good", "average", "needs_improvement", "poor"]),
-  problemSolvingRating: z.enum(["excellent", "good", "average", "needs_improvement", "poor"]),
-  ownershipRating: z.enum(["excellent", "good", "average", "needs_improvement", "poor", "not_applicable"]),
-  opennessToFeedbackRating: z.enum(["excellent", "good", "average", "needs_improvement", "poor"]),
-  conflictHandlingRating: z.enum(["excellent", "good", "average", "needs_improvement", "poor", "not_applicable"]),
-  jobSpecificCompetencies: z.string().min(1, "Please provide feedback on job-specific competencies"),
+  relationshipWithPeer: z
+    .string()
+    .min(1, "Please describe your relationship with this person"),
+  collaborationRating: z.enum([
+    "excellent",
+    "good",
+    "average",
+    "needs_improvement",
+    "poor",
+  ]),
+  communicationRating: z.enum([
+    "excellent",
+    "good",
+    "average",
+    "needs_improvement",
+    "poor",
+  ]),
+  reliabilityRating: z.enum([
+    "excellent",
+    "good",
+    "average",
+    "needs_improvement",
+    "poor",
+  ]),
+  problemSolvingRating: z.enum([
+    "excellent",
+    "good",
+    "average",
+    "needs_improvement",
+    "poor",
+  ]),
+  ownershipRating: z.enum([
+    "excellent",
+    "good",
+    "average",
+    "needs_improvement",
+    "poor",
+    "not_applicable",
+  ]),
+  opennessToFeedbackRating: z.enum([
+    "excellent",
+    "good",
+    "average",
+    "needs_improvement",
+    "poor",
+  ]),
+  conflictHandlingRating: z.enum([
+    "excellent",
+    "good",
+    "average",
+    "needs_improvement",
+    "poor",
+    "not_applicable",
+  ]),
+  jobSpecificCompetencies: z
+    .string()
+    .min(1, "Please provide feedback on job-specific competencies"),
   strengths: z.string().min(1, "Please describe the person's strengths"),
   developmentAreas: z.string().min(1, "Please describe areas for development"),
   overallSummary: z.string().min(1, "Please provide an overall summary"),
@@ -99,7 +175,11 @@ export default function FeedbackRequestForm() {
 
   const submitMutation = useMutation({
     mutationFn: async (data: FeedbackFormValues) => {
-      const response = await apiRequest("POST", `/api/feedback-requests/${id}/submit`, data);
+      const response = await apiRequest(
+        "POST",
+        `/api/feedback-requests/${id}/submit`,
+        data
+      );
       return response.json();
     },
     onSuccess: () => {
@@ -144,7 +224,9 @@ export default function FeedbackRequestForm() {
         <div className="p-6 max-w-4xl mx-auto">
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">Feedback request not found</p>
+              <p className="text-muted-foreground">
+                Feedback request not found
+              </p>
               <Link href="/feedback-requests">
                 <Button variant="link">Back to Feedback Requests</Button>
               </Link>
@@ -161,7 +243,9 @@ export default function FeedbackRequestForm() {
         <div className="p-6 max-w-4xl mx-auto">
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">This feedback has already been submitted.</p>
+              <p className="text-muted-foreground">
+                This feedback has already been submitted.
+              </p>
               <Link href="/feedback-requests">
                 <Button variant="link">Back to Feedback Requests</Button>
               </Link>
@@ -174,7 +258,10 @@ export default function FeedbackRequestForm() {
 
   return (
     <RoleGuard allowedRoles={["employee", "manager"]}>
-      <div className="p-6 max-w-4xl mx-auto space-y-6" data-testid="feedback-form-page">
+      <div
+        className="p-6 max-w-4xl mx-auto space-y-6"
+        data-testid="feedback-form-page"
+      >
         <div className="flex items-center gap-4">
           <Link href="/feedback-requests">
             <Button variant="ghost" size="icon">
@@ -182,9 +269,12 @@ export default function FeedbackRequestForm() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Provide Feedback</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              Provide Feedback
+            </h1>
             <p className="text-muted-foreground">
-              Feedback for {request.subject?.firstName} {request.subject?.lastName}
+              Feedback for {request.subject?.firstName}{" "}
+              {request.subject?.lastName}
             </p>
           </div>
         </div>
@@ -195,7 +285,9 @@ export default function FeedbackRequestForm() {
               <User className="h-5 w-5" />
               Employee Details
             </CardTitle>
-            <CardDescription>Information about the person you're providing feedback for</CardDescription>
+            <CardDescription>
+              Information about the person you're providing feedback for
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -203,7 +295,9 @@ export default function FeedbackRequestForm() {
                 <User className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Name</p>
-                  <p className="font-medium">{request.subject?.firstName} {request.subject?.lastName}</p>
+                  <p className="font-medium">
+                    {request.subject?.firstName} {request.subject?.lastName}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -217,21 +311,29 @@ export default function FeedbackRequestForm() {
                 <MapPin className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Location</p>
-                  <p className="font-medium">{request.subject?.locationName || "N/A"}</p>
+                  <p className="font-medium">
+                    {request.subject?.locationName || "N/A"}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Building className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Department</p>
-                  <p className="font-medium">{request.subject?.department || "N/A"}</p>
+                  <p className="font-medium">
+                    {request.subject?.department || "N/A"}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <UserCheck className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Reporting Manager</p>
-                  <p className="font-medium">{request.subject?.managerName || "N/A"}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Reporting Manager
+                  </p>
+                  <p className="font-medium">
+                    {request.subject?.managerName || "N/A"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -260,7 +362,8 @@ export default function FeedbackRequestForm() {
                         />
                       </FormControl>
                       <FormDescription>
-                        How long have you worked with this person? In what capacity?
+                        How long have you worked with this person? In what
+                        capacity?
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -272,7 +375,9 @@ export default function FeedbackRequestForm() {
             <Card>
               <CardHeader>
                 <CardTitle>Competency Ratings</CardTitle>
-                <CardDescription>Rate the employee on the following competencies</CardDescription>
+                <CardDescription>
+                  Rate the employee on the following competencies
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -282,7 +387,10 @@ export default function FeedbackRequestForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Collaboration and Teamwork*</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-collaboration">
                               <SelectValue placeholder="Select rating" />
@@ -290,7 +398,9 @@ export default function FeedbackRequestForm() {
                           </FormControl>
                           <SelectContent>
                             {RATING_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -305,7 +415,10 @@ export default function FeedbackRequestForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Communication*</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-communication">
                               <SelectValue placeholder="Select rating" />
@@ -313,7 +426,9 @@ export default function FeedbackRequestForm() {
                           </FormControl>
                           <SelectContent>
                             {RATING_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -328,7 +443,10 @@ export default function FeedbackRequestForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Reliability*</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-reliability">
                               <SelectValue placeholder="Select rating" />
@@ -336,7 +454,9 @@ export default function FeedbackRequestForm() {
                           </FormControl>
                           <SelectContent>
                             {RATING_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -351,7 +471,10 @@ export default function FeedbackRequestForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Problem-solving*</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-problem-solving">
                               <SelectValue placeholder="Select rating" />
@@ -359,7 +482,9 @@ export default function FeedbackRequestForm() {
                           </FormControl>
                           <SelectContent>
                             {RATING_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -374,7 +499,10 @@ export default function FeedbackRequestForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Ownership*</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-ownership">
                               <SelectValue placeholder="Select rating" />
@@ -382,7 +510,9 @@ export default function FeedbackRequestForm() {
                           </FormControl>
                           <SelectContent>
                             {RATING_OPTIONS_WITH_NA.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -397,7 +527,10 @@ export default function FeedbackRequestForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Openness to Feedback*</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-openness">
                               <SelectValue placeholder="Select rating" />
@@ -405,7 +538,9 @@ export default function FeedbackRequestForm() {
                           </FormControl>
                           <SelectContent>
                             {RATING_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -420,7 +555,10 @@ export default function FeedbackRequestForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Conflict Handling & Leadership*</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-conflict">
                               <SelectValue placeholder="Select rating" />
@@ -428,7 +566,9 @@ export default function FeedbackRequestForm() {
                           </FormControl>
                           <SelectContent>
                             {RATING_OPTIONS_WITH_NA.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -539,15 +679,26 @@ export default function FeedbackRequestForm() {
                         value={field.value?.toString()}
                       >
                         <FormControl>
-                          <SelectTrigger data-testid="select-rating" className="w-48">
+                          <SelectTrigger
+                            data-testid="select-rating"
+                            className="w-48"
+                          >
                             <SelectValue placeholder="Select rating (1-5)" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="1">1 - Needs Improvement</SelectItem>
-                          <SelectItem value="2">2 - Below Expectations</SelectItem>
-                          <SelectItem value="3">3 - Meets Expectations</SelectItem>
-                          <SelectItem value="4">4 - Exceeds Expectations</SelectItem>
+                          <SelectItem value="1">
+                            1 - Needs Improvement
+                          </SelectItem>
+                          <SelectItem value="2">
+                            2 - Below Expectations
+                          </SelectItem>
+                          <SelectItem value="3">
+                            3 - Meets Expectations
+                          </SelectItem>
+                          <SelectItem value="4">
+                            4 - Exceeds Expectations
+                          </SelectItem>
                           <SelectItem value="5">5 - Outstanding</SelectItem>
                         </SelectContent>
                       </Select>
@@ -560,7 +711,11 @@ export default function FeedbackRequestForm() {
 
             <div className="flex justify-end gap-4">
               <Link href="/feedback-requests">
-                <Button type="button" variant="outline" data-testid="btn-cancel">
+                <Button
+                  type="button"
+                  variant="outline"
+                  data-testid="btn-cancel"
+                >
                   Cancel
                 </Button>
               </Link>

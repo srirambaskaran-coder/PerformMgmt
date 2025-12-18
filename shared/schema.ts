@@ -4,37 +4,70 @@ import { z } from "zod";
 // ENUMS - Pure TypeScript enum types
 // ============================================
 
-export const UserRoles = ["super_admin", "admin", "hr_manager", "employee", "manager"] as const;
-export type UserRole = typeof UserRoles[number];
+export const UserRoles = [
+  "super_admin",
+  "admin",
+  "hr_manager",
+  "employee",
+  "manager",
+] as const;
+export type UserRole = (typeof UserRoles)[number];
 
 export const StatusValues = ["active", "inactive"] as const;
-export type Status = typeof StatusValues[number];
+export type Status = (typeof StatusValues)[number];
 
 export const CategoryValues = ["employee", "manager"] as const;
-export type Category = typeof CategoryValues[number];
+export type Category = (typeof CategoryValues)[number];
 
 export const PublishTypeValues = ["now", "as_per_calendar"] as const;
-export type PublishType = typeof PublishTypeValues[number];
+export type PublishType = (typeof PublishTypeValues)[number];
 
-export const AppraisalTypeValues = ["questionnaire_based", "kpi_based", "mbo_based", "okr_based"] as const;
-export type AppraisalType = typeof AppraisalTypeValues[number];
+export const AppraisalTypeValues = [
+  "questionnaire_based",
+  "kpi_based",
+  "mbo_based",
+  "okr_based",
+] as const;
+export type AppraisalType = (typeof AppraisalTypeValues)[number];
 
-export const AppraisalCycleStatusValues = ["draft", "active", "closed", "cancelled"] as const;
-export type AppraisalCycleStatus = typeof AppraisalCycleStatusValues[number];
+export const AppraisalCycleStatusValues = [
+  "draft",
+  "active",
+  "closed",
+  "cancelled",
+] as const;
+export type AppraisalCycleStatus = (typeof AppraisalCycleStatusValues)[number];
 
 export const CalendarProviderValues = ["google", "outlook"] as const;
-export type CalendarProvider = typeof CalendarProviderValues[number];
+export type CalendarProvider = (typeof CalendarProviderValues)[number];
 
-export const GoalStatusValues = ["on_track", "delayed", "completed", "not_started"] as const;
-export type GoalStatus = typeof GoalStatusValues[number];
+export const GoalStatusValues = [
+  "on_track",
+  "delayed",
+  "completed",
+  "not_started",
+] as const;
+export type GoalStatus = (typeof GoalStatusValues)[number];
 
 // Feedback rating enum for 360 degree feedback
-export const FeedbackRatingValues = ["excellent", "good", "average", "needs_improvement", "poor", "not_applicable"] as const;
-export type FeedbackRating = typeof FeedbackRatingValues[number];
+export const FeedbackRatingValues = [
+  "excellent",
+  "good",
+  "average",
+  "needs_improvement",
+  "poor",
+  "not_applicable",
+] as const;
+export type FeedbackRating = (typeof FeedbackRatingValues)[number];
 
 // Feedback request status enum
-export const FeedbackRequestStatusValues = ["pending", "submitted", "cancelled"] as const;
-export type FeedbackRequestStatus = typeof FeedbackRequestStatusValues[number];
+export const FeedbackRequestStatusValues = [
+  "pending",
+  "submitted",
+  "cancelled",
+] as const;
+export type FeedbackRequestStatus =
+  (typeof FeedbackRequestStatusValues)[number];
 
 // ============================================
 // INTERFACES - Pure TypeScript types
@@ -449,52 +482,172 @@ export interface FeedbackRequest {
 // INSERT TYPES - Types for creating records
 // ============================================
 
-export type InsertUser = Omit<User, "id" | "createdAt" | "updatedAt" | "passwordHash" | "createdById"> & {
+export type InsertUser = Omit<
+  User,
+  "id" | "createdAt" | "updatedAt" | "passwordHash" | "createdById"
+> & {
   password?: string;
   confirmPassword?: string;
 };
 
 export type InsertCompany = Omit<Company, "id" | "createdAt" | "updatedAt">;
 export type InsertLocation = Omit<Location, "id" | "createdAt" | "updatedAt">;
-export type InsertQuestionnaireTemplate = Omit<QuestionnaireTemplate, "id" | "createdAt" | "updatedAt">;
-export type InsertReviewCycle = Omit<ReviewCycle, "id" | "createdAt" | "updatedAt">;
-export type InsertEvaluation = Omit<Evaluation, "id" | "createdAt" | "updatedAt">;
-export type InsertEmailTemplate = Omit<EmailTemplate, "id" | "createdAt" | "updatedAt">;
-export type InsertEmailConfig = Omit<EmailConfig, "id" | "createdAt" | "updatedAt">;
-export type InsertRegistration = Omit<Registration, "id" | "createdAt" | "updatedAt" | "notificationSent" | "status">;
+export type InsertQuestionnaireTemplate = Omit<
+  QuestionnaireTemplate,
+  "id" | "createdAt" | "updatedAt"
+>;
+export type InsertReviewCycle = Omit<
+  ReviewCycle,
+  "id" | "createdAt" | "updatedAt"
+>;
+export type InsertEvaluation = Omit<
+  Evaluation,
+  "id" | "createdAt" | "updatedAt"
+>;
+export type InsertEmailTemplate = Omit<
+  EmailTemplate,
+  "id" | "createdAt" | "updatedAt"
+>;
+export type InsertEmailConfig = Omit<
+  EmailConfig,
+  "id" | "createdAt" | "updatedAt"
+>;
+export type InsertRegistration = Omit<
+  Registration,
+  "id" | "createdAt" | "updatedAt" | "notificationSent" | "status"
+>;
 export type InsertAccessToken = Omit<AccessToken, "id" | "createdAt">;
-export type InsertCalendarCredential = Omit<CalendarCredential, "id" | "createdAt" | "updatedAt">;
-export type InsertLevel = Omit<Level, "id" | "createdAt" | "updatedAt" | "createdById">;
-export type InsertGrade = Omit<Grade, "id" | "createdAt" | "updatedAt" | "createdById">;
-export type InsertDepartment = Omit<Department, "id" | "createdAt" | "updatedAt" | "createdById">;
-export type InsertAppraisalCycle = Omit<AppraisalCycle, "id" | "createdAt" | "updatedAt" | "createdById">;
-export type InsertReviewFrequency = Omit<ReviewFrequency, "id" | "createdAt" | "updatedAt" | "createdById">;
-export type InsertFrequencyCalendar = Omit<FrequencyCalendar, "id" | "createdAt" | "updatedAt" | "createdById">;
-export type InsertFrequencyCalendarDetails = Omit<FrequencyCalendarDetails, "id" | "createdAt" | "updatedAt" | "createdById">;
-export type InsertPublishQuestionnaire = Omit<PublishQuestionnaire, "id" | "createdAt" | "updatedAt" | "createdById">;
-export type InsertAppraisalGroup = Omit<AppraisalGroup, "id" | "createdAt" | "updatedAt">;
-export type InsertAppraisalGroupMember = Omit<AppraisalGroupMember, "id" | "addedAt">;
-export type InsertInitiatedAppraisal = Omit<InitiatedAppraisal, "id" | "createdAt" | "updatedAt">;
-export type InsertInitiatedAppraisalDetailTiming = Omit<InitiatedAppraisalDetailTiming, "id" | "createdAt" | "updatedAt">;
-export type InsertScheduledAppraisalTask = Omit<ScheduledAppraisalTask, "id" | "createdAt" | "updatedAt">;
-export type InsertDevelopmentGoal = Omit<DevelopmentGoal, "id" | "createdAt" | "updatedAt" | "status">;
+export type InsertCalendarCredential = Omit<
+  CalendarCredential,
+  "id" | "createdAt" | "updatedAt"
+>;
+export type InsertLevel = Omit<
+  Level,
+  "id" | "createdAt" | "updatedAt" | "createdById"
+>;
+export type InsertGrade = Omit<
+  Grade,
+  "id" | "createdAt" | "updatedAt" | "createdById"
+>;
+export type InsertDepartment = Omit<
+  Department,
+  "id" | "createdAt" | "updatedAt" | "createdById"
+>;
+export type InsertAppraisalCycle = Omit<
+  AppraisalCycle,
+  "id" | "createdAt" | "updatedAt" | "createdById"
+>;
+export type InsertReviewFrequency = Omit<
+  ReviewFrequency,
+  "id" | "createdAt" | "updatedAt" | "createdById"
+>;
+export type InsertFrequencyCalendar = Omit<
+  FrequencyCalendar,
+  "id" | "createdAt" | "updatedAt" | "createdById"
+>;
+export type InsertFrequencyCalendarDetails = Omit<
+  FrequencyCalendarDetails,
+  "id" | "createdAt" | "updatedAt" | "createdById"
+>;
+export type InsertPublishQuestionnaire = Omit<
+  PublishQuestionnaire,
+  "id" | "createdAt" | "updatedAt" | "createdById"
+>;
+export type InsertAppraisalGroup = Omit<
+  AppraisalGroup,
+  "id" | "createdAt" | "updatedAt"
+>;
+export type InsertAppraisalGroupMember = Omit<
+  AppraisalGroupMember,
+  "id" | "addedAt"
+>;
+export type InsertInitiatedAppraisal = Omit<
+  InitiatedAppraisal,
+  "id" | "createdAt" | "updatedAt"
+>;
+export type InsertInitiatedAppraisalDetailTiming = Omit<
+  InitiatedAppraisalDetailTiming,
+  "id" | "createdAt" | "updatedAt"
+>;
+export type InsertScheduledAppraisalTask = Omit<
+  ScheduledAppraisalTask,
+  "id" | "createdAt" | "updatedAt"
+>;
+export type InsertDevelopmentGoal = Omit<
+  DevelopmentGoal,
+  "id" | "createdAt" | "updatedAt" | "status"
+>;
 
 // Feedback Request insert type (for creating new feedback requests)
-export type InsertFeedbackRequest = Omit<FeedbackRequest, "id" | "createdAt" | "updatedAt" | "submittedAt" | "status" | 
-  "relationshipWithPeer" | "collaborationRating" | "communicationRating" | "reliabilityRating" | 
-  "problemSolvingRating" | "ownershipRating" | "opennessToFeedbackRating" | "conflictHandlingRating" | 
-  "jobSpecificCompetencies" | "strengths" | "developmentAreas" | "overallSummary" | "recommendedRating">;
+export type InsertFeedbackRequest = Omit<
+  FeedbackRequest,
+  | "id"
+  | "createdAt"
+  | "updatedAt"
+  | "submittedAt"
+  | "status"
+  | "relationshipWithPeer"
+  | "collaborationRating"
+  | "communicationRating"
+  | "reliabilityRating"
+  | "problemSolvingRating"
+  | "ownershipRating"
+  | "opennessToFeedbackRating"
+  | "conflictHandlingRating"
+  | "jobSpecificCompetencies"
+  | "strengths"
+  | "developmentAreas"
+  | "overallSummary"
+  | "recommendedRating"
+>;
 
 // Submit Feedback type (for submitting feedback response)
 export interface SubmitFeedback {
   relationshipWithPeer: string;
-  collaborationRating: "excellent" | "good" | "average" | "needs_improvement" | "poor";
-  communicationRating: "excellent" | "good" | "average" | "needs_improvement" | "poor";
-  reliabilityRating: "excellent" | "good" | "average" | "needs_improvement" | "poor";
-  problemSolvingRating: "excellent" | "good" | "average" | "needs_improvement" | "poor";
-  ownershipRating: "excellent" | "good" | "average" | "needs_improvement" | "poor" | "not_applicable";
-  opennessToFeedbackRating: "excellent" | "good" | "average" | "needs_improvement" | "poor";
-  conflictHandlingRating: "excellent" | "good" | "average" | "needs_improvement" | "poor" | "not_applicable";
+  collaborationRating:
+    | "excellent"
+    | "good"
+    | "average"
+    | "needs_improvement"
+    | "poor";
+  communicationRating:
+    | "excellent"
+    | "good"
+    | "average"
+    | "needs_improvement"
+    | "poor";
+  reliabilityRating:
+    | "excellent"
+    | "good"
+    | "average"
+    | "needs_improvement"
+    | "poor";
+  problemSolvingRating:
+    | "excellent"
+    | "good"
+    | "average"
+    | "needs_improvement"
+    | "poor";
+  ownershipRating:
+    | "excellent"
+    | "good"
+    | "average"
+    | "needs_improvement"
+    | "poor"
+    | "not_applicable";
+  opennessToFeedbackRating:
+    | "excellent"
+    | "good"
+    | "average"
+    | "needs_improvement"
+    | "poor";
+  conflictHandlingRating:
+    | "excellent"
+    | "good"
+    | "average"
+    | "needs_improvement"
+    | "poor"
+    | "not_applicable";
   jobSpecificCompetencies: string;
   strengths: string;
   developmentAreas: string;
@@ -507,38 +660,46 @@ export interface SubmitFeedback {
 // ============================================
 
 // User schema
-export const insertUserSchema = z.object({
-  email: z.string().email().optional().nullable(),
-  firstName: z.string().optional().nullable(),
-  lastName: z.string().optional().nullable(),
-  profileImageUrl: z.string().optional().nullable(),
-  code: z.string().optional().nullable(),
-  designation: z.string().optional().nullable(),
-  department: z.string().optional().nullable(),
-  dateOfJoining: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
-  mobileNumber: z.string().optional().nullable(),
-  reportingManagerId: z.string().optional().nullable(),
-  locationId: z.string().optional().nullable(),
-  companyId: z.string().optional().nullable(),
-  levelId: z.string().optional().nullable(),
-  gradeId: z.string().optional().nullable(),
-  role: z.enum(UserRoles).optional().nullable(),
-  roles: z.array(z.enum(UserRoles)).optional().default(["employee"]),
-  status: z.enum(StatusValues).optional().nullable(),
-  password: z.string().min(8, "Password must be at least 8 characters").optional(),
-  confirmPassword: z.string().optional(),
-}).refine(
-  (data) => {
-    if (data.password || data.confirmPassword) {
-      return data.password === data.confirmPassword;
+export const insertUserSchema = z
+  .object({
+    email: z.string().email().optional().nullable(),
+    firstName: z.string().optional().nullable(),
+    lastName: z.string().optional().nullable(),
+    profileImageUrl: z.string().optional().nullable(),
+    code: z.string().optional().nullable(),
+    designation: z.string().optional().nullable(),
+    department: z.string().optional().nullable(),
+    dateOfJoining: z.preprocess(
+      (val) => (val ? new Date(val as string) : null),
+      z.date().nullable().optional()
+    ),
+    mobileNumber: z.string().optional().nullable(),
+    reportingManagerId: z.string().optional().nullable(),
+    locationId: z.string().optional().nullable(),
+    companyId: z.string().optional().nullable(),
+    levelId: z.string().optional().nullable(),
+    gradeId: z.string().optional().nullable(),
+    role: z.enum(UserRoles).optional().nullable(),
+    roles: z.array(z.enum(UserRoles)).optional().default(["employee"]),
+    status: z.enum(StatusValues).optional().nullable(),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .optional(),
+    confirmPassword: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.password || data.confirmPassword) {
+        return data.password === data.confirmPassword;
+      }
+      return true;
+    },
+    {
+      message: "Passwords do not match",
+      path: ["confirmPassword"],
     }
-    return true;
-  },
-  {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  }
-);
+  );
 
 // Company schema
 export const insertCompanySchema = z.object({
@@ -599,16 +760,31 @@ export const insertEvaluationSchema = z.object({
   reviewCycleId: z.string().optional().nullable(),
   initiatedAppraisalId: z.string().optional().nullable(),
   selfEvaluationData: z.any().optional().nullable(),
-  selfEvaluationSubmittedAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  selfEvaluationSubmittedAt: z.preprocess(
+    (val) => (val ? new Date(val as string) : null),
+    z.date().nullable().optional()
+  ),
   managerEvaluationData: z.any().optional().nullable(),
-  managerEvaluationSubmittedAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  managerEvaluationSubmittedAt: z.preprocess(
+    (val) => (val ? new Date(val as string) : null),
+    z.date().nullable().optional()
+  ),
   overallRating: z.number().optional().nullable(),
   status: z.string().optional().default("not_started"),
-  meetingScheduledAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  meetingScheduledAt: z.preprocess(
+    (val) => (val ? new Date(val as string) : null),
+    z.date().nullable().optional()
+  ),
   meetingNotes: z.string().optional().nullable(),
   showNotesToEmployee: z.boolean().optional().default(false),
-  meetingCompletedAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
-  finalizedAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  meetingCompletedAt: z.preprocess(
+    (val) => (val ? new Date(val as string) : null),
+    z.date().nullable().optional()
+  ),
+  finalizedAt: z.preprocess(
+    (val) => (val ? new Date(val as string) : null),
+    z.date().nullable().optional()
+  ),
 });
 
 // Email Template schema
@@ -647,7 +823,10 @@ export const insertAccessTokenSchema = z.object({
   evaluationId: z.string().min(1),
   tokenType: z.string().min(1),
   expiresAt: z.preprocess((val) => new Date(val as string), z.date()),
-  usedAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  usedAt: z.preprocess(
+    (val) => (val ? new Date(val as string) : null),
+    z.date().nullable().optional()
+  ),
   isActive: z.boolean().optional().default(true),
 });
 
@@ -659,7 +838,10 @@ export const insertCalendarCredentialSchema = z.object({
   clientSecret: z.string().min(1),
   accessToken: z.string().optional().nullable(),
   refreshToken: z.string().min(1),
-  expiresAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  expiresAt: z.preprocess(
+    (val) => (val ? new Date(val as string) : null),
+    z.date().nullable().optional()
+  ),
   scope: z.string().optional().nullable(),
   isActive: z.boolean().optional().default(true),
 });
@@ -786,7 +968,10 @@ export const insertScheduledAppraisalTaskSchema = z.object({
   frequencyCalendarDetailId: z.string().min(1),
   scheduledDate: z.preprocess((val) => new Date(val as string), z.date()),
   status: z.string().default("pending"),
-  executedAt: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
+  executedAt: z.preprocess(
+    (val) => (val ? new Date(val as string) : null),
+    z.date().nullable().optional()
+  ),
   error: z.string().optional().nullable(),
 });
 
@@ -801,8 +986,21 @@ export const insertDevelopmentGoalSchema = z.object({
 });
 
 // Feedback request schemas
-const feedbackRatingSchema = z.enum(["excellent", "good", "average", "needs_improvement", "poor"]);
-const feedbackRatingWithNASchema = z.enum(["excellent", "good", "average", "needs_improvement", "poor", "not_applicable"]);
+const feedbackRatingSchema = z.enum([
+  "excellent",
+  "good",
+  "average",
+  "needs_improvement",
+  "poor",
+]);
+const feedbackRatingWithNASchema = z.enum([
+  "excellent",
+  "good",
+  "average",
+  "needs_improvement",
+  "poor",
+  "not_applicable",
+]);
 
 export const insertFeedbackRequestSchema = z.object({
   appraisalId: z.string().min(1, "Appraisal ID is required"),
@@ -814,7 +1012,9 @@ export const insertFeedbackRequestSchema = z.object({
 });
 
 export const submitFeedbackSchema = z.object({
-  relationshipWithPeer: z.string().min(1, "Please describe your relationship with this employee"),
+  relationshipWithPeer: z
+    .string()
+    .min(1, "Please describe your relationship with this employee"),
   collaborationRating: feedbackRatingSchema,
   communicationRating: feedbackRatingSchema,
   reliabilityRating: feedbackRatingSchema,
@@ -822,7 +1022,9 @@ export const submitFeedbackSchema = z.object({
   ownershipRating: feedbackRatingWithNASchema,
   opennessToFeedbackRating: feedbackRatingSchema,
   conflictHandlingRating: feedbackRatingWithNASchema,
-  jobSpecificCompetencies: z.string().min(1, "Please describe their job-specific competencies"),
+  jobSpecificCompetencies: z
+    .string()
+    .min(1, "Please describe their job-specific competencies"),
   strengths: z.string().min(1, "Please describe their strengths"),
   developmentAreas: z.string().min(1, "Please describe areas for development"),
   overallSummary: z.string().min(1, "Please provide an overall summary"),
@@ -830,57 +1032,74 @@ export const submitFeedbackSchema = z.object({
 });
 
 // Update schema for development goals
-export const updateDevelopmentGoalSchema = z.object({
-  description: z.string().min(1).optional(),
-  plannedOutcome: z.string().min(1).optional(),
-  targetDate: z.preprocess(
-    (val) => (val ? new Date(val as string) : undefined),
-    z.date().optional()
-  ),
-  progress: z.number().min(0).max(100).optional(),
-}).strict();
+export const updateDevelopmentGoalSchema = z
+  .object({
+    description: z.string().min(1).optional(),
+    plannedOutcome: z.string().min(1).optional(),
+    targetDate: z.preprocess(
+      (val) => (val ? new Date(val as string) : undefined),
+      z.date().optional()
+    ),
+    progress: z.number().min(0).max(100).optional(),
+  })
+  .strict();
 
 // Update user schema
-export const updateUserSchema = z.object({
-  email: z.string().email().optional().nullable(),
-  firstName: z.string().optional().nullable(),
-  lastName: z.string().optional().nullable(),
-  profileImageUrl: z.string().optional().nullable(),
-  code: z.string().optional().nullable(),
-  designation: z.string().optional().nullable(),
-  department: z.string().optional().nullable(),
-  dateOfJoining: z.preprocess((val) => val ? new Date(val as string) : null, z.date().nullable().optional()),
-  mobileNumber: z.string().optional().nullable(),
-  reportingManagerId: z.string().optional().nullable(),
-  locationId: z.string().optional().nullable(),
-  companyId: z.string().optional().nullable(),
-  levelId: z.string().optional().nullable(),
-  gradeId: z.string().optional().nullable(),
-  role: z.enum(UserRoles).optional().nullable(),
-  roles: z.array(z.enum(UserRoles)).optional(),
-  status: z.enum(StatusValues).optional().nullable(),
-}).partial().strict();
+export const updateUserSchema = z
+  .object({
+    email: z.string().email().optional().nullable(),
+    firstName: z.string().optional().nullable(),
+    lastName: z.string().optional().nullable(),
+    profileImageUrl: z.string().optional().nullable(),
+    code: z.string().optional().nullable(),
+    designation: z.string().optional().nullable(),
+    department: z.string().optional().nullable(),
+    dateOfJoining: z.preprocess(
+      (val) => (val ? new Date(val as string) : null),
+      z.date().nullable().optional()
+    ),
+    mobileNumber: z.string().optional().nullable(),
+    reportingManagerId: z.string().optional().nullable(),
+    locationId: z.string().optional().nullable(),
+    companyId: z.string().optional().nullable(),
+    levelId: z.string().optional().nullable(),
+    gradeId: z.string().optional().nullable(),
+    role: z.enum(UserRoles).optional().nullable(),
+    roles: z.array(z.enum(UserRoles)).optional(),
+    status: z.enum(StatusValues).optional().nullable(),
+  })
+  .partial()
+  .strict();
 
 // Password update schema
-export const passwordUpdateSchema = z.object({
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  confirmPassword: z.string(),
-}).strict().refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
+export const passwordUpdateSchema = z
+  .object({
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z.string(),
+  })
+  .strict()
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 // Role update schema
-export const roleUpdateSchema = z.object({
-  role: z.enum(UserRoles).optional(),
-  roles: z.array(z.enum(UserRoles)).optional(),
-}).strict();
+export const roleUpdateSchema = z
+  .object({
+    role: z.enum(UserRoles).optional(),
+    roles: z.array(z.enum(UserRoles)).optional(),
+  })
+  .strict();
 
 // Send Reminder Request schema
-export const sendReminderRequestSchema = z.object({
-  employeeId: z.string().min(1, "Employee ID is required"),
-  initiatedAppraisalId: z.string().min(1, "Initiated Appraisal ID is required"),
-}).strict();
+export const sendReminderRequestSchema = z
+  .object({
+    employeeId: z.string().min(1, "Employee ID is required"),
+    initiatedAppraisalId: z
+      .string()
+      .min(1, "Initiated Appraisal ID is required"),
+  })
+  .strict();
 
 // Upsert user schema for Replit Auth
 export const upsertUserSchema = z.object({
