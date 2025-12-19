@@ -27,6 +27,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -317,6 +327,7 @@ export default function QuestionnaireTemplates() {
   const [editingTemplate, setEditingTemplate] =
     useState<QuestionnaireTemplate | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [deleteTemplateId, setDeleteTemplateId] = useState<string | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -564,10 +575,13 @@ export default function QuestionnaireTemplates() {
   };
 
   const handleDelete = (id: string) => {
-    if (
-      confirm("Are you sure you want to delete this questionnaire template?")
-    ) {
-      deleteTemplateMutation.mutate(id);
+    setDeleteTemplateId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteTemplateId) {
+      deleteTemplateMutation.mutate(deleteTemplateId);
+      setDeleteTemplateId(null);
     }
   };
 
@@ -1128,6 +1142,24 @@ export default function QuestionnaireTemplates() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTemplateId} onOpenChange={(open) => !open && setDeleteTemplateId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Questionnaire Template</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this questionnaire template? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RoleGuard>
   );
 }

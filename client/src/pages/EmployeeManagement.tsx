@@ -27,6 +27,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -176,6 +186,7 @@ export default function EmployeeManagement() {
   const [uploadResults, setUploadResults] = useState<any>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -507,6 +518,41 @@ export default function EmployeeManagement() {
     },
   });
 
+  // Watch the selected company ID for filtering dependent dropdowns
+  const selectedCompanyId = form.watch("companyId");
+
+  // Filter locations, departments, levels, grades, and users based on selected company
+  const filteredLocations = isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
+    ? locations.filter((loc: any) => loc.companyId === selectedCompanyId)
+    : locations;
+
+  const filteredDepartments = isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
+    ? departments.filter((dept: any) => dept.companyId === selectedCompanyId)
+    : departments;
+
+  const filteredLevels = isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
+    ? levels.filter((level: any) => level.companyId === selectedCompanyId)
+    : levels;
+
+  const filteredGrades = isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
+    ? grades.filter((grade: any) => grade.companyId === selectedCompanyId)
+    : grades;
+
+  const filteredManagers = isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
+    ? users.filter((user: any) => user.companyId === selectedCompanyId && user.id !== editingUser?.id)
+    : users.filter((user: any) => user.id !== editingUser?.id);
+
+  // Reset dependent fields when company changes (only for super admin)
+  useEffect(() => {
+    if (isSuperAdmin && !editingUser) {
+      form.setValue("locationId", "none");
+      form.setValue("department", "none");
+      form.setValue("levelId", "none");
+      form.setValue("gradeId", "none");
+      form.setValue("reportingManagerId", "none");
+    }
+  }, [selectedCompanyId, isSuperAdmin, editingUser, form]);
+
   // Update form companyId when currentUser loads (for admins)
   useEffect(() => {
     if (isAdmin && currentUser?.companyId && !editingUser) {
@@ -589,8 +635,13 @@ export default function EmployeeManagement() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this user?")) {
-      deleteUserMutation.mutate(id);
+    setDeleteUserId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteUserId) {
+      deleteUserMutation.mutate(deleteUserId);
+      setDeleteUserId(null);
     }
   };
 
@@ -822,39 +873,6 @@ export default function EmployeeManagement() {
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
-                        name="locationId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Location</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value ?? "none"}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-location">
-                                  <SelectValue placeholder="Select location" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="none">
-                                  No Location
-                                </SelectItem>
-                                {locations.map((location: any) => (
-                                  <SelectItem
-                                    key={location.id}
-                                    value={location.id}
-                                  >
-                                    {location.name} ({location.code})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
                         name="companyId"
                         render={({ field }) => (
                           <FormItem>
@@ -891,6 +909,40 @@ export default function EmployeeManagement() {
                           </FormItem>
                         )}
                       />
+
+                      <FormField
+                        control={form.control}
+                        name="locationId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Location</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value ?? "none"}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-location">
+                                  <SelectValue placeholder="Select location" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">
+                                  No Location
+                                </SelectItem>
+                                {filteredLocations.map((location: any) => (
+                                  <SelectItem
+                                    key={location.id}
+                                    value={location.id}
+                                  >
+                                    {location.name} ({location.code})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 gap-4">
@@ -913,7 +965,7 @@ export default function EmployeeManagement() {
                                 <SelectItem value="none">
                                   No Department
                                 </SelectItem>
-                                {departments.map((department: any) => (
+                                {filteredDepartments.map((department: any) => (
                                   <SelectItem
                                     key={department.id}
                                     value={department.code}
@@ -947,7 +999,7 @@ export default function EmployeeManagement() {
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="none">No Level</SelectItem>
-                                {levels.map((level: any) => (
+                                {filteredLevels.map((level: any) => (
                                   <SelectItem key={level.id} value={level.id}>
                                     {level.description} ({level.code})
                                   </SelectItem>
@@ -975,7 +1027,7 @@ export default function EmployeeManagement() {
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="none">No Grade</SelectItem>
-                                {grades.map((grade: any) => (
+                                {filteredGrades.map((grade: any) => (
                                   <SelectItem key={grade.id} value={grade.id}>
                                     {grade.description} ({grade.code})
                                   </SelectItem>
@@ -1006,11 +1058,7 @@ export default function EmployeeManagement() {
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="none">No Manager</SelectItem>
-                                {users
-                                  .filter(
-                                    (user: any) => user.id !== editingUser?.id
-                                  )
-                                  .map((user: any) => (
+                                {filteredManagers.map((user: any) => (
                                     <SelectItem key={user.id} value={user.id}>
                                       {user.firstName} {user.lastName} (
                                       {user.email})
@@ -1659,6 +1707,31 @@ export default function EmployeeManagement() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!deleteUserId}
+        onOpenChange={(open) => !open && setDeleteUserId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this user? This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RoleGuard>
   );
 }

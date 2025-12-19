@@ -27,6 +27,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Form,
   FormControl,
   FormField,
@@ -50,6 +60,7 @@ import { Plus, Edit, Trash2, Building } from "lucide-react";
 export default function CompanyManagement() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [deleteCompanyId, setDeleteCompanyId] = useState<string | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -170,8 +181,13 @@ export default function CompanyManagement() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this company?")) {
-      deleteCompanyMutation.mutate(id);
+    setDeleteCompanyId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteCompanyId) {
+      deleteCompanyMutation.mutate(deleteCompanyId);
+      setDeleteCompanyId(null);
     }
   };
 
@@ -613,6 +629,24 @@ export default function CompanyManagement() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteCompanyId} onOpenChange={(open) => !open && setDeleteCompanyId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Company</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this company? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RoleGuard>
   );
 }
