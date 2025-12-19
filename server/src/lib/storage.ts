@@ -701,7 +701,9 @@ export interface IStorage {
 
   // Locations - now company-filtered
   getLocations(companyId?: string): Promise<Location[]>;
+  getAllLocations(companyId?: string): Promise<Location[]>;
   getLocation(id: string): Promise<Location | undefined>;
+  getLocationById(id: string): Promise<Location | undefined>;
   createLocation(
     location: InsertLocation,
     companyId?: string
@@ -829,22 +831,9 @@ export interface IStorage {
 
   // Many more (levels, grades, etc.) - now company-filtered
   getLevels(companyId: string): Promise<Level[]>;
+  getAllLevels(companyId?: string): Promise<Level[]>;
   getLevel(id: string, companyId?: string): Promise<Level | undefined>;
-  createLevel(
-    level: InsertLevel,
-    companyId: string,
-    createdById: string
-  ): Promise<Level>;
-  updateLevel(
-    id: string,
-    level: Partial<InsertLevel>,
-    companyId: string
-  ): Promise<Level>;
-  deleteLevel(id: string, companyId: string): Promise<void>;
-
-  // Levels - company-filtered
-  getLevels(companyId: string): Promise<Level[]>;
-  getLevel(id: string, companyId?: string): Promise<Level | undefined>;
+  getLevelById(id: string): Promise<Level | undefined>;
   createLevel(
     level: InsertLevel,
     companyId: string,
@@ -859,7 +848,9 @@ export interface IStorage {
 
   // Grades - company-filtered
   getGrades(companyId: string): Promise<Grade[]>;
+  getAllGrades(companyId?: string): Promise<Grade[]>;
   getGrade(id: string, companyId?: string): Promise<Grade | undefined>;
+  getGradeById(id: string): Promise<Grade | undefined>;
   createGrade(
     grade: InsertGrade,
     companyId: string,
@@ -874,10 +865,12 @@ export interface IStorage {
 
   // Departments - company-filtered
   getDepartments(companyId: string): Promise<Department[]>;
+  getAllDepartments(companyId?: string): Promise<Department[]>;
   getDepartment(
     id: string,
     companyId?: string
   ): Promise<Department | undefined>;
+  getDepartmentById(id: string): Promise<Department | undefined>;
   createDepartment(
     department: InsertDepartment,
     companyId: string,
@@ -1432,6 +1425,15 @@ export class DatabaseStorage implements IStorage {
     try {
       await pool.request().input("Id", id).execute("dbo.DeleteLocation");
     } catch {}
+  }
+
+  // Wrapper methods for services
+  async getAllLocations(companyId?: string): Promise<Location[]> {
+    return this.getLocations(companyId);
+  }
+
+  async getLocationById(id: string): Promise<Location | undefined> {
+    return this.getLocation(id);
   }
 
   // ---------- Email Templates ----------
@@ -2315,6 +2317,25 @@ export class DatabaseStorage implements IStorage {
     } catch {}
   }
 
+  // Wrapper methods for level services
+  async getAllLevels(companyId?: string): Promise<Level[]> {
+    const pool = await getPool();
+    try {
+      const request = pool.request();
+      if (companyId) {
+        request.input("CompanyId", companyId);
+      }
+      const result = await request.execute("dbo.GetLevels");
+      return (result.recordset || []).map(mapRawLevel);
+    } catch {
+      return [];
+    }
+  }
+
+  async getLevelById(id: string): Promise<Level | undefined> {
+    return this.getLevel(id);
+  }
+
   // ---------- Grades ----------
   async getGrades(companyId: string): Promise<Grade[]> {
     const pool = await getPool();
@@ -2383,6 +2404,25 @@ export class DatabaseStorage implements IStorage {
         .input("CompanyId", companyId)
         .execute("dbo.DeleteGrade");
     } catch {}
+  }
+
+  // Wrapper methods for grade services
+  async getAllGrades(companyId?: string): Promise<Grade[]> {
+    const pool = await getPool();
+    try {
+      const request = pool.request();
+      if (companyId) {
+        request.input("CompanyId", companyId);
+      }
+      const result = await request.execute("dbo.GetGrades");
+      return (result.recordset || []).map(mapRawGrade);
+    } catch {
+      return [];
+    }
+  }
+
+  async getGradeById(id: string): Promise<Grade | undefined> {
+    return this.getGrade(id);
   }
 
   // ---------- Departments ----------
@@ -2456,6 +2496,25 @@ export class DatabaseStorage implements IStorage {
         .input("CompanyId", companyId)
         .execute("dbo.DeleteDepartment");
     } catch {}
+  }
+
+  // Wrapper methods for department services
+  async getAllDepartments(companyId?: string): Promise<Department[]> {
+    const pool = await getPool();
+    try {
+      const request = pool.request();
+      if (companyId) {
+        request.input("CompanyId", companyId);
+      }
+      const result = await request.execute("dbo.GetDepartments");
+      return (result.recordset || []).map(mapRawDepartment);
+    } catch {
+      return [];
+    }
+  }
+
+  async getDepartmentById(id: string): Promise<Department | undefined> {
+    return this.getDepartment(id);
   }
 
   // ---------- Appraisal Cycles ----------
