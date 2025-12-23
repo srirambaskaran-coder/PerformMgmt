@@ -1,12 +1,16 @@
-import { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken, extractTokenFromHeader, TokenPayload } from '../utils/jwt';
+import { Request, Response, NextFunction } from "express";
+import {
+  verifyAccessToken,
+  extractTokenFromHeader,
+  TokenPayload,
+} from "../utils/jwt";
 
 // Extended request interface for JWT-authenticated requests
 export interface AuthenticatedRequest extends Request {
   // JWT payload attached by middleware
   user?: TokenPayload;
   // Legacy session properties accessed dynamically
-  session: Request['session'] & {
+  session: Request["session"] & {
     userId?: string;
     activeRole?: string;
   };
@@ -22,34 +26,34 @@ export const isAuthenticated = (
   next: NextFunction
 ) => {
   const authReq = req as AuthenticatedRequest;
-  
+
   // Try JWT authentication first (preferred method)
   const token = extractTokenFromHeader(req.headers.authorization);
-  
+
   if (token) {
     const payload = verifyAccessToken(token);
-    
+
     if (payload) {
       // Attach user info to request
       authReq.user = payload;
       return next();
     }
-    
+
     // Token provided but invalid/expired
-    return res.status(401).json({ 
-      message: 'Unauthorized - Invalid or expired token',
-      code: 'TOKEN_INVALID'
+    return res.status(401).json({
+      message: "Unauthorized - Invalid or expired token",
+      code: "TOKEN_INVALID",
     });
   }
-  
+
   // Fallback to session-based auth (for backward compatibility)
   if (authReq.session?.userId) {
     return next();
   }
-  
-  return res.status(401).json({ 
-    message: 'Unauthorized - Please login',
-    code: 'NO_AUTH'
+
+  return res.status(401).json({
+    message: "Unauthorized - Please login",
+    code: "NO_AUTH",
   });
 };
 
@@ -60,42 +64,44 @@ export const isAuthenticated = (
 export const requireRoles = (...allowedRoles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const authReq = req as AuthenticatedRequest;
-    
+
     // Check JWT-based authentication first
     if (authReq.user) {
       const userRole = authReq.user.role;
       const availableRoles = authReq.user.roles || [userRole];
-      
+
       // Check if user has any of the allowed roles
-      const hasRole = allowedRoles.some(role => availableRoles.includes(role));
-      
+      const hasRole = allowedRoles.some((role) =>
+        availableRoles.includes(role)
+      );
+
       if (!hasRole) {
-        return res.status(403).json({ 
-          message: 'Forbidden - Insufficient permissions',
-          code: 'INSUFFICIENT_PERMISSIONS'
+        return res.status(403).json({
+          message: "Forbidden - Insufficient permissions",
+          code: "INSUFFICIENT_PERMISSIONS",
         });
       }
-      
+
       return next();
     }
-    
+
     // Fallback to session-based auth
     if (!authReq.session?.userId) {
-      return res.status(401).json({ 
-        message: 'Unauthorized - Please login',
-        code: 'NO_AUTH'
+      return res.status(401).json({
+        message: "Unauthorized - Please login",
+        code: "NO_AUTH",
       });
     }
-    
+
     const userRole = authReq.session.activeRole;
-    
+
     if (!userRole || !allowedRoles.includes(userRole)) {
-      return res.status(403).json({ 
-        message: 'Forbidden - Insufficient permissions',
-        code: 'INSUFFICIENT_PERMISSIONS'
+      return res.status(403).json({
+        message: "Forbidden - Insufficient permissions",
+        code: "INSUFFICIENT_PERMISSIONS",
       });
     }
-    
+
     next();
   };
 };

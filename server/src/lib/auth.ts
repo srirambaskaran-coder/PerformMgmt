@@ -32,16 +32,18 @@ export function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = async (req: any, res, next) => {
   // Try JWT authentication first (preferred for cross-origin)
   const token = extractTokenFromHeader(req.headers.authorization);
-  
+
   if (token) {
     const payload = verifyAccessToken(token);
-    
+
     if (payload) {
       // Attach user info from JWT
       try {
         const user = await storage.getUser(payload.userId);
         if (!user) {
-          return res.status(401).json({ message: "Unauthorized - User not found" });
+          return res
+            .status(401)
+            .json({ message: "Unauthorized - User not found" });
         }
         req.user = user;
         return next();
@@ -50,14 +52,14 @@ export const isAuthenticated: RequestHandler = async (req: any, res, next) => {
         return res.status(500).json({ message: "Authentication error" });
       }
     }
-    
+
     // Token provided but invalid
-    return res.status(401).json({ 
+    return res.status(401).json({
       message: "Unauthorized - Invalid or expired token",
-      code: "TOKEN_INVALID"
+      code: "TOKEN_INVALID",
     });
   }
-  
+
   // Fallback to session-based auth
   if (!req.session || !req.session.userId) {
     return res.status(401).json({ message: "Unauthorized - Please login" });

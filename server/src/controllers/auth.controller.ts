@@ -1,9 +1,9 @@
-import { Request, Response } from 'express';
-import { AuthService } from '../services/auth.service';
-import { ApiResponse } from '../utils/response';
-import { asyncHandler } from '../middleware/error.middleware';
-import { AuthenticatedRequest, getUserId } from '../middleware/auth.middleware';
-import { generateTokens, verifyRefreshToken, TokenPayload } from '../utils/jwt';
+import { Request, Response } from "express";
+import { AuthService } from "../services/auth.service";
+import { ApiResponse } from "../utils/response";
+import { asyncHandler } from "../middleware/error.middleware";
+import { AuthenticatedRequest, getUserId } from "../middleware/auth.middleware";
+import { generateTokens, verifyRefreshToken, TokenPayload } from "../utils/jwt";
 
 export class AuthController {
   private authService: AuthService;
@@ -28,12 +28,16 @@ export class AuthController {
 
     const tokens = generateTokens(tokenPayload);
 
-    return ApiResponse.success(res, { 
-      user,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      expiresIn: tokens.expiresIn,
-    }, 'Login successful');
+    return ApiResponse.success(
+      res,
+      {
+        user,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: tokens.expiresIn,
+      },
+      "Login successful"
+    );
   });
 
   /**
@@ -43,14 +47,14 @@ export class AuthController {
     const { refreshToken } = req.body;
 
     if (!refreshToken) {
-      return ApiResponse.badRequest(res, 'Refresh token is required');
+      return ApiResponse.badRequest(res, "Refresh token is required");
     }
 
     // Verify refresh token
     const payload = verifyRefreshToken(refreshToken);
-    
+
     if (!payload) {
-      return ApiResponse.unauthorized(res, 'Invalid or expired refresh token');
+      return ApiResponse.unauthorized(res, "Invalid or expired refresh token");
     }
 
     // Get current user data
@@ -67,12 +71,16 @@ export class AuthController {
 
     const tokens = generateTokens(tokenPayload);
 
-    return ApiResponse.success(res, { 
-      user,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      expiresIn: tokens.expiresIn,
-    }, 'Token refreshed successfully');
+    return ApiResponse.success(
+      res,
+      {
+        user,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: tokens.expiresIn,
+      },
+      "Token refreshed successfully"
+    );
   });
 
   logout = asyncHandler(async (req: Request, res: Response) => {
@@ -93,26 +101,26 @@ export class AuthController {
       });
     }
 
-    return ApiResponse.success(res, null, 'Logout successful');
+    return ApiResponse.success(res, null, "Logout successful");
   });
 
   getCurrentUser = asyncHandler(async (req: Request, res: Response) => {
     const userId = getUserId(req);
-    
+
     if (!userId) {
-      return ApiResponse.unauthorized(res, 'Not authenticated');
+      return ApiResponse.unauthorized(res, "Not authenticated");
     }
 
     const user = await this.authService.getCurrentUser(userId);
 
-    return ApiResponse.success(res, { user }, 'User retrieved successfully');
+    return ApiResponse.success(res, { user }, "User retrieved successfully");
   });
 
   checkAuth = asyncHandler(async (req: Request, res: Response) => {
     const userId = getUserId(req);
 
     if (!userId) {
-      return ApiResponse.unauthorized(res, 'Not authenticated');
+      return ApiResponse.unauthorized(res, "Not authenticated");
     }
 
     const user = await this.authService.getCurrentUser(userId);
