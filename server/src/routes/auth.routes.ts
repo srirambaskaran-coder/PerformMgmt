@@ -13,11 +13,21 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+const refreshTokenSchema = z.object({
+  refreshToken: z.string().min(1, 'Refresh token is required'),
+});
+
 // Routes
 router.post(
   '/login',
   validateBody(loginSchema),
   authController.login
+);
+
+router.post(
+  '/refresh',
+  validateBody(refreshTokenSchema),
+  authController.refreshToken
 );
 
 router.post(

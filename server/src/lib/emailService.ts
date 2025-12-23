@@ -2,6 +2,12 @@ import nodemailer from "nodemailer";
 import sql from "mssql";
 import { getPool } from "./mssql";
 
+interface EmailAttachment {
+  filename: string;
+  content: string | Buffer;
+  contentType?: string;
+}
+
 interface EmailOptions {
   to: string;
   subject: string;
@@ -9,6 +15,7 @@ interface EmailOptions {
   text?: string;
   cc?: string | string[];
   bcc?: string | string[];
+  attachments?: EmailAttachment[];
 }
 
 class EmailService {
@@ -66,6 +73,7 @@ class EmailService {
       text: options.text,
       cc: options.cc,
       bcc: options.bcc,
+      attachments: options.attachments,
     };
 
     try {
@@ -675,12 +683,18 @@ export async function sendMeetingInvite(
   managerName: string,
   meetingDate: Date,
   meetingTitle: string,
-  meetingDescription: string
+  meetingDescription: string,
+  managerEmail?: string
 ): Promise<void> {
   const icsContent = emailService.generateCalendarInvite(
     employeeName,
     managerName,
-    meetingDate
+    meetingDate,
+    60, // duration
+    undefined, // location
+    undefined, // notes
+    employeeEmail,
+    managerEmail
   );
 
   const subject = `Meeting Invitation: ${meetingTitle}`;
@@ -709,7 +723,8 @@ export async function sendMeetingInvite(
     </div>
   `;
 
-  return emailService.sendEmail({
+  // Send to employee
+  await emailService.sendEmail({
     to: employeeEmail,
     subject,
     html,
@@ -721,6 +736,43 @@ export async function sendMeetingInvite(
       },
     ] as any,
   });
+
+  // Send to manager as well if email is provided
+  if (managerEmail) {
+    const managerHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">Performance Review Meeting Scheduled</h2>
+        <p>Dear ${managerName},</p>
+        <p>You have scheduled a one-on-one meeting with ${employeeName} to discuss their performance review.</p>
+        
+        <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #1e40af; margin-top: 0;">Meeting Details</h3>
+          <p><strong>Title:</strong> ${meetingTitle}</p>
+          <p><strong>Date:</strong> ${formattedDate}</p>
+          <p><strong>Time:</strong> ${formattedTime}</p>
+          <p><strong>With:</strong> ${employeeName}</p>
+          <p><strong>Description:</strong> ${meetingDescription}</p>
+        </div>
+        
+        <p>The meeting invitation has been added to your calendar.</p>
+        
+        <p>Best regards,<br>Performance Management System</p>
+      </div>
+    `;
+
+    await emailService.sendEmail({
+      to: managerEmail,
+      subject,
+      html: managerHtml,
+      attachments: [
+        {
+          filename: "meeting-invite.ics",
+          content: icsContent,
+          contentType: "text/calendar",
+        },
+      ] as any,
+    });
+  }
 }
 
 export async function sendEvaluationCompletionNotification(

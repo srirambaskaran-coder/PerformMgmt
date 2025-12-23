@@ -7,8 +7,14 @@ APP_ENV=qc
 # Server Configuration
 PORT=3000
 
-# Session Secret
+# Session Secret (kept for backward compatibility)
 SESSION_SECRET=your-qc-session-secret-change-this
+
+# JWT Configuration
+JWT_SECRET=your-qc-jwt-secret-change-this-to-a-long-random-string
+JWT_REFRESH_SECRET=your-qc-jwt-refresh-secret-change-this-to-a-long-random-string
+JWT_ACCESS_EXPIRY_SECONDS=900
+JWT_REFRESH_EXPIRY_SECONDS=604800
 
 # ===== QC/STAGING DATABASE =====
 DB_SERVER_QC=your-qc-db-server

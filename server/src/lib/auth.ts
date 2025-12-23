@@ -2,8 +2,9 @@ import type { RequestHandler } from "express";
 import { storage } from "./storage";
 import session from "express-session";
 import type { Express } from "express";
+import { verifyAccessToken, extractTokenFromHeader } from "../utils/jwt";
 
-// Simple session-based authentication (replace Replit auth)
+// Setup session for backward compatibility (can be removed once fully migrated to JWT)
 export function setupAuth(app: Express) {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   // Allow overriding secure cookie via env for local development
@@ -27,8 +28,37 @@ export function setupAuth(app: Express) {
   );
 }
 
-// Authentication middleware - checks if user is logged in
+// Authentication middleware - checks JWT token or session
 export const isAuthenticated: RequestHandler = async (req: any, res, next) => {
+  // Try JWT authentication first (preferred for cross-origin)
+  const token = extractTokenFromHeader(req.headers.authorization);
+  
+  if (token) {
+    const payload = verifyAccessToken(token);
+    
+    if (payload) {
+      // Attach user info from JWT
+      try {
+        const user = await storage.getUser(payload.userId);
+        if (!user) {
+          return res.status(401).json({ message: "Unauthorized - User not found" });
+        }
+        req.user = user;
+        return next();
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        return res.status(500).json({ message: "Authentication error" });
+      }
+    }
+    
+    // Token provided but invalid
+    return res.status(401).json({ 
+      message: "Unauthorized - Invalid or expired token",
+      code: "TOKEN_INVALID"
+    });
+  }
+  
+  // Fallback to session-based auth
   if (!req.session || !req.session.userId) {
     return res.status(401).json({ message: "Unauthorized - Please login" });
   }

@@ -6098,7 +6098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Send email notification to employee (if email service is configured)
               try {
                 const { sendAppraisalInitiationEmail } = await import(
-                  "./emailService"
+                  "./lib/emailService"
                 );
                 const dueDate = new Date();
                 dueDate.setDate(dueDate.getDate() + validatedData.daysToClose);
@@ -6370,7 +6370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Send email notification to employee
               try {
                 const { sendAppraisalInitiationEmail } = await import(
-                  "./emailService"
+                  "./lib/emailService"
                 );
                 const dueDate = new Date(calendarDetail.endDate);
                 dueDate.setDate(dueDate.getDate() + daysToClose);
@@ -6816,7 +6816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .map((hrm) => hrm.email as string);
 
             const { sendManagerSubmissionNotification } = await import(
-              "./emailService"
+              "./lib/emailService"
             );
             await sendManagerSubmissionNotification(
               employee.email || "",
@@ -6902,7 +6902,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Send calendar invite
-        const { sendMeetingInvite } = await import("./emailService");
+        const { sendMeetingInvite } = await import("./lib/emailService");
         await sendMeetingInvite(
           employee.email || "",
           `${employee.firstName} ${employee.lastName}`,
@@ -6910,7 +6910,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           new Date(meetingDate),
           meetingTitle || "Performance Review One-on-One Meeting",
           meetingDescription ||
-            "Discussion about your performance review and career development."
+            "Discussion about your performance review and career development.",
+          manager.email || ""
         );
 
         res.json({
@@ -6987,7 +6988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Send calendar invite to both employee and manager using the email service function
-        const { sendCalendarInvite } = await import("./emailService");
+        const { sendCalendarInvite } = await import("./lib/emailService");
         await sendCalendarInvite(
           employee.email || "",
           manager.email || "",
@@ -7142,7 +7143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Send completion notifications
         const { sendEvaluationCompletionNotification } = await import(
-          "./emailService"
+          "./lib/emailService"
         );
 
         // Prepare employee data for email
