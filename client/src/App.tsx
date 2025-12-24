@@ -99,7 +99,10 @@ function Router() {
           <Route path="/meetings" component={Meetings} />
           <Route path="/development-goals" component={DevelopmentGoals} />
           <Route path="/feedback-requests" component={FeedbackRequests} />
-          <Route path="/feedback-requests/:id" component={FeedbackRequestForm} />
+          <Route
+            path="/feedback-requests/:id"
+            component={FeedbackRequestForm}
+          />
           <Route path="/hr-meetings" component={HRMeetingsView} />
           <Route path="/calibrate-ratings" component={CalibrateRatings} />
           <Route path="/analytics" component={Analytics} />

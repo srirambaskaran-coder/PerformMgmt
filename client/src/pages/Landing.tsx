@@ -40,6 +40,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useParams } from "wouter";
 import { API_BASE_URL } from "@/config/api.config";
+import { setStoredUser, setTokens } from "@/hooks/useAuth";
 
 const registrationSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -123,7 +124,8 @@ export default function Landing() {
 
   const onLoginSubmit = async (data: LoginForm) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/login/company`, {
+      // Use JWT auth endpoint
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -132,16 +134,38 @@ export default function Landing() {
 
       if (response.ok) {
         const result = await response.json();
+        console.log("[Landing] Login response:", result);
+
+        // Store JWT tokens (if backend returns them)
+        if (result.accessToken) {
+          setTokens(result.accessToken, result.refreshToken, result.expiresIn);
+          console.log("[Landing] JWT tokens stored");
+        } else {
+          console.log("[Landing] No JWT tokens in response (using session cookies)");
+        }
+
+        // Store user data
+        if (result.user) {
+          setStoredUser(result.user);
+          console.log("[Landing] User stored:", result.user.role || result.user.Role);
+        }
+
         toast({
           title: "Login Successful",
           description: `Welcome back! Redirecting to your dashboard...`,
         });
         setIsLoginOpen(false);
         loginForm.reset();
-        // Use setTimeout to allow toast to show before redirect
+
+        // Log what's stored for debugging
+        console.log("[Landing] Stored accessToken:", localStorage.getItem("pms_access_token"));
+        console.log("[Landing] Stored user:", localStorage.getItem("pms_auth_user"));
+
+        // Force full page reload to pick up new auth state
         setTimeout(() => {
-          window.location.href = "/";
-        }, 1000);
+          console.log("[Landing] Reloading page now...");
+          window.location.reload();
+        }, 2000);
       } else {
         const errorData = await response.json();
         toast({

@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, clearAuthData } from "@/hooks/useAuth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -58,8 +58,10 @@ export function Header() {
     } catch (error) {
       console.error("Logout error:", error);
     }
+    // Clear localStorage auth data
+    clearAuthData();
     // Redirect to login page
-    window.location.href = "/";
+    window.location.href = `${import.meta.env.BASE_URL || "/"}#/`;
   };
 
   // Get active role and available roles from user object

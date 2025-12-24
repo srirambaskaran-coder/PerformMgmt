@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Building, Shield, UserCheck, User } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { API_BASE_URL } from "@/config/api.config";
+import { setStoredUser, setTokens } from "@/hooks/useAuth";
 
 interface TestUser {
   id: string;
@@ -62,8 +63,16 @@ export default function DevLogin() {
         credentials: "include",
         body: JSON.stringify({ userId }),
       }).then((res) => res.json()),
-    onSuccess: () => {
-      window.location.href = "/";
+    onSuccess: (result) => {
+      // Store JWT tokens
+      if (result.accessToken) {
+        setTokens(result.accessToken, result.refreshToken, result.expiresIn);
+      }
+      // Store user data
+      if (result.user) {
+        setStoredUser(result.user);
+      }
+      window.location.reload();
     },
   });
 

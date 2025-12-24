@@ -1,17 +1,11 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { API_BASE_URL } from "@/config/api.config";
-import { getAccessToken } from "@/hooks/useAuth";
-
-// Helper to get Authorization header with JWT token
-function getAuthHeaders(): HeadersInit {
-  const token = getAccessToken();
-  if (token) {
-    return {
-      "Authorization": `Bearer ${token}`,
-    };
-  }
-  return {};
-}
+import {
+  getAccessToken,
+  isTokenExpired,
+  refreshAccessToken,
+  clearAuthData,
+} from "@/hooks/useAuth";
 
 // Helper to build full API URL
 function buildApiUrl(url: string): string {
@@ -22,8 +16,37 @@ function buildApiUrl(url: string): string {
   return `${API_BASE_URL}${cleanUrl}`;
 }
 
+// Helper to get auth headers with JWT token
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
+
+  // Check if token needs refresh
+  if (isTokenExpired()) {
+    console.log("[API] Token expired, attempting refresh...");
+    const refreshed = await refreshAccessToken();
+    if (!refreshed) {
+      console.log("[API] Token refresh failed, user needs to re-login");
+      // Don't clear auth here, let the 401 handler do it
+    }
+  }
+
+  const accessToken = getAccessToken();
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
+  }
+
+  return headers;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    // Handle 401 - clear auth and redirect to login
+    if (res.status === 401) {
+      console.log("[API] Received 401, clearing auth data");
+      clearAuthData();
+      window.location.href = `${import.meta.env.BASE_URL || "/"}#/`;
+      throw new Error("Session expired. Please login again.");
+    }
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
@@ -34,16 +57,15 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined
 ): Promise<Response> {
-  const headers: HeadersInit = {
-    ...getAuthHeaders(),
-    ...(data ? { "Content-Type": "application/json" } : {}),
-  };
-
+  const authHeaders = await getAuthHeaders();
   const res = await fetch(buildApiUrl(url), {
     method,
-    headers,
+    headers: {
+      ...(data ? { "Content-Type": "application/json" } : {}),
+      ...authHeaders,
+    },
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include", // Keep for backward compatibility
+    credentials: "include",
   });
 
   await throwIfResNotOk(res);
@@ -57,16 +79,28 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const url = queryKey.join("/") as string;
+    const authHeaders = await getAuthHeaders();
     const res = await fetch(buildApiUrl(url), {
-      headers: getAuthHeaders(),
       credentials: "include",
+      headers: authHeaders,
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
     }
 
-    await throwIfResNotOk(res);
+    if (res.status === 401) {
+      console.log("[API] Received 401, clearing auth data");
+      clearAuthData();
+      window.location.href = `${import.meta.env.BASE_URL || "/"}#/`;
+      throw new Error("Session expired. Please login again.");
+    }
+
+    if (!res.ok) {
+      const text = (await res.text()) || res.statusText;
+      throw new Error(`${res.status}: ${text}`);
+    }
+
     return await res.json();
   };
 

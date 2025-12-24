@@ -165,9 +165,7 @@ export default function AdminDashboard() {
               <span className="text-xs text-green-600">
                 {metrics?.activeUsers || 0} active
               </span>
-              <span className="text-xs text-muted-foreground">
-                users this week
-              </span>
+              <span className="text-xs text-muted-foreground">users</span>
             </div>
           </CardContent>
         </Card>

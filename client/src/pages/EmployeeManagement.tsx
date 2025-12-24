@@ -522,25 +522,33 @@ export default function EmployeeManagement() {
   const selectedCompanyId = form.watch("companyId");
 
   // Filter locations, departments, levels, grades, and users based on selected company
-  const filteredLocations = isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
-    ? locations.filter((loc: any) => loc.companyId === selectedCompanyId)
-    : locations;
+  const filteredLocations =
+    isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
+      ? locations.filter((loc: any) => loc.companyId === selectedCompanyId)
+      : locations;
 
-  const filteredDepartments = isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
-    ? departments.filter((dept: any) => dept.companyId === selectedCompanyId)
-    : departments;
+  const filteredDepartments =
+    isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
+      ? departments.filter((dept: any) => dept.companyId === selectedCompanyId)
+      : departments;
 
-  const filteredLevels = isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
-    ? levels.filter((level: any) => level.companyId === selectedCompanyId)
-    : levels;
+  const filteredLevels =
+    isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
+      ? levels.filter((level: any) => level.companyId === selectedCompanyId)
+      : levels;
 
-  const filteredGrades = isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
-    ? grades.filter((grade: any) => grade.companyId === selectedCompanyId)
-    : grades;
+  const filteredGrades =
+    isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
+      ? grades.filter((grade: any) => grade.companyId === selectedCompanyId)
+      : grades;
 
-  const filteredManagers = isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
-    ? users.filter((user: any) => user.companyId === selectedCompanyId && user.id !== editingUser?.id)
-    : users.filter((user: any) => user.id !== editingUser?.id);
+  const filteredManagers =
+    isSuperAdmin && selectedCompanyId && selectedCompanyId !== "none"
+      ? users.filter(
+          (user: any) =>
+            user.companyId === selectedCompanyId && user.id !== editingUser?.id
+        )
+      : users.filter((user: any) => user.id !== editingUser?.id);
 
   // Reset dependent fields when company changes (only for super admin)
   useEffect(() => {
@@ -1059,11 +1067,11 @@ export default function EmployeeManagement() {
                               <SelectContent>
                                 <SelectItem value="none">No Manager</SelectItem>
                                 {filteredManagers.map((user: any) => (
-                                    <SelectItem key={user.id} value={user.id}>
-                                      {user.firstName} {user.lastName} (
-                                      {user.email})
-                                    </SelectItem>
-                                  ))}
+                                  <SelectItem key={user.id} value={user.id}>
+                                    {user.firstName} {user.lastName} (
+                                    {user.email})
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <FormMessage />

@@ -108,6 +108,7 @@ interface ManagerReviewData {
 
 interface MeetingSchedule {
   meetingDate: Date;
+  meetingTime: string;
   meetingTitle: string;
   meetingDescription: string;
 }
@@ -150,6 +151,7 @@ export default function ManagerSubmissions() {
   });
   const [meetingData, setMeetingData] = useState<MeetingSchedule>({
     meetingDate: addDays(new Date(), 7),
+    meetingTime: '10:00',
     meetingTitle: 'Performance Review One-on-One',
     meetingDescription: 'Discussion about your performance review and career development.'
   });
@@ -828,24 +830,61 @@ export default function ManagerSubmissions() {
             </DialogHeader>
 
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="meeting-date">Meeting Date & Time</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {meetingData.meetingDate ? format(meetingData.meetingDate, "PPP 'at' p") : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={meetingData.meetingDate}
-                      onSelect={(date) => date && setMeetingData(prev => ({ ...prev, meetingDate: date }))}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="meeting-date">Meeting Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start text-left">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {meetingData.meetingDate ? format(meetingData.meetingDate, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={meetingData.meetingDate}
+                        onSelect={(date) => date && setMeetingData(prev => ({ ...prev, meetingDate: date }))}
+                        initialFocus
+                        disabled={(date) => date < new Date()}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <Label htmlFor="meeting-time">Meeting Time</Label>
+                  <Select
+                    value={meetingData.meetingTime}
+                    onValueChange={(value) => setMeetingData(prev => ({ ...prev, meetingTime: value }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="08:00">8:00 AM</SelectItem>
+                      <SelectItem value="08:30">8:30 AM</SelectItem>
+                      <SelectItem value="09:00">9:00 AM</SelectItem>
+                      <SelectItem value="09:30">9:30 AM</SelectItem>
+                      <SelectItem value="10:00">10:00 AM</SelectItem>
+                      <SelectItem value="10:30">10:30 AM</SelectItem>
+                      <SelectItem value="11:00">11:00 AM</SelectItem>
+                      <SelectItem value="11:30">11:30 AM</SelectItem>
+                      <SelectItem value="12:00">12:00 PM</SelectItem>
+                      <SelectItem value="12:30">12:30 PM</SelectItem>
+                      <SelectItem value="13:00">1:00 PM</SelectItem>
+                      <SelectItem value="13:30">1:30 PM</SelectItem>
+                      <SelectItem value="14:00">2:00 PM</SelectItem>
+                      <SelectItem value="14:30">2:30 PM</SelectItem>
+                      <SelectItem value="15:00">3:00 PM</SelectItem>
+                      <SelectItem value="15:30">3:30 PM</SelectItem>
+                      <SelectItem value="16:00">4:00 PM</SelectItem>
+                      <SelectItem value="16:30">4:30 PM</SelectItem>
+                      <SelectItem value="17:00">5:00 PM</SelectItem>
+                      <SelectItem value="17:30">5:30 PM</SelectItem>
+                      <SelectItem value="18:00">6:00 PM</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div>
                 <Label htmlFor="meeting-title">Meeting Title</Label>
@@ -873,9 +912,17 @@ export default function ManagerSubmissions() {
               <Button
                 onClick={() => {
                   if (selectedEvaluation) {
+                    // Combine date and time into a single Date object
+                    const [hours, minutes] = meetingData.meetingTime.split(':').map(Number);
+                    const combinedDateTime = new Date(meetingData.meetingDate);
+                    combinedDateTime.setHours(hours, minutes, 0, 0);
+                    
                     scheduleMeetingMutation.mutate({
                       evaluationId: selectedEvaluation.id,
-                      meetingData
+                      meetingData: {
+                        ...meetingData,
+                        meetingDate: combinedDateTime
+                      }
                     });
                   }
                 }}

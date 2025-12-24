@@ -7,7 +7,7 @@ import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
 
 export default function Dashboard() {
   const { user } = useAuth();
-  
+
   if (!user) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -18,25 +18,34 @@ export default function Dashboard() {
     );
   }
 
-  // Render role-specific dashboard based on active role (or fallback to default role)
-  const currentRole = user.activeRole || user.role;
+  // Handle both uppercase (from API) and lowercase (from schema) property names
+  const userAny = user as any;
+  const currentRole =
+    userAny.activeRole || userAny.ActiveRole || userAny.role || userAny.Role;
+
+  console.log("[Dashboard] User:", user, "Current role:", currentRole);
+
   switch (currentRole) {
-    case 'super_admin':
+    case "super_admin":
       return <SuperAdminDashboard />;
-    case 'admin':
+    case "admin":
       return <AdminDashboard />;
-    case 'hr_manager':
+    case "hr_manager":
       return <HRManagerDashboard />;
-    case 'manager':
+    case "manager":
       return <ManagerDashboard />;
-    case 'employee':
+    case "employee":
       return <EmployeeDashboard />;
     default:
       return (
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <p className="text-muted-foreground">Dashboard not available for your role.</p>
-            <p className="text-sm text-muted-foreground mt-1">Please contact your administrator.</p>
+            <p className="text-muted-foreground">
+              Dashboard not available for your role.
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Please contact your administrator.
+            </p>
           </div>
         </div>
       );
