@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./lib/storage";
 import { setupAuth, isAuthenticated, requireRoles } from "./lib/auth";
+import { generateTokens, verifyRefreshToken } from "./utils/jwt";
 import { z } from "zod";
 import {
   insertUserSchema,
@@ -64,7 +65,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup session-based authentication
   setupAuth(app);
 
-  // Login endpoint
+  // Login endpoint - Returns JWT tokens
   app.post("/api/auth/login", async (req: any, res) => {
     try {
       const { email, password } = req.body;
@@ -84,9 +85,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // TODO: Verify password hash - for now just check if password matches
       // In production, use bcrypt to compare password with user.password hash
 
-      // Set session
-      req.session.userId = user.id;
-      req.session.activeRole = user.role;
+      // Generate JWT tokens
+      const tokens = generateTokens({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        roles: user.roles,
+        companyId: user.companyId,
+      });
 
       res.json({
         message: "Login successful",
@@ -98,10 +104,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: user.role,
           roles: user.roles,
         },
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: tokens.expiresIn,
       });
     } catch (error: unknown) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Refresh token endpoint - Issues new access token using refresh token
+  app.post("/api/auth/refresh", async (req: any, res) => {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(400).json({ message: "Refresh token required" });
+      }
+
+      // Verify refresh token
+      const payload = verifyRefreshToken(refreshToken);
+
+      if (!payload) {
+        return res.status(401).json({ 
+          message: "Invalid or expired refresh token",
+          code: "REFRESH_TOKEN_INVALID"
+        });
+      }
+
+      // Get user from database
+      const user = await storage.getUser(payload.userId);
+
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Generate new tokens
+      const tokens = generateTokens({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        roles: user.roles,
+        companyId: user.companyId,
+      });
+
+      res.json({
+        message: "Token refreshed successfully",
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: tokens.expiresIn,
+      });
+    } catch (error: unknown) {
+      console.error("Token refresh error:", error);
+      res.status(500).json({ message: "Token refresh failed" });
     }
   });
 
@@ -6461,7 +6517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
-    // Development login endpoint to bypass OAuth
+    // Development login endpoint to bypass OAuth - Returns JWT tokens
     app.post("/api/dev/login", async (req, res) => {
       try {
         const { userId } = req.body;
@@ -6476,27 +6532,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "User not found" });
         }
 
-        // Set the user in the session (mimicking OAuth flow)
-        const expires_at = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60; // 7 days from now
-
-        (req.session as any).passport = {
-          user: {
-            id: user.id,
-            claims: {
-              sub: user.id,
-              email: user.email,
-              first_name: user.firstName,
-              last_name: user.lastName,
-              exp: expires_at,
-            },
-            expires_at: expires_at,
-            access_token: "dev-token",
-            refresh_token: "dev-refresh-token",
-          },
-        };
-
-        // Mark request as authenticated for immediate use
-        (req as any).user = (req.session as any).passport.user;
+        // Generate JWT tokens
+        const tokens = generateTokens({
+          userId: user.id,
+          email: user.email,
+          role: user.role,
+          roles: user.roles,
+          companyId: user.companyId,
+        });
 
         res.json({
           message: "Logged in successfully",
@@ -6507,6 +6550,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lastName: user.lastName,
             role: user.role,
           },
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresIn: tokens.expiresIn,
         });
       } catch (error: unknown) {
         console.error("Error in dev login:", error);
