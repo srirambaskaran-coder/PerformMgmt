@@ -127,9 +127,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const payload = verifyRefreshToken(refreshToken);
 
       if (!payload) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           message: "Invalid or expired refresh token",
-          code: "REFRESH_TOKEN_INVALID"
+          code: "REFRESH_TOKEN_INVALID",
         });
       }
 
