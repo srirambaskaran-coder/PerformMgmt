@@ -13,14 +13,18 @@ export function getEnvType(): Environment {
   const origin = window.location.origin;
   const hostname = window.location.hostname;
 
-  // Development: localhost or 127.0.0.1
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
+  // Development: localhost, 127.0.0.1, or smeqc (dev server)
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname.includes("smeqc")
+  ) {
     return "development";
   }
 
-  // QC: check for qc/staging in hostname or specific domains
+  // QC: check for qc/staging in hostname or specific domains (but not smeqc which is dev)
   if (
-    hostname.includes("qc") ||
+    (hostname.includes("qc") && !hostname.includes("smeqc")) ||
     hostname.includes("staging") ||
     hostname.includes("test")
   ) {

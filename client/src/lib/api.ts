@@ -1,4 +1,16 @@
 import { API_BASE_URL, API_TIMEOUT, getApiUrl } from '@/config/api.config';
+import { getAccessToken } from '@/hooks/useAuth';
+
+// Helper to get Authorization header with JWT token
+function getAuthHeaders(): HeadersInit {
+  const token = getAccessToken();
+  if (token) {
+    return {
+      'Authorization': `Bearer ${token}`,
+    };
+  }
+  return {};
+}
 
 // Configure axios or fetch with environment-based URL
 export const apiClient = {
@@ -7,9 +19,10 @@ export const apiClient = {
     const response = await fetch(url, {
       ...options,
       method: 'GET',
-      credentials: 'include', // Important for session cookies
+      credentials: 'include', // Keep for backward compatibility
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
         ...options.headers,
       },
     });
@@ -29,6 +42,7 @@ export const apiClient = {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
         ...options.headers,
       },
       body: data ? JSON.stringify(data) : undefined,
@@ -49,6 +63,7 @@ export const apiClient = {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
         ...options.headers,
       },
       body: data ? JSON.stringify(data) : undefined,
@@ -69,6 +84,7 @@ export const apiClient = {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
         ...options.headers,
       },
     });

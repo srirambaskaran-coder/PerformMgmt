@@ -1,5 +1,17 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { API_BASE_URL } from "@/config/api.config";
+import { getAccessToken } from "@/hooks/useAuth";
+
+// Helper to get Authorization header with JWT token
+function getAuthHeaders(): HeadersInit {
+  const token = getAccessToken();
+  if (token) {
+    return {
+      "Authorization": `Bearer ${token}`,
+    };
+  }
+  return {};
+}
 
 // Helper to build full API URL
 function buildApiUrl(url: string): string {
@@ -22,11 +34,16 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined
 ): Promise<Response> {
+  const headers: HeadersInit = {
+    ...getAuthHeaders(),
+    ...(data ? { "Content-Type": "application/json" } : {}),
+  };
+
   const res = await fetch(buildApiUrl(url), {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
+    credentials: "include", // Keep for backward compatibility
   });
 
   await throwIfResNotOk(res);
@@ -41,6 +58,7 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const url = queryKey.join("/") as string;
     const res = await fetch(buildApiUrl(url), {
+      headers: getAuthHeaders(),
       credentials: "include",
     });
 
