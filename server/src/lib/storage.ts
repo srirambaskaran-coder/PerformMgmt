@@ -592,25 +592,84 @@ function mapRawFeedbackRequest(raw: any): FeedbackRequest {
     requesterId: raw.RequesterId ?? raw.requester_id ?? raw.requesterId,
     reviewerId: raw.ReviewerId ?? raw.reviewer_id ?? raw.reviewerId ?? null,
     subjectId: raw.SubjectId ?? raw.subject_id ?? raw.subjectId,
-    evaluationId: raw.EvaluationId ?? raw.evaluation_id ?? raw.evaluationId ?? null,
-    appraisalCycleId: raw.AppraisalCycleId ?? raw.appraisal_cycle_id ?? raw.appraisalCycleId ?? null,
-    externalEmail: raw.ExternalEmail ?? raw.external_email ?? raw.externalEmail ?? null,
+    evaluationId:
+      raw.EvaluationId ?? raw.evaluation_id ?? raw.evaluationId ?? null,
+    appraisalCycleId:
+      raw.AppraisalCycleId ??
+      raw.appraisal_cycle_id ??
+      raw.appraisalCycleId ??
+      null,
+    externalEmail:
+      raw.ExternalEmail ?? raw.external_email ?? raw.externalEmail ?? null,
     status: raw.Status ?? raw.status ?? "pending",
-    dueDate: raw.DueDate ? new Date(raw.DueDate) : raw.due_date ? new Date(raw.due_date) : null,
-    relationshipWithPeer: raw.RelationshipWithPeer ?? raw.relationship_with_peer ?? raw.relationshipWithPeer ?? null,
-    collaborationRating: raw.CollaborationRating ?? raw.collaboration_rating ?? raw.collaborationRating ?? null,
-    communicationRating: raw.CommunicationRating ?? raw.communication_rating ?? raw.communicationRating ?? null,
-    reliabilityRating: raw.ReliabilityRating ?? raw.reliability_rating ?? raw.reliabilityRating ?? null,
-    problemSolvingRating: raw.ProblemSolvingRating ?? raw.problem_solving_rating ?? raw.problemSolvingRating ?? null,
-    ownershipRating: raw.OwnershipRating ?? raw.ownership_rating ?? raw.ownershipRating ?? null,
-    opennessToFeedbackRating: raw.OpennessToFeedbackRating ?? raw.openness_to_feedback_rating ?? raw.opennessToFeedbackRating ?? null,
-    conflictHandlingRating: raw.ConflictHandlingRating ?? raw.conflict_handling_rating ?? raw.conflictHandlingRating ?? null,
-    jobSpecificCompetencies: raw.JobSpecificCompetencies ?? raw.job_specific_competencies ?? raw.jobSpecificCompetencies ?? null,
+    dueDate: raw.DueDate
+      ? new Date(raw.DueDate)
+      : raw.due_date
+      ? new Date(raw.due_date)
+      : null,
+    relationshipWithPeer:
+      raw.RelationshipWithPeer ??
+      raw.relationship_with_peer ??
+      raw.relationshipWithPeer ??
+      null,
+    collaborationRating:
+      raw.CollaborationRating ??
+      raw.collaboration_rating ??
+      raw.collaborationRating ??
+      null,
+    communicationRating:
+      raw.CommunicationRating ??
+      raw.communication_rating ??
+      raw.communicationRating ??
+      null,
+    reliabilityRating:
+      raw.ReliabilityRating ??
+      raw.reliability_rating ??
+      raw.reliabilityRating ??
+      null,
+    problemSolvingRating:
+      raw.ProblemSolvingRating ??
+      raw.problem_solving_rating ??
+      raw.problemSolvingRating ??
+      null,
+    ownershipRating:
+      raw.OwnershipRating ??
+      raw.ownership_rating ??
+      raw.ownershipRating ??
+      null,
+    opennessToFeedbackRating:
+      raw.OpennessToFeedbackRating ??
+      raw.openness_to_feedback_rating ??
+      raw.opennessToFeedbackRating ??
+      null,
+    conflictHandlingRating:
+      raw.ConflictHandlingRating ??
+      raw.conflict_handling_rating ??
+      raw.conflictHandlingRating ??
+      null,
+    jobSpecificCompetencies:
+      raw.JobSpecificCompetencies ??
+      raw.job_specific_competencies ??
+      raw.jobSpecificCompetencies ??
+      null,
     strengths: raw.Strengths ?? raw.strengths ?? null,
-    developmentAreas: raw.DevelopmentAreas ?? raw.development_areas ?? raw.developmentAreas ?? null,
-    overallSummary: raw.OverallSummary ?? raw.overall_summary ?? raw.overallSummary ?? null,
-    recommendedRating: raw.RecommendedRating ?? raw.recommended_rating ?? raw.recommendedRating ?? null,
-    submittedAt: raw.SubmittedAt ? new Date(raw.SubmittedAt) : raw.submitted_at ? new Date(raw.submitted_at) : null,
+    developmentAreas:
+      raw.DevelopmentAreas ??
+      raw.development_areas ??
+      raw.developmentAreas ??
+      null,
+    overallSummary:
+      raw.OverallSummary ?? raw.overall_summary ?? raw.overallSummary ?? null,
+    recommendedRating:
+      raw.RecommendedRating ??
+      raw.recommended_rating ??
+      raw.recommendedRating ??
+      null,
+    submittedAt: raw.SubmittedAt
+      ? new Date(raw.SubmittedAt)
+      : raw.submitted_at
+      ? new Date(raw.submitted_at)
+      : null,
     createdAt: raw.CreatedAt ?? raw.created_at ?? raw.createdAt ?? null,
     updatedAt: raw.UpdatedAt ?? raw.updated_at ?? raw.updatedAt ?? null,
   } as FeedbackRequest;
@@ -732,6 +791,10 @@ export interface IStorage {
     id: string,
     template: Partial<InsertQuestionnaireTemplate>,
     companyId?: string
+  ): Promise<QuestionnaireTemplate>;
+  copyQuestionnaireTemplate(
+    id: string,
+    createdById: string
   ): Promise<QuestionnaireTemplate>;
   deleteQuestionnaireTemplate(id: string, companyId?: string): Promise<void>;
 
@@ -1065,11 +1128,19 @@ export interface IStorage {
   getTeamMemberDevelopmentGoals(managerId: string): Promise<DevelopmentGoal[]>;
 
   // Feedback Request operations
-  getFeedbackRequestsForReviewer(reviewerId: string): Promise<FeedbackRequest[]>;
+  getFeedbackRequestsForReviewer(
+    reviewerId: string
+  ): Promise<FeedbackRequest[]>;
   getFeedbackRequestsForSubject(subjectId: string): Promise<FeedbackRequest[]>;
   getFeedbackRequest(id: string): Promise<FeedbackRequest | undefined>;
-  createFeedbackRequest(request: InsertFeedbackRequest): Promise<FeedbackRequest>;
-  submitFeedbackRequest(id: string, reviewerId: string, feedback: SubmitFeedback): Promise<FeedbackRequest>;
+  createFeedbackRequest(
+    request: InsertFeedbackRequest
+  ): Promise<FeedbackRequest>;
+  submitFeedbackRequest(
+    id: string,
+    reviewerId: string,
+    feedback: SubmitFeedback
+  ): Promise<FeedbackRequest>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1918,6 +1989,54 @@ export class DatabaseStorage implements IStorage {
         .execute("dbo.DeleteQuestionnaireTemplate");
     } catch {}
   }
+
+  async copyQuestionnaireTemplate(
+    id: string,
+    createdById: string
+  ): Promise<QuestionnaireTemplate> {
+    // First, get the original template
+    const originalTemplate = await this.getQuestionnaireTemplate(id);
+    if (!originalTemplate) {
+      throw new Error("Template not found");
+    }
+
+    // Create a copy with modified name and new creator
+    const copyData: InsertQuestionnaireTemplate = {
+      name: `${originalTemplate.name} (Copy)`,
+      description: originalTemplate.description,
+      status: originalTemplate.status,
+    };
+
+    // Use createQuestionnaireTemplate with all the original template's properties
+    const pool = await getPool();
+    const req = pool
+      .request()
+      .input("Name", copyData.name)
+      .input("Description", copyData.description || null)
+      .input("TargetRole", originalTemplate.targetRole || null)
+      .input(
+        "Questions",
+        originalTemplate.questions
+          ? JSON.stringify(originalTemplate.questions)
+          : JSON.stringify([])
+      )
+      .input("Year", originalTemplate.year || null)
+      .input("CompanyId", originalTemplate.companyId || null)
+      .input("Status", originalTemplate.status || "active")
+      .input("ApplicableCategory", originalTemplate.applicableCategory || null)
+      .input("ApplicableLevelId", originalTemplate.applicableLevelId || null)
+      .input("ApplicableGradeId", originalTemplate.applicableGradeId || null)
+      .input(
+        "ApplicableLocationId",
+        originalTemplate.applicableLocationId || null
+      )
+      .input("SendOnMail", originalTemplate.sendOnMail || false)
+      .input("CreatedById", createdById);
+
+    const result = await req.execute("dbo.CreateQuestionnaireTemplate");
+    return (await this.getQuestionnaireTemplate(result.recordset[0].Id))!;
+  }
+
   async getQuestionnaireTemplatesByYear(
     year: number
   ): Promise<QuestionnaireTemplate[]> {
@@ -3669,7 +3788,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ---------- Feedback Request Operations ----------
-  async getFeedbackRequestsForReviewer(reviewerId: string): Promise<FeedbackRequest[]> {
+  async getFeedbackRequestsForReviewer(
+    reviewerId: string
+  ): Promise<FeedbackRequest[]> {
     const pool = await getPool();
     try {
       const result = await pool
@@ -3682,7 +3803,9 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getFeedbackRequestsForSubject(subjectId: string): Promise<FeedbackRequest[]> {
+  async getFeedbackRequestsForSubject(
+    subjectId: string
+  ): Promise<FeedbackRequest[]> {
     const pool = await getPool();
     try {
       const result = await pool
@@ -3709,7 +3832,9 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createFeedbackRequest(request: InsertFeedbackRequest): Promise<FeedbackRequest> {
+  async createFeedbackRequest(
+    request: InsertFeedbackRequest
+  ): Promise<FeedbackRequest> {
     const pool = await getPool();
     const req = pool
       .request()
