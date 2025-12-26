@@ -16,33 +16,56 @@ export function getEnvironment(): Environment {
   return 'development';
 }
 
-// CORS allowed origins for each environment
-const allowedOrigins: Record<Environment, string[]> = {
-  development: [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:4173',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:4173',
-  ],
-  qc: [
-    'http://your-qc-frontend-url.com',
-    'https://your-qc-frontend-url.com',
-  ],
-  production: [
-    'https://your-prod-frontend-url.com',
-  ],
-};
+// Get allowed origins from environment variable or use defaults
+function getOriginsForEnvironment(env: Environment): string[] {
+  // Allow custom origins via environment variable (comma-separated)
+  const customOrigins = process.env.CORS_ALLOWED_ORIGINS;
+  if (customOrigins) {
+    return customOrigins.split(',').map(origin => origin.trim());
+  }
+
+  // Default origins per environment
+  const defaultOrigins: Record<Environment, string[]> = {
+    development: [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:4173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:3001',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:5174',
+      'http://127.0.0.1:4173',
+    ],
+    qc: [
+      'http://your-qc-frontend-url.com',
+      'https://your-qc-frontend-url.com',
+    ],
+    production: [
+      'https://your-prod-frontend-url.com',
+    ],
+  };
+
+  return defaultOrigins[env];
+}
 
 export function getCorsOptions(): CorsOptions {
   const env = getEnvironment();
-  const origins = allowedOrigins[env];
+  const origins = getOriginsForEnvironment(env);
+
+  // In development, allow all origins for easier testing
+  const allowAllInDev = process.env.CORS_ALLOW_ALL === 'true' || env === 'development';
 
   return {
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) {
+        return callback(null, true);
+      }
+
+      // In development with CORS_ALLOW_ALL, accept any origin
+      if (allowAllInDev) {
         return callback(null, true);
       }
 
