@@ -6,7 +6,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/Layout";
-import { SystemErrorProvider, useSystemError } from "@/contexts/SystemErrorContext";
+import {
+  SystemErrorProvider,
+  useSystemError,
+} from "@/contexts/SystemErrorContext";
 import { SystemErrorModal } from "@/components/SystemErrorModal";
 import { useEffect } from "react";
 import NotFound from "@/pages/not-found";

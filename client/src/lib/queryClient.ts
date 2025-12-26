@@ -108,7 +108,7 @@ export const getQueryFn: <T>(options: {
 
     if (!res.ok) {
       const text = (await res.text()) || res.statusText;
-      
+
       // Trigger system error modal for 500+ errors
       if (res.status >= 500 && systemErrorHandler) {
         systemErrorHandler(
@@ -116,7 +116,7 @@ export const getQueryFn: <T>(options: {
           `Server error (${res.status}): Unable to communicate with the server. Please try again later.`
         );
       }
-      
+
       throw new Error(`${res.status}: ${text}`);
     }
 

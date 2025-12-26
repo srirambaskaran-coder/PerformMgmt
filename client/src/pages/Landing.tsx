@@ -141,13 +141,18 @@ export default function Landing() {
           setTokens(result.accessToken, result.refreshToken, result.expiresIn);
           console.log("[Landing] JWT tokens stored");
         } else {
-          console.log("[Landing] No JWT tokens in response (using session cookies)");
+          console.log(
+            "[Landing] No JWT tokens in response (using session cookies)"
+          );
         }
 
         // Store user data
         if (result.user) {
           setStoredUser(result.user);
-          console.log("[Landing] User stored:", result.user.role || result.user.Role);
+          console.log(
+            "[Landing] User stored:",
+            result.user.role || result.user.Role
+          );
         }
 
         toast({
@@ -158,8 +163,14 @@ export default function Landing() {
         loginForm.reset();
 
         // Log what's stored for debugging
-        console.log("[Landing] Stored accessToken:", localStorage.getItem("pms_access_token"));
-        console.log("[Landing] Stored user:", localStorage.getItem("pms_auth_user"));
+        console.log(
+          "[Landing] Stored accessToken:",
+          localStorage.getItem("pms_access_token")
+        );
+        console.log(
+          "[Landing] Stored user:",
+          localStorage.getItem("pms_auth_user")
+        );
 
         // Redirect to dashboard with page reload to refresh auth state
         setTimeout(() => {

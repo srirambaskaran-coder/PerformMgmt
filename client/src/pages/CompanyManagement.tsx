@@ -460,7 +460,8 @@ export default function CompanyManagement() {
                               onUpload={handleFileUpload}
                             />
                             <p className="text-xs text-muted-foreground">
-                              Maximum file size: 2MB. Recommended: Square image (200x200px or larger)
+                              Maximum file size: 2MB. Recommended: Square image
+                              (200x200px or larger)
                             </p>
 
                             {/* OR Divider */}
@@ -634,17 +635,24 @@ export default function CompanyManagement() {
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteCompanyId} onOpenChange={(open) => !open && setDeleteCompanyId(null)}>
+      <AlertDialog
+        open={!!deleteCompanyId}
+        onOpenChange={(open) => !open && setDeleteCompanyId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Company</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this company? This action cannot be undone.
+              Are you sure you want to delete this company? This action cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
