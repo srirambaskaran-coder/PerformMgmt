@@ -161,11 +161,12 @@ export default function Landing() {
         console.log("[Landing] Stored accessToken:", localStorage.getItem("pms_access_token"));
         console.log("[Landing] Stored user:", localStorage.getItem("pms_auth_user"));
 
-        // Force full page reload to pick up new auth state
+        // Redirect to dashboard with page reload to refresh auth state
         setTimeout(() => {
-          console.log("[Landing] Reloading page now...");
+          console.log("[Landing] Redirecting to dashboard...");
+          window.location.href = `${import.meta.env.BASE_URL || "/"}#/`;
           window.location.reload();
-        }, 2000);
+        }, 1000);
       } else {
         const errorData = await response.json();
         toast({

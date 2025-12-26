@@ -7,6 +7,16 @@ import {
   clearAuthData,
 } from "@/hooks/useAuth";
 
+// Global error handler for system-wide errors
+let systemErrorHandler: ((error: boolean, message?: string) => void) | null =
+  null;
+
+export function setSystemErrorHandler(
+  handler: (error: boolean, message?: string) => void
+) {
+  systemErrorHandler = handler;
+}
+
 // Helper to build full API URL
 function buildApiUrl(url: string): string {
   if (url.startsWith("http://") || url.startsWith("https://")) {
@@ -98,6 +108,15 @@ export const getQueryFn: <T>(options: {
 
     if (!res.ok) {
       const text = (await res.text()) || res.statusText;
+      
+      // Trigger system error modal for 500+ errors
+      if (res.status >= 500 && systemErrorHandler) {
+        systemErrorHandler(
+          true,
+          `Server error (${res.status}): Unable to communicate with the server. Please try again later.`
+        );
+      }
+      
       throw new Error(`${res.status}: ${text}`);
     }
 
@@ -112,9 +131,27 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       staleTime: Infinity,
       retry: false,
+      onError: (error: any) => {
+        // Check if error is a 500+ server error
+        if (error?.message?.match(/^5\d{2}:/) && systemErrorHandler) {
+          systemErrorHandler(
+            true,
+            "The system is experiencing technical difficulties. Please contact support if the issue persists."
+          );
+        }
+      },
     },
     mutations: {
       retry: false,
+      onError: (error: any) => {
+        // Check if error is a 500+ server error
+        if (error?.message?.match(/^5\d{2}:/) && systemErrorHandler) {
+          systemErrorHandler(
+            true,
+            "The system is experiencing technical difficulties. Please contact support if the issue persists."
+          );
+        }
+      },
     },
   },
 });

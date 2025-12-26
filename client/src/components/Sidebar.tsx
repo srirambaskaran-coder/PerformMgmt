@@ -2,6 +2,7 @@
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/SidebarContext";
+import { useQuery } from "@tanstack/react-query";
 import {
   Building,
   ChartPie,
@@ -176,6 +177,13 @@ export function Sidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
 
+  // Fetch company data if user has a companyId
+  const companyId = (user as any)?.companyId;
+  const { data: company } = useQuery({
+    queryKey: ["/api/companies", companyId],
+    enabled: !!companyId,
+  });
+
   // Use active role from session for role switching support
   const activeRole =
     (user as any)?.activeRole || (user as any)?.role || "employee";
@@ -206,13 +214,32 @@ export function Sidebar() {
             collapsed ? "justify-center" : "gap-3"
           )}
         >
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shrink-0">
-            <Building className="h-5 w-5 text-primary-foreground" />
-          </div>
+          {(company as any)?.logoUrl ? (
+            <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-background border border-border">
+              <img
+                src={(company as any).logoUrl}
+                alt={(company as any)?.name || "Company Logo"}
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  // Fallback to default icon if image fails to load
+                  e.currentTarget.style.display = "none";
+                  e.currentTarget.parentElement!.innerHTML = `
+                    <div class="w-full h-full bg-primary rounded-lg flex items-center justify-center">
+                      <svg class="h-5 w-5 text-primary-foreground" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    </div>
+                  `;
+                }}
+              />
+            </div>
+          ) : (
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shrink-0">
+              <Building className="h-5 w-5 text-primary-foreground" />
+            </div>
+          )}
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <h2 className="font-semibold text-foreground text-sm truncate">
-                Performance Hub
+                {(company as any)?.name || "Performance Hub"}
               </h2>
               <p className="text-xs text-muted-foreground truncate">
                 Employee Management

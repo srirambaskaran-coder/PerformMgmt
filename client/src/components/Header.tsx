@@ -60,8 +60,11 @@ export function Header() {
     }
     // Clear localStorage auth data
     clearAuthData();
-    // Redirect to login page
-    window.location.href = `${import.meta.env.BASE_URL || "/"}#/`;
+    // Clear query cache
+    queryClient.clear();
+    // Force redirect to login page with page reload
+    window.location.href = `${import.meta.env.BASE_URL || "/"}#/login`;
+    window.location.reload();
   };
 
   // Get active role and available roles from user object

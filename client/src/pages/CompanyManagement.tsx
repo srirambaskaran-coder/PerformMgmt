@@ -448,7 +448,7 @@ export default function CompanyManagement() {
                           <div className="border rounded-lg p-4 space-y-4">
                             {/* Option 1: Upload File */}
                             <FileDropzone
-                              maxFileSize={5242880}
+                              maxFileSize={2097152}
                               acceptedFileTypes={[
                                 "image/png",
                                 "image/jpeg",
@@ -459,6 +459,9 @@ export default function CompanyManagement() {
                               onFileSelect={() => {}}
                               onUpload={handleFileUpload}
                             />
+                            <p className="text-xs text-muted-foreground">
+                              Maximum file size: 2MB. Recommended: Square image (200x200px or larger)
+                            </p>
 
                             {/* OR Divider */}
                             <div className="relative">

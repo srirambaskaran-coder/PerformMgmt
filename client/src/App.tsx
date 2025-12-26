@@ -1,11 +1,14 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
-import { queryClient } from "./lib/queryClient";
+import { queryClient, setSystemErrorHandler } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/Layout";
+import { SystemErrorProvider, useSystemError } from "@/contexts/SystemErrorContext";
+import { SystemErrorModal } from "@/components/SystemErrorModal";
+import { useEffect } from "react";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import DevLogin from "@/pages/DevLogin";
@@ -116,10 +119,27 @@ function Router() {
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { hasSystemError, errorMessage, setSystemError, clearSystemError } =
+    useSystemError();
+
+  // Register system error handler
+  useEffect(() => {
+    setSystemErrorHandler(setSystemError);
+  }, [setSystemError]);
+
+  const handleRetry = () => {
+    clearSystemError();
+    window.location.reload();
+  };
 
   return (
     <>
       <Toaster />
+      <SystemErrorModal
+        isOpen={hasSystemError}
+        errorMessage={errorMessage}
+        onRetry={handleRetry}
+      />
       {isLoading || !isAuthenticated ? (
         <Router />
       ) : (
@@ -134,11 +154,13 @@ function AppContent() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter hook={useHashLocation}>
-          <AppContent />
-        </WouterRouter>
-      </TooltipProvider>
+      <SystemErrorProvider>
+        <TooltipProvider>
+          <WouterRouter hook={useHashLocation}>
+            <AppContent />
+          </WouterRouter>
+        </TooltipProvider>
+      </SystemErrorProvider>
     </QueryClientProvider>
   );
 }
