@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { API_BASE_URL } from "@/config/api.config";
 import {
   Card,
   CardContent,
@@ -209,26 +210,28 @@ export default function CompanyManagement() {
 
   const handleFileUpload = async (file: File) => {
     try {
-      // Get presigned URL
-      const response = await apiRequest("POST", "/api/objects/upload");
-      const data = await response.json();
-      const uploadURL = data.uploadURL;
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      formData.append("logo", file);
 
-      // Upload file directly to S3
-      await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
+      // Upload file to backend
+      const response = await fetch(`${API_BASE_URL}/api/companies/upload-logo`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
         headers: {
-          "Content-Type": file.type,
+          Authorization: `Bearer ${localStorage.getItem("pms_access_token")}`,
         },
       });
 
-      // Update the logo URL in the backend
-      const logoResponse = await apiRequest("PUT", "/api/company-logos", {
-        logoURL: uploadURL,
-      });
-      const logoData = await logoResponse.json();
-      form.setValue("logoUrl", logoData.objectPath);
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const data = await response.json();
+      
+      // Set the logo URL returned by backend
+      form.setValue("logoUrl", data.logoUrl);
 
       toast({
         title: "Success",
