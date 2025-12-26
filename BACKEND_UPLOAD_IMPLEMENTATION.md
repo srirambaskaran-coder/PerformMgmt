@@ -3,6 +3,7 @@
 This document provides the backend implementation for handling company logo uploads without S3.
 
 ## Overview
+
 Files are stored locally on the server in an `uploads/logos/` directory and served via a static file endpoint.
 
 ## Implementation Steps
@@ -17,13 +18,13 @@ npm install --save-dev @types/multer
 ### 2. Create Upload Configuration (src/config/upload.ts)
 
 ```typescript
-import multer from 'multer';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs';
+import multer from "multer";
+import path from "path";
+import { v4 as uuidv4 } from "uuid";
+import fs from "fs";
 
 // Ensure upload directory exists
-const uploadDir = path.join(process.cwd(), 'uploads', 'logos');
+const uploadDir = path.join(process.cwd(), "uploads", "logos");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -42,13 +43,27 @@ const storage = multer.diskStorage({
 });
 
 // File filter for images only
-const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
-  
+const fileFilter = (
+  req: any,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml",
+  ];
+
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only JPEG, PNG, GIF, WebP, and SVG images are allowed.'));
+    cb(
+      new Error(
+        "Invalid file type. Only JPEG, PNG, GIF, WebP, and SVG images are allowed."
+      )
+    );
   }
 };
 
@@ -69,26 +84,28 @@ export const UPLOAD_DIR = uploadDir;
 Add this route to your companies router:
 
 ```typescript
-import express from 'express';
-import { logoUpload } from '../config/upload';
-import { authenticateJWT } from '../middleware/auth';
-import path from 'path';
+import express from "express";
+import { logoUpload } from "../config/upload";
+import { authenticateJWT } from "../middleware/auth";
+import path from "path";
 
 const router = express.Router();
 
 // Upload logo endpoint
 router.post(
-  '/companies/upload-logo',
+  "/companies/upload-logo",
   authenticateJWT,
-  logoUpload.single('logo'),
+  logoUpload.single("logo"),
   async (req, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
+        return res.status(400).json({ error: "No file uploaded" });
       }
 
       // Generate the public URL for the uploaded file
-      const baseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+      const baseUrl =
+        process.env.API_BASE_URL ||
+        `http://localhost:${process.env.PORT || 3000}`;
       const logoUrl = `${baseUrl}/uploads/logos/${req.file.filename}`;
 
       res.json({
@@ -98,8 +115,8 @@ router.post(
         size: req.file.size,
       });
     } catch (error) {
-      console.error('Logo upload error:', error);
-      res.status(500).json({ error: 'Failed to upload logo' });
+      console.error("Logo upload error:", error);
+      res.status(500).json({ error: "Failed to upload logo" });
     }
   }
 );
@@ -112,13 +129,13 @@ export default router;
 Add this to your main server file to serve uploaded files:
 
 ```typescript
-import express from 'express';
-import path from 'path';
+import express from "express";
+import path from "path";
 
 const app = express();
 
 // Serve uploaded files statically
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // ... rest of your server configuration
 ```
@@ -135,30 +152,30 @@ API_BASE_URL=http://localhost:3000
 ### 6. Add Cleanup Service (Optional - src/services/cleanup.ts)
 
 ```typescript
-import fs from 'fs';
-import path from 'path';
-import { db } from '../db';
+import fs from "fs";
+import path from "path";
+import { db } from "../db";
 
 /**
  * Clean up orphaned logo files that are no longer referenced in the database
  */
 export async function cleanupOrphanedLogos() {
   try {
-    const uploadDir = path.join(process.cwd(), 'uploads', 'logos');
+    const uploadDir = path.join(process.cwd(), "uploads", "logos");
     const files = fs.readdirSync(uploadDir);
-    
+
     // Get all logo URLs from database
     const companies = await db.query.companies.findMany({
       columns: { logoUrl: true },
     });
-    
+
     const activeFiles = new Set(
       companies
-        .map(c => c.logoUrl)
+        .map((c) => c.logoUrl)
         .filter(Boolean)
-        .map(url => path.basename(url!))
+        .map((url) => path.basename(url!))
     );
-    
+
     // Delete files not in database
     let deletedCount = 0;
     for (const file of files) {
@@ -167,10 +184,10 @@ export async function cleanupOrphanedLogos() {
         deletedCount++;
       }
     }
-    
+
     console.log(`Cleaned up ${deletedCount} orphaned logo files`);
   } catch (error) {
-    console.error('Cleanup error:', error);
+    console.error("Cleanup error:", error);
   }
 }
 
@@ -183,28 +200,28 @@ setInterval(cleanupOrphanedLogos, 24 * 60 * 60 * 1000);
 When a company is deleted, also delete its logo file:
 
 ```typescript
-router.delete('/companies/:id', authenticateJWT, async (req, res) => {
+router.delete("/companies/:id", authenticateJWT, async (req, res) => {
   try {
     const company = await db.query.companies.findFirst({
       where: eq(companies.id, req.params.id),
     });
-    
+
     if (company?.logoUrl) {
       // Delete the logo file
       const filename = path.basename(company.logoUrl);
-      const filePath = path.join(process.cwd(), 'uploads', 'logos', filename);
-      
+      const filePath = path.join(process.cwd(), "uploads", "logos", filename);
+
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
     }
-    
+
     // Delete company from database
     await db.delete(companies).where(eq(companies.id, req.params.id));
-    
+
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete company' });
+    res.status(500).json({ error: "Failed to delete company" });
   }
 });
 ```
@@ -221,18 +238,21 @@ router.delete('/companies/:id', authenticateJWT, async (req, res) => {
 ## Production Deployment
 
 ### Option 1: Same Server
+
 - Store uploads on the same server
 - Serve via Express static middleware
 - **Pros**: Simple, no external dependencies
 - **Cons**: Files lost if server is recreated, no CDN caching
 
 ### Option 2: Network File Storage (NFS)
+
 - Mount shared storage (NFS, EFS, Azure Files)
 - Multiple servers can access same files
 - **Pros**: Scalable, persistent across deployments
 - **Cons**: Slightly more complex setup
 
 ### Option 3: Object Storage (Future)
+
 - Switch to cloud storage later if needed (S3, Azure Blob, Google Cloud Storage)
 - Keep same API interface, just change storage backend
 - **Pros**: Best for production at scale
@@ -285,21 +305,24 @@ If you later want to move existing files:
 // Migration script
 async function migrateToLocalStorage() {
   const companies = await db.query.companies.findMany();
-  
+
   for (const company of companies) {
-    if (company.logoUrl?.includes('s3.amazonaws.com')) {
+    if (company.logoUrl?.includes("s3.amazonaws.com")) {
       // Download from S3
       const response = await fetch(company.logoUrl);
       const buffer = await response.buffer();
-      
+
       // Save locally
-      const filename = `${uuidv4()}-${Date.now()}.${getExtFromUrl(company.logoUrl)}`;
+      const filename = `${uuidv4()}-${Date.now()}.${getExtFromUrl(
+        company.logoUrl
+      )}`;
       const filePath = path.join(uploadDir, filename);
       fs.writeFileSync(filePath, buffer);
-      
+
       // Update database
       const newUrl = `${API_BASE_URL}/uploads/logos/${filename}`;
-      await db.update(companies)
+      await db
+        .update(companies)
         .set({ logoUrl: newUrl })
         .where(eq(companies.id, company.id));
     }
@@ -310,6 +333,7 @@ async function migrateToLocalStorage() {
 ## Summary
 
 This implementation provides:
+
 - ✅ Local file storage (no S3 dependency)
 - ✅ Production-ready with proper validation
 - ✅ File size limits (2MB for logos)

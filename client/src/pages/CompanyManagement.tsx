@@ -215,21 +215,24 @@ export default function CompanyManagement() {
       formData.append("logo", file);
 
       // Upload file to backend
-      const response = await fetch(`${API_BASE_URL}/api/companies/upload-logo`, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("pms_access_token")}`,
-        },
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/companies/upload-logo`,
+        {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("pms_access_token")}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Upload failed");
       }
 
       const data = await response.json();
-      
+
       // Set the logo URL returned by backend
       form.setValue("logoUrl", data.logoUrl);
 
