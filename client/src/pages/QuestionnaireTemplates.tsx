@@ -355,7 +355,9 @@ export default function QuestionnaireTemplates() {
       description: template.Description || template.description,
       companyId:
         template.ClientId || template.CompanyId || template.companyId
-          ? String(template.ClientId || template.CompanyId || template.companyId)
+          ? String(
+              template.ClientId || template.CompanyId || template.companyId,
+            )
           : null,
       applicableLevelId:
         template.ApplicableLevelId || template.applicableLevelId
@@ -398,7 +400,7 @@ export default function QuestionnaireTemplates() {
         name: location.LocationName || location.Name,
         code: location.LocationCode || location.Code,
         companyId: String(
-          location.ClientID || location.CompanyId || location.companyId || ""
+          location.ClientID || location.CompanyId || location.companyId || "",
         ),
         status: location.Status === 1 || location.Status === true,
       }));
@@ -412,7 +414,9 @@ export default function QuestionnaireTemplates() {
         id: String(level.Id),
         code: level.Code,
         name: level.Name,
-        companyId: String(level.ClientId || level.CompanyId || level.companyId || ""),
+        companyId: String(
+          level.ClientId || level.CompanyId || level.companyId || "",
+        ),
         status: level.Status === 1 || level.Status === true,
       }));
     },
@@ -425,7 +429,9 @@ export default function QuestionnaireTemplates() {
         id: String(grade.Id),
         code: grade.Code,
         description: grade.Description,
-        companyId: String(grade.ClientId || grade.CompanyId || grade.companyId || ""),
+        companyId: String(
+          grade.ClientId || grade.CompanyId || grade.companyId || "",
+        ),
         status: grade.Status === 1 || grade.Status === true,
       }));
     },
@@ -640,29 +646,35 @@ export default function QuestionnaireTemplates() {
   const selectedCompanyId = form.watch("companyId");
 
   // Determine the effective company ID for filtering (use selected or current user's company)
-  const effectiveCompanyId = selectedCompanyId || (!isSuperAdmin && currentUserCompanyId ? String(currentUserCompanyId) : null);
+  const effectiveCompanyId =
+    selectedCompanyId ||
+    (!isSuperAdmin && currentUserCompanyId
+      ? String(currentUserCompanyId)
+      : null);
 
   // Filter locations, levels, and grades based on selected company or current user's company
-  const filteredLocations =
-    effectiveCompanyId
-      ? locations.filter(
-          (loc: any) => String(loc.companyId) === effectiveCompanyId && loc.status === true,
-        )
-      : locations.filter((loc: any) => loc.status === true);
+  const filteredLocations = effectiveCompanyId
+    ? locations.filter(
+        (loc: any) =>
+          String(loc.companyId) === effectiveCompanyId && loc.status === true,
+      )
+    : locations.filter((loc: any) => loc.status === true);
 
-  const filteredLevels =
-    effectiveCompanyId
-      ? levels.filter(
-          (level: any) => String(level.companyId) === effectiveCompanyId && level.status === true,
-        )
-      : levels.filter((level: any) => level.status === true);
+  const filteredLevels = effectiveCompanyId
+    ? levels.filter(
+        (level: any) =>
+          String(level.companyId) === effectiveCompanyId &&
+          level.status === true,
+      )
+    : levels.filter((level: any) => level.status === true);
 
-  const filteredGrades =
-    effectiveCompanyId
-      ? grades.filter(
-          (grade: any) => String(grade.companyId) === effectiveCompanyId && grade.status === true,
-        )
-      : grades.filter((grade: any) => grade.status === true);
+  const filteredGrades = effectiveCompanyId
+    ? grades.filter(
+        (grade: any) =>
+          String(grade.companyId) === effectiveCompanyId &&
+          grade.status === true,
+      )
+    : grades.filter((grade: any) => grade.status === true);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1452,9 +1464,12 @@ export default function QuestionnaireTemplates() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Make Questionnaire Template Inactive</AlertDialogTitle>
+            <AlertDialogTitle>
+              Make Questionnaire Template Inactive
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to make this questionnaire template inactive?
+              Are you sure you want to make this questionnaire template
+              inactive?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

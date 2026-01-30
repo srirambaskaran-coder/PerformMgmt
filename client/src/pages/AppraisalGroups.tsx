@@ -113,9 +113,15 @@ export default function AppraisalGroups() {
     dojTillDate: undefined,
   });
   // State for deactivate group confirmation
-  const [groupToDeactivate, setGroupToDeactivate] = useState<string | null>(null);
+  const [groupToDeactivate, setGroupToDeactivate] = useState<string | null>(
+    null,
+  );
   // State for remove member confirmation
-  const [memberToRemove, setMemberToRemove] = useState<{ groupId: string; userId: string; memberName: string } | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<{
+    groupId: string;
+    userId: string;
+    memberName: string;
+  } | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] =
     useState<AppraisalGroupWithMembers | null>(null);
@@ -577,13 +583,20 @@ export default function AppraisalGroups() {
     }
   };
 
-  const handleRemoveMember = (groupId: string, userId: string, memberName: string) => {
+  const handleRemoveMember = (
+    groupId: string,
+    userId: string,
+    memberName: string,
+  ) => {
     setMemberToRemove({ groupId, userId, memberName });
   };
 
   const confirmRemoveMember = () => {
     if (memberToRemove) {
-      removeMemberMutation.mutate({ groupId: memberToRemove.groupId, userId: memberToRemove.userId });
+      removeMemberMutation.mutate({
+        groupId: memberToRemove.groupId,
+        userId: memberToRemove.userId,
+      });
       setMemberToRemove(null);
     }
   };
@@ -1217,7 +1230,11 @@ export default function AppraisalGroups() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() =>
-                                      handleRemoveMember(group.id, member.id, `${member.firstName} ${member.lastName}`)
+                                      handleRemoveMember(
+                                        group.id,
+                                        member.id,
+                                        `${member.firstName} ${member.lastName}`,
+                                      )
                                     }
                                     className="h-6 w-6 p-0 ml-2"
                                     data-testid={`remove-member-${group.id}-${member.id}`}
@@ -1639,7 +1656,10 @@ export default function AppraisalGroups() {
         </Dialog>
 
         {/* Deactivate Group AlertDialog */}
-        <AlertDialog open={!!groupToDeactivate} onOpenChange={(open) => !open && setGroupToDeactivate(null)}>
+        <AlertDialog
+          open={!!groupToDeactivate}
+          onOpenChange={(open) => !open && setGroupToDeactivate(null)}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Make Appraisal Group Inactive</AlertDialogTitle>
@@ -1649,7 +1669,7 @@ export default function AppraisalGroups() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
+              <AlertDialogAction
                 onClick={confirmDeactivate}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
@@ -1660,17 +1680,21 @@ export default function AppraisalGroups() {
         </AlertDialog>
 
         {/* Remove Member AlertDialog */}
-        <AlertDialog open={!!memberToRemove} onOpenChange={(open) => !open && setMemberToRemove(null)}>
+        <AlertDialog
+          open={!!memberToRemove}
+          onOpenChange={(open) => !open && setMemberToRemove(null)}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Remove Member from Group</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to remove {memberToRemove?.memberName} from this group?
+                Are you sure you want to remove {memberToRemove?.memberName}{" "}
+                from this group?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
+              <AlertDialogAction
                 onClick={confirmRemoveMember}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >

@@ -171,7 +171,9 @@ export default function ReviewFrequencyManagement() {
     useState<ReviewFrequency | null>(null);
   const [tourDemoFrequency, setTourDemoFrequency] =
     useState<ReviewFrequency | null>(null);
-  const [deleteFrequencyId, setDeleteFrequencyId] = useState<string | null>(null);
+  const [deleteFrequencyId, setDeleteFrequencyId] = useState<string | null>(
+    null,
+  );
 
   // Fetch review frequencies
   const {
@@ -673,7 +675,10 @@ export default function ReviewFrequencyManagement() {
         )}
       </div>
 
-      <AlertDialog open={!!deleteFrequencyId} onOpenChange={(open) => !open && setDeleteFrequencyId(null)}>
+      <AlertDialog
+        open={!!deleteFrequencyId}
+        onOpenChange={(open) => !open && setDeleteFrequencyId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Make Review Frequency Inactive</AlertDialogTitle>
@@ -683,7 +688,7 @@ export default function ReviewFrequencyManagement() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={confirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

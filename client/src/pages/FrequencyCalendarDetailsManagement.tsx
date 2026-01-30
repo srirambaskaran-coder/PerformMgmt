@@ -217,7 +217,9 @@ export default function FrequencyCalendarDetailsManagement() {
     });
 
   // Filter to show only active calendars in dropdown
-  const activeFrequencyCalendars = frequencyCalendars.filter(calendar => calendar.status === "active");
+  const activeFrequencyCalendars = frequencyCalendars.filter(
+    (calendar) => calendar.status === "active",
+  );
 
   // Create mutation
   const createMutation = useMutation({
@@ -845,7 +847,10 @@ export default function FrequencyCalendarDetailsManagement() {
         )}
       </div>
 
-      <AlertDialog open={!!deleteDetailsId} onOpenChange={(open) => !open && setDeleteDetailsId(null)}>
+      <AlertDialog
+        open={!!deleteDetailsId}
+        onOpenChange={(open) => !open && setDeleteDetailsId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Make Calendar Details Inactive</AlertDialogTitle>
@@ -855,7 +860,7 @@ export default function FrequencyCalendarDetailsManagement() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={confirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

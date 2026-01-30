@@ -580,7 +580,10 @@ export function decryptAndStoreHRsuiteSession(): boolean {
     console.log(
       "[HRsuite] Session decrypted and stored to pms_hrsuite_session",
     );
-    console.log("[HRsuite] Decrypted session keys:", Object.keys(decryptedSession));
+    console.log(
+      "[HRsuite] Decrypted session keys:",
+      Object.keys(decryptedSession),
+    );
     return true;
   } catch (error) {
     console.error("[HRsuite] Failed to decrypt and store session:", error);

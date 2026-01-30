@@ -71,7 +71,10 @@ import {
 } from "lucide-react";
 import type { DevelopmentGoal, GoalStatus } from "@shared/schema";
 
-interface GoalWithDetails extends Omit<DevelopmentGoal, 'createdAt' | 'updatedAt' | 'targetDate'> {
+interface GoalWithDetails extends Omit<
+  DevelopmentGoal,
+  "createdAt" | "updatedAt" | "targetDate"
+> {
   targetDate: string | Date;
   createdOn?: string | null;
   createdBy?: string | null;

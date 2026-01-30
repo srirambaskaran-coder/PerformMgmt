@@ -1434,13 +1434,11 @@ export default function ManagerSubmissions() {
                               onClick={() => {
                                 setSelectedEvaluation(evaluation);
                                 setNotesData({
-                                  meetingNotes:
-                                    evaluation.meetingNotes || "",
+                                  meetingNotes: evaluation.meetingNotes || "",
                                   finalRating:
                                     evaluation.overallRating || undefined,
                                   showNotesToEmployee:
-                                    evaluation.showNotesToEmployee ??
-                                    false,
+                                    evaluation.showNotesToEmployee ?? false,
                                 });
                                 setIsNotesDialogOpen(true);
                               }}

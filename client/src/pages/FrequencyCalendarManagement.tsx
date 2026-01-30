@@ -231,8 +231,12 @@ export default function FrequencyCalendarManagement() {
   });
 
   // Filter to show only active items in dropdowns
-  const activeAppraisalCycles = appraisalCycles.filter(cycle => cycle.status === "active");
-  const activeReviewFrequencies = reviewFrequencies.filter(freq => freq.status === "active");
+  const activeAppraisalCycles = appraisalCycles.filter(
+    (cycle) => cycle.status === "active",
+  );
+  const activeReviewFrequencies = reviewFrequencies.filter(
+    (freq) => freq.status === "active",
+  );
 
   // Create mutation
   const createMutation = useMutation({
@@ -828,17 +832,22 @@ export default function FrequencyCalendarManagement() {
         )}
       </div>
 
-      <AlertDialog open={!!deleteCalendarId} onOpenChange={(open) => !open && setDeleteCalendarId(null)}>
+      <AlertDialog
+        open={!!deleteCalendarId}
+        onOpenChange={(open) => !open && setDeleteCalendarId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Make Frequency Calendar Inactive</AlertDialogTitle>
+            <AlertDialogTitle>
+              Make Frequency Calendar Inactive
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to make this frequency calendar inactive?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={confirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

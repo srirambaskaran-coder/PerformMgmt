@@ -967,7 +967,10 @@ export default function AppraisalCycleManagement() {
         </Dialog>
       </div>
 
-      <AlertDialog open={!!deleteCycleId} onOpenChange={(open) => !open && setDeleteCycleId(null)}>
+      <AlertDialog
+        open={!!deleteCycleId}
+        onOpenChange={(open) => !open && setDeleteCycleId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Make Appraisal Cycle Inactive</AlertDialogTitle>
@@ -977,7 +980,7 @@ export default function AppraisalCycleManagement() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={confirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
