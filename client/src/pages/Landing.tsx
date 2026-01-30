@@ -40,7 +40,8 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useParams } from "wouter";
 import { API_BASE_URL } from "@/config/api.config";
-import { setStoredUser, setTokens } from "@/hooks/useAuth";
+import { setStoredUser, setTokens, normalizeUser } from "@/hooks/useAuth";
+import { setLoginSource } from "@/lib/ssoAuth";
 
 const registrationSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -99,7 +100,6 @@ export default function Landing() {
       const response = await fetch(`${API_BASE_URL}/api/registration`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(data),
       });
 
@@ -128,8 +128,11 @@ export default function Landing() {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          loginCode: data.companyUrl,
+          email: data.email,
+          password: data.password,
+        }),
       });
 
       if (response.ok) {
@@ -142,18 +145,19 @@ export default function Landing() {
           console.log("[Landing] JWT tokens stored");
         } else {
           console.log(
-            "[Landing] No JWT tokens in response (using session cookies)"
+            "[Landing] No JWT tokens in response (using session cookies)",
           );
         }
 
-        // Store user data
+        // Store user data (normalize to lowercase keys)
         if (result.user) {
-          setStoredUser(result.user);
-          console.log(
-            "[Landing] User stored:",
-            result.user.role || result.user.Role
-          );
+          const normalizedUser = normalizeUser(result.user);
+          setStoredUser(normalizedUser);
+          console.log("[Landing] User stored:", normalizedUser.role);
         }
+
+        // Mark login source as PMS (direct login)
+        setLoginSource("pms");
 
         toast({
           title: "Login Successful",
@@ -165,11 +169,11 @@ export default function Landing() {
         // Log what's stored for debugging
         console.log(
           "[Landing] Stored accessToken:",
-          localStorage.getItem("pms_access_token")
+          localStorage.getItem("pms_access_token"),
         );
         console.log(
           "[Landing] Stored user:",
-          localStorage.getItem("pms_auth_user")
+          localStorage.getItem("pms_auth_user"),
         );
 
         // Redirect to dashboard with page reload to refresh auth state

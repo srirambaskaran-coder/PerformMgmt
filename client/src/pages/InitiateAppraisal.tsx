@@ -61,6 +61,7 @@ import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { API_BASE_URL } from "@/config/api.config";
+import { useTour } from "@/contexts/TourContext";
 import type {
   SafeUser,
   AppraisalGroup,
@@ -184,7 +185,10 @@ const initiateAppraisalSchema = z
   })
   .refine(
     (data) => {
-      if (data.appraisalType === "questionnaire_based" || data.appraisalType === "mbo_based") {
+      if (
+        data.appraisalType === "questionnaire_based" ||
+        data.appraisalType === "mbo_based"
+      ) {
         return (
           data.questionnaireTemplateIds &&
           data.questionnaireTemplateIds.length > 0
@@ -198,7 +202,7 @@ const initiateAppraisalSchema = z
     {
       message: "Please select required fields based on appraisal type",
       path: ["appraisalType"],
-    }
+    },
   );
 
 type CalendarDetailTiming = z.infer<typeof calendarDetailTimingSchema>;
@@ -211,9 +215,10 @@ export default function InitiateAppraisal() {
   const [isInitiateFormOpen, setIsInitiateFormOpen] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(
-    null
+    null,
   );
   const { toast } = useToast();
+  const { isRunning: isTourMode, currentAction, clearAction } = useTour();
 
   // Form initialization
   const form = useForm<InitiateAppraisalForm>({
@@ -240,18 +245,104 @@ export default function InitiateAppraisal() {
     AppraisalGroupWithMembers[]
   >({
     queryKey: ["/api/appraisal-groups"],
+    select: (data: any[]) => {
+      return data.map((group: any) => ({
+        id: group.Id,
+        name: group.Name,
+        description: group.Description,
+        companyId: group.CompanyId,
+        status: group.Status ? "active" : "inactive",
+        createdBy: group.CreatedBy,
+        createdOn: group.CreatedOn,
+        lastUpdatedBy: group.LastUpdatedBy,
+        lastUpdatedOn: group.LastUpdatedOn,
+        members: (group.members || []).map((member: any) => ({
+          id: member.UserId,
+          firstName: member.FirstName,
+          lastName: member.LastName,
+          email: member.Email,
+          code: member.Code,
+          role: member.Role || "employee",
+          status: member.Status ? "active" : "inactive",
+        })),
+      }));
+    },
   });
+
+  // Tour action handlers - must be after groups query
+  useEffect(() => {
+    if (!isTourMode || !currentAction) return;
+
+    if (currentAction === "openInitiateAppraisalForm") {
+      // Open the form with a demo group if available
+      if (groups.length > 0) {
+        setSelectedGroup(groups[0]);
+        setIsInitiateFormOpen(true);
+      }
+      clearAction();
+    } else if (currentAction === "closeInitiateAppraisalForm") {
+      setIsInitiateFormOpen(false);
+      setSelectedGroup(null);
+      clearAction();
+    }
+  }, [currentAction, isTourMode, clearAction, groups]);
+
+  // Clean up when tour ends
+  useEffect(() => {
+    const handleTourEnd = () => {
+      setIsInitiateFormOpen(false);
+      setSelectedGroup(null);
+    };
+
+    window.addEventListener("tourEnded", handleTourEnd);
+    return () => window.removeEventListener("tourEnded", handleTourEnd);
+  }, []);
 
   // Fetch questionnaire templates for dropdown
   const { data: questionnaireTemplates = [] } = useQuery<
     QuestionnaireTemplate[]
   >({
     queryKey: ["/api/questionnaire-templates"],
+    select: (data: any[]) => {
+      return data.map((template: any) => ({
+        id: template.Id,
+        name: template.Name,
+        description: template.Description,
+        targetRole: template.TargetRole,
+        questions: template.Questions,
+        year: template.Year,
+        applicableCategory: template.ApplicableCategory,
+        applicableLevelId: template.ApplicableLevelId,
+        applicableGradeId: template.ApplicableGradeId,
+        applicableLocationId: template.ApplicableLocationId,
+        sendOnMail: template.SendOnMail,
+        companyId: template.CompanyId,
+        status: template.Status,
+        createdBy: template.CreatedBy,
+        createdOn: template.CreatedOn,
+        lastUpdatedBy: template.LastUpdatedBy,
+        lastUpdatedOn: template.LastUpdatedOn,
+      }));
+    },
   });
 
   // Fetch frequency calendars for dropdown
   const { data: frequencyCalendars = [] } = useQuery<FrequencyCalendar[]>({
     queryKey: ["/api/frequency-calendars"],
+    select: (data: any[]) => {
+      return data.map((calendar: any) => ({
+        id: calendar.Id,
+        code: calendar.Code,
+        description: calendar.Description,
+        appraisalCycleId: calendar.AppraisalCycleId,
+        reviewFrequencyId: calendar.ReviewFrequencyId,
+        status: calendar.Status,
+        createdBy: calendar.CreatedBy,
+        createdOn: calendar.CreatedOn,
+        lastUpdatedBy: calendar.LastUpdatedBy,
+        lastUpdatedOn: calendar.LastUpdatedOn,
+      }));
+    },
   });
 
   // Fetch calendar details when a calendar is selected
@@ -261,16 +352,25 @@ export default function InitiateAppraisal() {
     queryKey: ["/api/frequency-calendars", selectedCalendarId, "details"],
     queryFn: async () => {
       if (!selectedCalendarId) return [];
-      const response = await fetch(
-        `${API_BASE_URL}/api/frequency-calendars/${selectedCalendarId}/details`,
-        {
-          credentials: "include",
-        }
+      const response = await apiRequest(
+        "GET",
+        `/api/frequency-calendars/${selectedCalendarId}/details`,
       );
-      if (!response.ok) {
-        throw new Error("Failed to fetch calendar details");
-      }
       return response.json();
+    },
+    select: (data: any[]) => {
+      return data.map((detail: any) => ({
+        id: detail.Id,
+        frequencyCalendarId: detail.FrequencyCalendarId,
+        displayName: detail.DisplayName,
+        startDate: detail.StartDate,
+        endDate: detail.EndDate,
+        status: detail.Status,
+        createdBy: detail.CreatedBy,
+        createdOn: detail.CreatedOn,
+        lastUpdatedBy: detail.LastUpdatedBy,
+        lastUpdatedOn: detail.LastUpdatedOn,
+      }));
     },
     enabled: !!selectedCalendarId,
   });
@@ -278,23 +378,15 @@ export default function InitiateAppraisal() {
   // Mutation for initiating appraisal
   const initiateMutation = useMutation({
     mutationFn: async (
-      data: InitiateAppraisalForm & { appraisalGroupId: string }
+      data: InitiateAppraisalForm & { appraisalGroupId: string },
     ) => {
       // For now, send as JSON since file upload is not fully implemented
       // TODO: Implement proper file upload with FormData when needed
-      const response = await fetch(`${API_BASE_URL}/api/initiate-appraisal`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`${response.status}: ${error}`);
-      }
+      const response = await apiRequest(
+        "POST",
+        "/api/initiate-appraisal",
+        data,
+      );
 
       return response.json();
     },
@@ -357,14 +449,14 @@ export default function InitiateAppraisal() {
   const initializeCalendarDetailTimings = (selectedDetailIds: string[]) => {
     const currentTimings = form.getValues("calendarDetailTimings");
     const selectedDetails = calendarDetails.filter((detail) =>
-      selectedDetailIds.includes(detail.id)
+      selectedDetailIds.includes(detail.id),
     );
 
     const updatedTimings: CalendarDetailTiming[] = selectedDetails.map(
       (detail) => {
         // Check if timing already exists for this detail
         const existingTiming = currentTimings.find(
-          (t) => t.detailId === detail.id
+          (t) => t.detailId === detail.id,
         );
         if (existingTiming) {
           // Preserve existing configuration
@@ -377,7 +469,7 @@ export default function InitiateAppraisal() {
           daysToClose: 30,
           numberOfReminders: 3,
         };
-      }
+      },
     );
 
     form.setValue("calendarDetailTimings", updatedTimings);
@@ -420,10 +512,10 @@ export default function InitiateAppraisal() {
   // Filter groups based on search query
   const filteredGroups = groups.filter(
     (group) =>
-      group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (group.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (group.description || "")
         .toLowerCase()
-        .includes(searchQuery.toLowerCase())
+        .includes(searchQuery.toLowerCase()),
   );
 
   return (
@@ -572,8 +664,19 @@ export default function InitiateAppraisal() {
         )}
 
         {/* Initiate Appraisal Form Dialog */}
-        <Dialog open={isInitiateFormOpen} onOpenChange={setIsInitiateFormOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <Dialog
+          open={isInitiateFormOpen}
+          onOpenChange={(open) => {
+            // Don't allow closing during tour mode
+            if (!open && isTourMode) {
+              return;
+            }
+            setIsInitiateFormOpen(open);
+          }}
+        >
+          <DialogContent
+            className={`max-w-4xl max-h-[90vh] overflow-y-auto ${isTourMode ? "z-[9997]" : ""}`}
+          >
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Settings2 className="h-5 w-5" />
@@ -657,7 +760,8 @@ export default function InitiateAppraisal() {
                     />
 
                     {/* Questionnaire Template Selection (for questionnaire_based and mbo_based/360 feedback) */}
-                    {(appraisalType === "questionnaire_based" || appraisalType === "mbo_based") && (
+                    {(appraisalType === "questionnaire_based" ||
+                      appraisalType === "mbo_based") && (
                       <FormField
                         control={form.control}
                         name="questionnaireTemplateIds"
@@ -670,7 +774,7 @@ export default function InitiateAppraisal() {
                                   (template) => ({
                                     value: template.id,
                                     label: template.name,
-                                  })
+                                  }),
                                 )}
                                 value={field.value || []}
                                 onChange={field.onChange}
@@ -831,7 +935,7 @@ export default function InitiateAppraisal() {
                                           return new Date(
                                             date.getFullYear(),
                                             date.getMonth(),
-                                            date.getDate()
+                                            date.getDate(),
                                           ).toLocaleDateString();
                                         };
 
@@ -840,7 +944,7 @@ export default function InitiateAppraisal() {
                                           label: `${
                                             detail.displayName
                                           } (${formatDate(
-                                            detail.startDate
+                                            detail.startDate,
                                           )} - ${formatDate(detail.endDate)})`,
                                         };
                                       })}
@@ -870,14 +974,14 @@ export default function InitiateAppraisal() {
                                 {calendarDetails
                                   .filter((detail) =>
                                     selectedCalendarDetailIds.includes(
-                                      detail.id
-                                    )
+                                      detail.id,
+                                    ),
                                   )
                                   .map((detail) => {
                                     const timingIndex = form
                                       .getValues("calendarDetailTimings")
                                       .findIndex(
-                                        (t) => t.detailId === detail.id
+                                        (t) => t.detailId === detail.id,
                                       );
                                     if (timingIndex === -1) return null;
                                     return (
@@ -890,7 +994,7 @@ export default function InitiateAppraisal() {
                                             <p className="text-sm text-muted-foreground">
                                               {(() => {
                                                 const formatDate = (
-                                                  dateValue: any
+                                                  dateValue: any,
                                                 ) => {
                                                   // First convert to Date object if it's a string
                                                   const date =
@@ -901,13 +1005,13 @@ export default function InitiateAppraisal() {
                                                   return new Date(
                                                     date.getFullYear(),
                                                     date.getMonth(),
-                                                    date.getDate()
+                                                    date.getDate(),
                                                   ).toLocaleDateString();
                                                 };
                                                 return `${formatDate(
-                                                  detail.startDate
+                                                  detail.startDate,
                                                 )} - ${formatDate(
-                                                  detail.endDate
+                                                  detail.endDate,
                                                 )}`;
                                               })()}
                                             </p>
@@ -989,7 +1093,7 @@ export default function InitiateAppraisal() {
                                                   <SelectContent>
                                                     {Array.from(
                                                       { length: 10 },
-                                                      (_, i) => i + 1
+                                                      (_, i) => i + 1,
                                                     ).map((num) => (
                                                       <SelectItem
                                                         key={num}
@@ -1106,7 +1210,7 @@ export default function InitiateAppraisal() {
                                 <SelectContent>
                                   {Array.from(
                                     { length: 10 },
-                                    (_, i) => i + 1
+                                    (_, i) => i + 1,
                                   ).map((num) => (
                                     <SelectItem
                                       key={num}
@@ -1276,7 +1380,7 @@ export default function InitiateAppraisal() {
                               if (dojFromDate) {
                                 if (!member.dateOfJoining) return false;
                                 const memberDoj = new Date(
-                                  member.dateOfJoining
+                                  member.dateOfJoining,
                                 );
                                 const fromDate = new Date(dojFromDate);
                                 fromDate.setHours(0, 0, 0, 0);
@@ -1288,7 +1392,7 @@ export default function InitiateAppraisal() {
                               if (dojTillDate) {
                                 if (!member.dateOfJoining) return false;
                                 const memberDoj = new Date(
-                                  member.dateOfJoining
+                                  member.dateOfJoining,
                                 );
                                 const tillDate = new Date(dojTillDate);
                                 tillDate.setHours(23, 59, 59, 999);
@@ -1312,7 +1416,7 @@ export default function InitiateAppraisal() {
                                     checked={isExcluded}
                                     onCheckedChange={(checked) => {
                                       const currentExcluded = form.getValues(
-                                        "excludedEmployeeIds"
+                                        "excludedEmployeeIds",
                                       );
                                       if (checked) {
                                         form.setValue("excludedEmployeeIds", [
@@ -1323,8 +1427,8 @@ export default function InitiateAppraisal() {
                                         form.setValue(
                                           "excludedEmployeeIds",
                                           currentExcluded.filter(
-                                            (id) => id !== member.id
-                                          )
+                                            (id) => id !== member.id,
+                                          ),
                                         );
                                       }
                                     }}
@@ -1346,7 +1450,10 @@ export default function InitiateAppraisal() {
                   </div>
 
                   {/* Publish Options */}
-                  <div className="space-y-4">
+                  <div
+                    className="space-y-4"
+                    data-testid="publish-options-section"
+                  >
                     <h4 className="text-lg font-semibold">Publish Options</h4>
 
                     <FormField
@@ -1362,6 +1469,7 @@ export default function InitiateAppraisal() {
                               onValueChange={field.onChange}
                               value={field.value}
                               className="flex flex-col space-y-2"
+                              data-testid="publish-options-radio-group"
                             >
                               <div className="flex items-center space-x-2">
                                 <RadioGroupItem
@@ -1428,7 +1536,7 @@ export default function InitiateAppraisal() {
                             .watch("calendarDetailTimings")
                             .map((timing: any) => {
                               const detail = calendarDetails.find(
-                                (d) => d.id === timing.detailId
+                                (d) => d.id === timing.detailId,
                               );
                               if (!detail) return null;
 
@@ -1443,7 +1551,7 @@ export default function InitiateAppraisal() {
                               const endDate = new Date(
                                 tempDate.getFullYear(),
                                 tempDate.getMonth(),
-                                tempDate.getDate()
+                                tempDate.getDate(),
                               );
 
                               const daysToAdd =
@@ -1452,7 +1560,7 @@ export default function InitiateAppraisal() {
                               // Create scheduled date by adding days
                               const scheduledDate = new Date(endDate);
                               scheduledDate.setDate(
-                                scheduledDate.getDate() + daysToAdd
+                                scheduledDate.getDate() + daysToAdd,
                               );
 
                               return (

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
@@ -26,6 +26,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Popover,
   PopoverContent,
@@ -56,14 +66,17 @@ import {
   type InsertLevel,
 } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { getClientIdFromSession } from "@/lib/ssoAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { useTour } from "@/contexts/TourContext";
 import {
   Plus,
   Search,
   Edit,
-  Trash2,
+  Ban,
   Layers,
   Tag,
   Clock,
@@ -165,19 +178,140 @@ export default function LevelManagement() {
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingLevel, setEditingLevel] = useState<Level | null>(null);
+  const [tourDemoLevel, setTourDemoLevel] = useState<Level | null>(null);
+  const [deleteLevelId, setDeleteLevelId] = useState<string | null>(null);
 
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
+  const { isTourMode, currentAction, clearAction } = useTour();
+
+  // Track previous tour mode to detect when tour ends
+  const prevTourModeRef = useRef(isTourMode);
+
+  // Form handling - must be defined before useEffect that uses it
+  const form = useForm<InsertLevel>({
+    resolver: zodResolver(insertLevelSchema),
+    defaultValues: {
+      code: "",
+      description: "",
+      status: "active",
+    },
+  });
+
+  const resetForm = useCallback(() => {
+    form.reset({
+      code: "",
+      description: "",
+      status: "active",
+    });
+  }, [form]);
+
+  // Handle tour actions
+  useEffect(() => {
+    // Only clean up when tour mode changes from true to false (tour ends)
+    if (prevTourModeRef.current && !isTourMode) {
+      setTourDemoLevel(null);
+      setIsCreateModalOpen(false);
+      resetForm();
+    }
+    prevTourModeRef.current = isTourMode;
+
+    if (!isTourMode) {
+      return;
+    }
+
+    if (currentAction === "openLevelForm") {
+      // Open modal and fill with demo data
+      resetForm();
+      setIsCreateModalOpen(true);
+      // Fill form after dialog opens
+      setTimeout(() => {
+        form.setValue("code", "DEMO-SR");
+        form.setValue(
+          "description",
+          "Senior Level - Demo data created during tour",
+        );
+        form.setValue("status", "active");
+      }, 200);
+      clearAction();
+    } else if (currentAction === "saveLevelAndClose") {
+      // Close modal and add demo level
+      setIsCreateModalOpen(false);
+      resetForm();
+      // Add demo level to display
+      setTourDemoLevel({
+        id: 9999,
+        code: "DEMO-SR",
+        description: "Senior Level - Demo data created during tour",
+        status: "active",
+        companyId: currentUser?.companyId
+          ? Number(currentUser.companyId)
+          : null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: null,
+        createdByName: "Tour Demo",
+        lastUpdatedBy: null,
+      });
+      clearAction();
+    }
+  }, [
+    currentAction,
+    isTourMode,
+    clearAction,
+    form,
+    currentUser?.companyId,
+    resetForm,
+  ]);
+
+  // Clean up tour demo data when tour ends
+  useEffect(() => {
+    const handleTourEnd = () => {
+      setTourDemoLevel(null);
+      setIsCreateModalOpen(false);
+      resetForm();
+    };
+
+    window.addEventListener("tourEnded", handleTourEnd);
+    return () => window.removeEventListener("tourEnded", handleTourEnd);
+  }, [resetForm]);
 
   // Data queries
   const { data: levels = [], isLoading } = useQuery<Level[]>({
     queryKey: ["/api/levels"],
+    select: (data: any[]) => {
+      return data.map((level: any) => ({
+        id: level.Id,
+        code: level.Code,
+        description: level.Description,
+        status: level.Status ? "active" : "inactive",
+        companyId: level.CompanyId,
+        createdAt: level.CreatedOn,
+        updatedAt: level.LastUpdatedOn,
+        createdBy: level.CreatedBy,
+        createdByName: level.CreatedByName,
+        lastUpdatedBy: level.LastUpdatedBy,
+      }));
+    },
   });
 
   // Mutations
   const createLevelMutation = useMutation({
     mutationFn: async (levelData: InsertLevel) => {
-      await apiRequest("POST", "/api/levels", levelData);
+      // Transform to PascalCase and convert status to boolean
+      const payload = {
+        Code: levelData.code,
+        Description: levelData.description,
+        Status:
+          levelData.status === "active"
+            ? true
+            : levelData.status === "inactive"
+              ? false
+              : levelData.status,
+        ClientId: getClientIdFromSession(),
+      };
+      await apiRequest("POST", "/api/levels", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/levels"] });
@@ -208,7 +342,23 @@ export default function LevelManagement() {
       id: string;
       levelData: Partial<InsertLevel>;
     }) => {
-      await apiRequest("PUT", `/api/levels/${id}`, levelData);
+      // Transform to PascalCase and convert status to boolean
+      const payload: any = {};
+      if (levelData.code !== undefined) payload.Code = levelData.code;
+      if (levelData.description !== undefined)
+        payload.Description = levelData.description;
+      if (levelData.status !== undefined) {
+        payload.Status =
+          levelData.status === "active"
+            ? true
+            : levelData.status === "inactive"
+              ? false
+              : levelData.status;
+      }
+      if (levelData.companyId !== undefined) {
+        payload.ClientId = getClientIdFromSession();
+      }
+      await apiRequest("PUT", `/api/levels/${id}`, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/levels"] });
@@ -254,24 +404,6 @@ export default function LevelManagement() {
     },
   });
 
-  // Form handling
-  const form = useForm<InsertLevel>({
-    resolver: zodResolver(insertLevelSchema),
-    defaultValues: {
-      code: "",
-      description: "",
-      status: "active",
-    },
-  });
-
-  const resetForm = () => {
-    form.reset({
-      code: "",
-      description: "",
-      status: "active",
-    });
-  };
-
   const handleEdit = (level: Level) => {
     setEditingLevel(level);
     form.reset({
@@ -293,15 +425,22 @@ export default function LevelManagement() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this level?")) {
-      deleteLevelMutation.mutate(id);
+    setDeleteLevelId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteLevelId) {
+      deleteLevelMutation.mutate(deleteLevelId);
+      setDeleteLevelId(null);
     }
   };
 
-  // Filtering logic
-  const filteredLevels = levels.filter((level) => {
+  // Filtering logic - include tour demo level if in tour mode
+  const allLevels = tourDemoLevel ? [tourDemoLevel, ...levels] : levels;
+  const filteredLevels = allLevels.filter((level) => {
     const matchesSearch =
-      level.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (level.code &&
+        level.code.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (level.description &&
         level.description.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesStatus =
@@ -312,137 +451,13 @@ export default function LevelManagement() {
 
   return (
     <RoleGuard allowedRoles={["admin"]}>
-      <div className="container mx-auto py-6">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold">Level Management</h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Manage organizational levels for employee categorization and
-              evaluation purposes
-            </p>
-          </div>
-          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-            <DialogTrigger asChild>
-              <Button
-                data-testid="button-create-level"
-                onClick={() => resetForm()}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Create Level
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingLevel ? "Edit Level" : "Create New Level"}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingLevel
-                    ? "Update the organizational level details"
-                    : "Define a new organizational level for employee categorization"}
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit(onSubmit)}
-                  className="space-y-6"
-                >
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="code"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Level Code</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="e.g., L1, L2, MGR, DIR"
-                              data-testid="input-code"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Status</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value ?? "active"}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-status">
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="inactive">Inactive</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            {...field}
-                            placeholder="Describe the responsibilities and expectations for this level..."
-                            className="min-h-24"
-                            data-testid="input-description"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex justify-end space-x-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setIsCreateModalOpen(false);
-                        setEditingLevel(null);
-                        resetForm();
-                      }}
-                      data-testid="button-cancel"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={
-                        createLevelMutation.isPending ||
-                        updateLevelMutation.isPending
-                      }
-                      data-testid="button-submit"
-                    >
-                      {createLevelMutation.isPending ||
-                      updateLevelMutation.isPending
-                        ? "Saving..."
-                        : editingLevel
-                        ? "Update"
-                        : "Create"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+      <div className="container mx-auto py-6 level-list">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold">Level Management</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Manage organizational levels for employee categorization and
+            evaluation purposes
+          </p>
         </div>
 
         {/* Search and Filters */}
@@ -487,7 +502,19 @@ export default function LevelManagement() {
             </div>
           ) : (
             filteredLevels.map((level) => (
-              <Card key={level.id} data-testid={`card-level-${level.id}`}>
+              <Card
+                key={level.id}
+                data-testid={
+                  level.id === 9999
+                    ? "tour-demo-level"
+                    : `card-level-${level.id}`
+                }
+                className={
+                  level.id === 9999
+                    ? "border-2 border-primary bg-primary/5"
+                    : ""
+                }
+              >
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -507,140 +534,13 @@ export default function LevelManagement() {
                           {level.status}
                         </Badge>
                       </div>
-                      {level.description && (
+                      {/* {level.description && (
                         <CardDescription
                           data-testid={`text-description-${level.id}`}
                         >
                           {level.description}
                         </CardDescription>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <Dialog
-                        open={!!editingLevel}
-                        onOpenChange={(open) => !open && setEditingLevel(null)}
-                      >
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(level)}
-                            data-testid={`button-edit-${level.id}`}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
-                          <DialogHeader>
-                            <DialogTitle>Edit Level</DialogTitle>
-                            <DialogDescription>
-                              Update the organizational level details
-                            </DialogDescription>
-                          </DialogHeader>
-                          <Form {...form}>
-                            <form
-                              onSubmit={form.handleSubmit(onSubmit)}
-                              className="space-y-6"
-                            >
-                              <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                  control={form.control}
-                                  name="code"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Level Code</FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          {...field}
-                                          placeholder="e.g., L1, L2, MGR, DIR"
-                                          data-testid="input-edit-code"
-                                        />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name="status"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Status</FormLabel>
-                                      <Select
-                                        onValueChange={field.onChange}
-                                        value={field.value ?? "active"}
-                                      >
-                                        <FormControl>
-                                          <SelectTrigger data-testid="select-edit-status">
-                                            <SelectValue placeholder="Select status" />
-                                          </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                          <SelectItem value="active">
-                                            Active
-                                          </SelectItem>
-                                          <SelectItem value="inactive">
-                                            Inactive
-                                          </SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
-
-                              <FormField
-                                control={form.control}
-                                name="description"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Description</FormLabel>
-                                    <FormControl>
-                                      <Textarea
-                                        {...field}
-                                        placeholder="Describe the responsibilities and expectations for this level..."
-                                        className="min-h-24"
-                                        data-testid="input-edit-description"
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              <div className="flex justify-end space-x-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => setEditingLevel(null)}
-                                  data-testid="button-edit-cancel"
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  type="submit"
-                                  disabled={updateLevelMutation.isPending}
-                                  data-testid="button-edit-submit"
-                                >
-                                  {updateLevelMutation.isPending
-                                    ? "Updating..."
-                                    : "Update"}
-                                </Button>
-                              </div>
-                            </form>
-                          </Form>
-                        </DialogContent>
-                      </Dialog>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(level.id)}
-                        disabled={deleteLevelMutation.isPending}
-                        data-testid={`button-delete-${level.id}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      )} */}
                     </div>
                   </div>
                 </CardHeader>
@@ -659,6 +559,7 @@ export default function LevelManagement() {
                           {level.createdAt
                             ? new Date(level.createdAt).toLocaleDateString()
                             : "Unknown"}
+                          {level.createdByName && ` by ${level.createdByName}`}
                         </span>
                       </div>
                     </div>
@@ -669,6 +570,30 @@ export default function LevelManagement() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!deleteLevelId}
+        onOpenChange={(open) => !open && setDeleteLevelId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Make Level Inactive</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to make this level inactive?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Make Inactive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RoleGuard>
   );
 }

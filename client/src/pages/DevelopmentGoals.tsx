@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -51,6 +52,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
+import { useTour } from "@/contexts/TourContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
@@ -67,9 +69,14 @@ import {
   Clock,
   Flag,
 } from "lucide-react";
-import type { DevelopmentGoal } from "@shared/schema";
+import type { DevelopmentGoal, GoalStatus } from "@shared/schema";
 
-interface GoalWithDetails extends DevelopmentGoal {
+interface GoalWithDetails extends Omit<DevelopmentGoal, 'createdAt' | 'updatedAt' | 'targetDate'> {
+  targetDate: string | Date;
+  createdOn?: string | null;
+  createdBy?: string | null;
+  lastUpdatedOn?: string | null;
+  lastUpdatedBy?: string | null;
   evaluation?: {
     id: string;
     status: string;
@@ -121,7 +128,7 @@ export default function DevelopmentGoals() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<GoalWithDetails | null>(
-    null
+    null,
   );
   const [selectedEvaluationId, setSelectedEvaluationId] = useState<
     string | null
@@ -130,17 +137,202 @@ export default function DevelopmentGoals() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isTourMode, currentAction, clearAction } = useTour();
+  const [showDemoData, setShowDemoData] = useState(false);
+
+  // Demo goals for tour
+  const demoGoals: GoalWithDetails[] = [
+    {
+      id: "demo-goal-1",
+      evaluationId: "demo-eval-1",
+      employeeId: user?.id || "employee-1",
+      description: "Complete Advanced React Training Course",
+      plannedOutcome:
+        "Gain expertise in React hooks, context API, and performance optimization to improve code quality and development speed",
+      targetDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
+      progress: 65,
+      status: "on_track",
+      createdOn: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      createdBy: user?.id || "employee-1",
+      lastUpdatedOn: new Date(
+        Date.now() - 2 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      lastUpdatedBy: user?.id || "employee-1",
+      evaluation: {
+        id: "demo-eval-1",
+        status: "completed",
+        meetingCompletedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        overallRating: 4.2,
+      },
+      appraisalCycle: {
+        id: "cycle-2024",
+        code: "Q4-2024",
+        description: "Q4 2024 Performance Review",
+      },
+      frequencyCalendarPeriod: {
+        displayName: "October - December 2024",
+        startDate: "2024-10-01",
+        endDate: "2024-12-31",
+      },
+    },
+    {
+      id: "demo-goal-2",
+      evaluationId: "demo-eval-1",
+      employeeId: user?.id || "employee-1",
+      description: "Improve code review practices and documentation",
+      plannedOutcome:
+        "Establish clear code review guidelines and improve documentation to reduce review turnaround time by 30%",
+      targetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      progress: 85,
+      status: "on_track",
+      createdOn: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+      createdBy: user?.id || "employee-1",
+      lastUpdatedOn: new Date(
+        Date.now() - 1 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      lastUpdatedBy: user?.id || "employee-1",
+      evaluation: {
+        id: "demo-eval-1",
+        status: "completed",
+        meetingCompletedAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000),
+        overallRating: 4.2,
+      },
+      appraisalCycle: {
+        id: "cycle-2024",
+        code: "Q4-2024",
+        description: "Q4 2024 Performance Review",
+      },
+      frequencyCalendarPeriod: {
+        displayName: "October - December 2024",
+        startDate: "2024-10-01",
+        endDate: "2024-12-31",
+      },
+    },
+    {
+      id: "demo-goal-3",
+      evaluationId: "demo-eval-1",
+      employeeId: user?.id || "employee-1",
+      description: "Learn and implement CI/CD best practices",
+      plannedOutcome:
+        "Set up automated testing and deployment pipelines to reduce deployment time and improve code quality",
+      targetDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+      progress: 25,
+      status: "on_track",
+      createdOn: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+      createdBy: user?.id || "employee-1",
+      lastUpdatedOn: new Date(
+        Date.now() - 5 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      lastUpdatedBy: user?.id || "employee-1",
+      evaluation: {
+        id: "demo-eval-1",
+        status: "completed",
+        meetingCompletedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+        overallRating: 4.2,
+      },
+      appraisalCycle: {
+        id: "cycle-2024",
+        code: "Q4-2024",
+        description: "Q4 2024 Performance Review",
+      },
+      frequencyCalendarPeriod: {
+        displayName: "October - December 2024",
+        startDate: "2024-10-01",
+        endDate: "2024-12-31",
+      },
+    },
+  ];
+
+  // Helper function to map numeric status to string
+  const mapGoalStatus = (status: number | null | undefined): GoalStatus => {
+    if (status === null || status === undefined) return "not_started";
+    switch (status) {
+      case 0: // NOT_STARTED
+        return "not_started";
+      case 1: // IN_PROGRESS
+        return "on_track";
+      case 2: // COMPLETED
+        return "completed";
+      case 3: // DELAYED
+        return "delayed";
+      default:
+        return "not_started";
+    }
+  };
 
   const { data: goals = [], isLoading: isLoadingGoals } = useQuery<
     GoalWithDetails[]
   >({
     queryKey: ["/api/development-goals"],
+    select: (data: any[]) => {
+      return data.map((goal: any) => ({
+        id: String(goal.Id),
+        evaluationId: String(goal.EvaluationId),
+        employeeId: String(goal.EmployeeId),
+        description: goal.Description,
+        plannedOutcome: goal.PlannedOutcome,
+        targetDate: goal.TargetDate,
+        progress: goal.Progress ?? 0,
+        status: mapGoalStatus(goal.Status),
+        createdOn: goal.CreatedOn,
+        createdBy: goal.CreatedBy,
+        lastUpdatedOn: goal.LastUpdatedOn,
+        lastUpdatedBy: goal.LastUpdatedBy,
+        evaluation: goal.evaluation
+          ? {
+              id: String(goal.evaluation.id),
+              status: goal.evaluation.status,
+              meetingCompletedAt: goal.evaluation.meetingCompletedAt,
+              overallRating: goal.evaluation.overallRating,
+            }
+          : null,
+        appraisalCycle: goal.appraisalCycle
+          ? {
+              id: String(goal.appraisalCycle.id),
+              code: goal.appraisalCycle.code,
+              description: goal.appraisalCycle.description,
+            }
+          : null,
+        frequencyCalendarPeriod: goal.frequencyCalendarPeriod,
+      }));
+    },
   });
+
+  // Merge demo data with real data when in tour mode
+  // Show demo data immediately during tour without waiting for API
+  const displayGoals = isTourMode ? [...goals, ...demoGoals] : goals;
+
+  // Demo eligible evaluations for tour
+  const demoEligibleEvaluations: EligibleEvaluation[] = [
+    {
+      id: "demo-eval-eligible-1",
+      meetingCompletedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      overallRating: 4.2,
+      appraisalCycle: {
+        id: "cycle-2024",
+        code: "Q4-2024",
+        description: "Q4 2024 Performance Review",
+        status: "active",
+      },
+      frequencyCalendarPeriod: {
+        displayName: "October - December 2024",
+        startDate: "2024-10-01",
+        endDate: "2024-12-31",
+      },
+      isActiveAppraisalCycle: true,
+      goalsCount: 3,
+    },
+  ];
 
   const { data: eligibleEvaluations = [], isLoading: isLoadingEvaluations } =
     useQuery<EligibleEvaluation[]>({
       queryKey: ["/api/development-goals/eligible-evaluations"],
     });
+
+  // Show demo eligible evaluations during tour
+  const displayEligibleEvaluations = isTourMode
+    ? [...eligibleEvaluations, ...demoEligibleEvaluations]
+    : eligibleEvaluations;
 
   const createForm = useForm<GoalFormData>({
     resolver: zodResolver(goalFormSchema),
@@ -157,9 +349,89 @@ export default function DevelopmentGoals() {
     resolver: zodResolver(goalFormSchema),
   });
 
+  // Handle tour actions - must be after form declarations
+  useEffect(() => {
+    if (!isTourMode) {
+      setShowDemoData(false);
+      setIsCreateDialogOpen(false);
+      setIsEditDialogOpen(false);
+      return;
+    }
+
+    if (!currentAction) return;
+
+    if (currentAction === "showDemoGoals") {
+      setShowDemoData(true);
+      clearAction();
+    }
+
+    if (currentAction === "openCreateGoalDialog") {
+      // Open the create goal dialog with demo evaluation pre-selected
+      createForm.reset({
+        evaluationId: "demo-eval-eligible-1",
+        description: "",
+        plannedOutcome: "",
+        targetDate: "",
+        progress: 0,
+      });
+      setSelectedEvaluationId("demo-eval-eligible-1");
+      setIsCreateDialogOpen(true);
+      clearAction();
+    }
+
+    if (currentAction === "closeCreateGoalDialog") {
+      setIsCreateDialogOpen(false);
+      clearAction();
+    }
+
+    if (currentAction === "openEditGoalDialog") {
+      // Open edit dialog for first demo goal - inline logic to avoid hoisting issues
+      const demoGoal = displayGoals.find((g) => g.id === "demo-goal-1");
+      if (demoGoal) {
+        setSelectedGoal(demoGoal);
+        editForm.reset({
+          evaluationId: demoGoal.evaluationId,
+          description: demoGoal.description,
+          plannedOutcome: demoGoal.plannedOutcome,
+          targetDate: demoGoal.targetDate
+            ? format(new Date(demoGoal.targetDate), "yyyy-MM-dd")
+            : "",
+          progress: demoGoal.progress || 0,
+        });
+        setIsEditDialogOpen(true);
+      }
+      clearAction();
+    }
+
+    if (currentAction === "closeEditGoalDialog") {
+      setIsEditDialogOpen(false);
+      setSelectedGoal(null);
+      clearAction();
+    }
+  }, [
+    isTourMode,
+    currentAction,
+    clearAction,
+    showDemoData,
+    displayGoals,
+    createForm,
+    editForm,
+  ]);
+
   const createGoalMutation = useMutation({
     mutationFn: async (data: GoalFormData) => {
-      const response = await apiRequest("POST", "/api/development-goals", data);
+      const payload = {
+        EvaluationId: Number(data.evaluationId),
+        Description: data.description,
+        PlannedOutcome: data.plannedOutcome,
+        TargetDate: data.targetDate,
+        Progress: data.progress || 0,
+      };
+      const response = await apiRequest(
+        "POST",
+        "/api/development-goals",
+        payload,
+      );
       return response.json();
     },
     onSuccess: () => {
@@ -191,10 +463,19 @@ export default function DevelopmentGoals() {
       id: string;
       data: Partial<GoalFormData>;
     }) => {
+      const payload: any = {};
+      if (data.evaluationId !== undefined)
+        payload.EvaluationId = Number(data.evaluationId);
+      if (data.description !== undefined)
+        payload.Description = data.description;
+      if (data.plannedOutcome !== undefined)
+        payload.PlannedOutcome = data.plannedOutcome;
+      if (data.targetDate !== undefined) payload.TargetDate = data.targetDate;
+      if (data.progress !== undefined) payload.Progress = data.progress;
       const response = await apiRequest(
         "PUT",
         `/api/development-goals/${id}`,
-        data
+        payload,
       );
       return response.json();
     },
@@ -283,7 +564,7 @@ export default function DevelopmentGoals() {
     }
   };
 
-  const getStatusBadge = (status: string | null) => {
+  const getStatusBadge = (status: GoalStatus | null | undefined) => {
     switch (status) {
       case "completed":
         return (
@@ -296,7 +577,7 @@ export default function DevelopmentGoals() {
         return (
           <Badge variant="default" className="bg-blue-600">
             <TrendingUp className="h-3 w-3 mr-1" />
-            On Track
+            In Progress
           </Badge>
         );
       case "delayed":
@@ -317,23 +598,32 @@ export default function DevelopmentGoals() {
     }
   };
 
-  const groupedGoals = goals.reduce((acc, goal) => {
-    const cycleKey = goal.appraisalCycle?.code || "Unknown Cycle";
-    if (!acc[cycleKey]) {
-      acc[cycleKey] = {
-        cycle: goal.appraisalCycle,
-        goals: [],
-      };
-    }
-    acc[cycleKey].goals.push(goal);
-    return acc;
-  }, {} as Record<string, { cycle: (typeof goals)[0]["appraisalCycle"]; goals: GoalWithDetails[] }>);
+  const groupedGoals = displayGoals.reduce(
+    (acc, goal) => {
+      const cycleKey = goal.appraisalCycle?.code || "Unknown Cycle";
+      if (!acc[cycleKey]) {
+        acc[cycleKey] = {
+          cycle: goal.appraisalCycle,
+          goals: [],
+        };
+      }
+      acc[cycleKey].goals.push(goal);
+      return acc;
+    },
+    {} as Record<
+      string,
+      {
+        cycle: (typeof displayGoals)[0]["appraisalCycle"];
+        goals: GoalWithDetails[];
+      }
+    >,
+  );
 
   const isLoading = isLoadingGoals || isLoadingEvaluations;
 
   return (
     <RoleGuard allowedRoles={["employee", "manager"]}>
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6" data-testid="development-goals">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -347,7 +637,7 @@ export default function DevelopmentGoals() {
           </div>
           <Button
             onClick={() => handleCreateGoal()}
-            disabled={eligibleEvaluations.length === 0}
+            disabled={displayEligibleEvaluations.length === 0}
             data-testid="button-add-goal"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -355,7 +645,7 @@ export default function DevelopmentGoals() {
           </Button>
         </div>
 
-        {eligibleEvaluations.length === 0 && !isLoading && (
+        {displayEligibleEvaluations.length === 0 && !isLoading && (
           <Card>
             <CardContent className="py-8 text-center">
               <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -385,7 +675,8 @@ export default function DevelopmentGoals() {
               </Card>
             ))}
           </div>
-        ) : goals.length === 0 && eligibleEvaluations.length > 0 ? (
+        ) : displayGoals.length === 0 &&
+          displayEligibleEvaluations.length > 0 ? (
           <Card>
             <CardContent className="py-8 text-center">
               <Flag className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -404,7 +695,7 @@ export default function DevelopmentGoals() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6" data-testid="goals-list">
             {Object.entries(groupedGoals).map(
               ([cycleKey, { cycle, goals: cycleGoals }]) => (
                 <Card key={cycleKey}>
@@ -435,16 +726,16 @@ export default function DevelopmentGoals() {
                                   {goal.frequencyCalendarPeriod.displayName} (
                                   {format(
                                     new Date(
-                                      goal.frequencyCalendarPeriod.startDate
+                                      goal.frequencyCalendarPeriod.startDate,
                                     ),
-                                    "dd/MM/yyyy"
+                                    "dd/MM/yyyy",
                                   )}{" "}
                                   -{" "}
                                   {format(
                                     new Date(
-                                      goal.frequencyCalendarPeriod.endDate
+                                      goal.frequencyCalendarPeriod.endDate,
                                     ),
-                                    "dd/MM/yyyy"
+                                    "dd/MM/yyyy",
                                   )}
                                   )
                                 </span>
@@ -462,7 +753,7 @@ export default function DevelopmentGoals() {
                                 {goal.targetDate
                                   ? format(
                                       new Date(goal.targetDate),
-                                      "MMM dd, yyyy"
+                                      "MMM dd, yyyy",
                                     )
                                   : "Not set"}
                               </span>
@@ -529,14 +820,25 @@ export default function DevelopmentGoals() {
                     ))}
                   </CardContent>
                 </Card>
-              )
+              ),
             )}
           </div>
         )}
 
         {/* Create Dialog */}
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent className="max-w-md">
+        <Dialog
+          open={isCreateDialogOpen}
+          onOpenChange={(open) => {
+            // Prevent closing dialog during tour mode unless explicitly requested via action
+            if (!isTourMode) {
+              setIsCreateDialogOpen(open);
+            }
+          }}
+        >
+          <DialogContent
+            className={cn("max-w-md", isTourMode && "z-[9991]")}
+            data-testid="dialog-create-goal"
+          >
             <DialogHeader>
               <DialogTitle>Create Development Goal</DialogTitle>
               <DialogDescription>
@@ -564,20 +866,20 @@ export default function DevelopmentGoals() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {eligibleEvaluations.map((evaluation) => {
+                          {displayEligibleEvaluations.map((evaluation) => {
                             let periodInfo = "";
                             if (evaluation.frequencyCalendarPeriod) {
                               const startDate = format(
                                 new Date(
-                                  evaluation.frequencyCalendarPeriod.startDate
+                                  evaluation.frequencyCalendarPeriod.startDate,
                                 ),
-                                "dd/MM/yyyy"
+                                "dd/MM/yyyy",
                               );
                               const endDate = format(
                                 new Date(
-                                  evaluation.frequencyCalendarPeriod.endDate
+                                  evaluation.frequencyCalendarPeriod.endDate,
                                 ),
-                                "dd/MM/yyyy"
+                                "dd/MM/yyyy",
                               );
                               periodInfo = ` | ${evaluation.frequencyCalendarPeriod.displayName} (${startDate} - ${endDate})`;
                             }
@@ -680,8 +982,19 @@ export default function DevelopmentGoals() {
         </Dialog>
 
         {/* Edit Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-md">
+        <Dialog
+          open={isEditDialogOpen}
+          onOpenChange={(open) => {
+            // Prevent closing dialog during tour mode unless explicitly requested via action
+            if (!isTourMode) {
+              setIsEditDialogOpen(open);
+            }
+          }}
+        >
+          <DialogContent
+            className={cn("max-w-md", isTourMode && "z-[9991]")}
+            data-testid="dialog-edit-goal"
+          >
             <DialogHeader>
               <DialogTitle>Edit Development Goal</DialogTitle>
               <DialogDescription>
@@ -705,16 +1018,16 @@ export default function DevelopmentGoals() {
                         {selectedGoal.frequencyCalendarPeriod.displayName} (
                         {format(
                           new Date(
-                            selectedGoal.frequencyCalendarPeriod.startDate
+                            selectedGoal.frequencyCalendarPeriod.startDate,
                           ),
-                          "dd/MM/yyyy"
+                          "dd/MM/yyyy",
                         )}{" "}
                         -{" "}
                         {format(
                           new Date(
-                            selectedGoal.frequencyCalendarPeriod.endDate
+                            selectedGoal.frequencyCalendarPeriod.endDate,
                           ),
-                          "dd/MM/yyyy"
+                          "dd/MM/yyyy",
                         )}
                         )
                       </div>

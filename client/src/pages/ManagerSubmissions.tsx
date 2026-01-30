@@ -1,26 +1,56 @@
-import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { RoleGuard } from '@/components/RoleGuard';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest, queryClient } from '@/lib/queryClient';
-import { 
-  ClipboardList, 
-  User, 
-  Calendar as CalendarIcon, 
-  MessageSquare, 
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTour } from "@/contexts/TourContext";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { RoleGuard } from "@/components/RoleGuard";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  ClipboardList,
+  User,
+  Calendar as CalendarIcon,
+  MessageSquare,
   Star,
   CheckCircle,
   Clock,
@@ -34,12 +64,12 @@ import {
   Search,
   X,
   Eye,
-  Download
-} from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
-import { format, addDays } from 'date-fns';
+  Download,
+} from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import { format, addDays } from "date-fns";
 
 interface Employee {
   id: string;
@@ -90,7 +120,7 @@ interface PeerEmployee {
 interface Question {
   id: string;
   text: string;
-  type: 'text' | 'textarea' | 'rating';
+  type: "text" | "textarea" | "rating";
   required: boolean;
 }
 
@@ -141,48 +171,504 @@ interface FeedbackRequestData {
 }
 
 export default function ManagerSubmissions() {
-  const [selectedEvaluation, setSelectedEvaluation] = useState<Evaluation | null>(null);
+  const { isRunning: isTourMode, currentAction, clearAction } = useTour();
+  const [showDemoData, setShowDemoData] = useState(false);
+  const [demoDataState, setDemoDataState] = useState<
+    "pending" | "reviewed" | "completed"
+  >("pending");
+
+  const [selectedEvaluation, setSelectedEvaluation] =
+    useState<Evaluation | null>(null);
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [isMeetingDialogOpen, setIsMeetingDialogOpen] = useState(false);
   const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
-  const [reviewData, setReviewData] = useState<ManagerReviewData>({ 
+  const [reviewData, setReviewData] = useState<ManagerReviewData>({
     managerEvaluationData: { questionRemarks: {} },
-    finalRating: 5
+    finalRating: 5,
   });
   const [meetingData, setMeetingData] = useState<MeetingSchedule>({
     meetingDate: addDays(new Date(), 7),
-    meetingTime: '10:00',
-    meetingTitle: 'Performance Review One-on-One',
-    meetingDescription: 'Discussion about your performance review and career development.'
+    meetingTime: "10:00",
+    meetingTitle: "Performance Review One-on-One",
+    meetingDescription:
+      "Discussion about your performance review and career development.",
   });
-  const [notesData, setNotesData] = useState<MeetingNotesData>({ meetingNotes: '', showNotesToEmployee: false });
-  const [selectedTab, setSelectedTab] = useState<'pending' | 'reviewed' | 'completed'>('pending');
+  const [notesData, setNotesData] = useState<MeetingNotesData>({
+    meetingNotes: "",
+    showNotesToEmployee: false,
+  });
+  const [selectedTab, setSelectedTab] = useState<
+    "pending" | "reviewed" | "completed"
+  >("pending");
 
   // 360 Degree Feedback state
   const [is360DialogOpen, setIs360DialogOpen] = useState(false);
-  const [selected360Tab, setSelected360Tab] = useState<'feedback' | 'peers' | 'reportees' | 'others'>('feedback');
+  const [selected360Tab, setSelected360Tab] = useState<
+    "feedback" | "peers" | "reportees" | "others"
+  >("feedback");
   const [selectedPeerIds, setSelectedPeerIds] = useState<string[]>([]);
   const [selectedReporteeIds, setSelectedReporteeIds] = useState<string[]>([]);
-  const [externalEmails, setExternalEmails] = useState<string>('');
-  const [peerSearchTerm, setPeerSearchTerm] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState<{success: boolean; emailsSent: string[]} | null>(null);
-  const [expandedFeedbackIds, setExpandedFeedbackIds] = useState<Set<string>>(new Set());
+  const [externalEmails, setExternalEmails] = useState<string>("");
+  const [peerSearchTerm, setPeerSearchTerm] = useState("");
+  const [confirmationResult, setConfirmationResult] = useState<{
+    success: boolean;
+    emailsSent: string[];
+  } | null>(null);
+  const [expandedFeedbackIds, setExpandedFeedbackIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   const { toast } = useToast();
 
+  // Demo data for tour - state changes based on tour progress
+  const getDemoSubmissions = (): Evaluation[] => {
+    const baseEmployee = {
+      id: "demo-emp-1",
+      firstName: "John",
+      lastName: "Doe",
+      email: "john.doe@company.com",
+      department: "Engineering",
+      designation: "Software Engineer",
+    };
+
+    const baseTemplate = {
+      id: "demo-template-1",
+      name: "Annual Performance Review",
+      questions: [
+        {
+          id: "q1",
+          text: "How would you rate your overall performance this year?",
+          type: "rating",
+          required: true,
+        },
+        {
+          id: "q2",
+          text: "Describe your key achievements.",
+          type: "textarea",
+          required: true,
+        },
+      ],
+    };
+
+    const selfEvalData = {
+      responses: [
+        {
+          questionId: "q1",
+          response:
+            "I consistently met all project deadlines and delivered high-quality work.",
+          rating: 4,
+        },
+        {
+          questionId: "q2",
+          response:
+            "I collaborated effectively with team members and helped junior developers.",
+          rating: 5,
+        },
+      ],
+    };
+
+    if (demoDataState === "pending") {
+      return [
+        {
+          id: "demo-eval-1",
+          employeeId: "demo-emp-1",
+          managerId: "current-manager",
+          reviewCycleId: "demo-cycle-1",
+          selfEvaluationData: selfEvalData,
+          selfEvaluationSubmittedAt: new Date().toISOString(),
+          managerEvaluationData: null,
+          managerEvaluationSubmittedAt: null,
+          overallRating: null,
+          status: "pending_manager_review",
+          meetingScheduledAt: null,
+          meetingNotes: null,
+          showNotesToEmployee: null,
+          meetingCompletedAt: null,
+          finalizedAt: null,
+          employee: baseEmployee,
+          questionnaireTemplate: baseTemplate,
+          appraisalType: "annual",
+          directReports: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ];
+    }
+
+    if (demoDataState === "reviewed") {
+      return [
+        {
+          id: "demo-eval-1",
+          employeeId: "demo-emp-1",
+          managerId: "current-manager",
+          reviewCycleId: "demo-cycle-1",
+          selfEvaluationData: selfEvalData,
+          selfEvaluationSubmittedAt: new Date().toISOString(),
+          managerEvaluationData: { questionRemarks: { q1: "Great work!" } },
+          managerEvaluationSubmittedAt: new Date().toISOString(),
+          overallRating: 4,
+          status: "reviewed",
+          meetingScheduledAt: null,
+          meetingNotes: null,
+          showNotesToEmployee: null,
+          meetingCompletedAt: null,
+          finalizedAt: null,
+          employee: baseEmployee,
+          questionnaireTemplate: baseTemplate,
+          appraisalType: "annual",
+          directReports: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ];
+    }
+
+    // completed state
+    return [
+      {
+        id: "demo-eval-1",
+        employeeId: "demo-emp-1",
+        managerId: "current-manager",
+        reviewCycleId: "demo-cycle-1",
+        selfEvaluationData: selfEvalData,
+        selfEvaluationSubmittedAt: new Date().toISOString(),
+        managerEvaluationData: { questionRemarks: { q1: "Great work!" } },
+        managerEvaluationSubmittedAt: new Date().toISOString(),
+        overallRating: 4,
+        status: "completed",
+        meetingScheduledAt: new Date().toISOString(),
+        meetingNotes: "Discussed career goals and performance improvements.",
+        showNotesToEmployee: true,
+        meetingCompletedAt: new Date().toISOString(),
+        finalizedAt: new Date().toISOString(),
+        employee: baseEmployee,
+        questionnaireTemplate: baseTemplate,
+        appraisalType: "annual",
+        directReports: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+  };
+
+  const demoSubmissions = getDemoSubmissions();
+
+  // Tour action handlers
+  useEffect(() => {
+    if (!isTourMode) {
+      setShowDemoData(false);
+      setDemoDataState("pending");
+      setIsReviewDialogOpen(false);
+      return;
+    }
+
+    if (currentAction === "showDemoSubmissions") {
+      setShowDemoData(true);
+      setDemoDataState("pending");
+      setSelectedTab("pending");
+      clearAction();
+    }
+
+    if (currentAction === "openReviewDialog") {
+      // Use pending demo data for review dialog
+      setDemoDataState("pending");
+      setSelectedTab("pending");
+      setTimeout(() => {
+        const pendingDemo = {
+          id: "demo-eval-1",
+          employeeId: "demo-emp-1",
+          managerId: "current-manager",
+          reviewCycleId: "demo-cycle-1",
+          selfEvaluationData: {
+            responses: [
+              {
+                questionId: "q1",
+                response: "I consistently met all project deadlines.",
+                rating: 4,
+              },
+              {
+                questionId: "q2",
+                response: "I collaborated effectively with team members.",
+                rating: 5,
+              },
+            ],
+          },
+          selfEvaluationSubmittedAt: new Date().toISOString(),
+          managerEvaluationData: null,
+          managerEvaluationSubmittedAt: null,
+          overallRating: null,
+          status: "pending_manager_review",
+          meetingScheduledAt: null,
+          meetingNotes: null,
+          showNotesToEmployee: null,
+          meetingCompletedAt: null,
+          finalizedAt: null,
+          employee: {
+            id: "demo-emp-1",
+            firstName: "John",
+            lastName: "Doe",
+            email: "john.doe@company.com",
+            department: "Engineering",
+            designation: "Software Engineer",
+          },
+          questionnaireTemplate: {
+            id: "demo-template-1",
+            name: "Annual Performance Review",
+            questions: [
+              {
+                id: "q1",
+                text: "Rate your overall performance",
+                type: "rating",
+                required: true,
+              },
+              {
+                id: "q2",
+                text: "Describe your achievements",
+                type: "textarea",
+                required: true,
+              },
+            ],
+          },
+          appraisalType: "annual",
+          directReports: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as Evaluation;
+        setSelectedEvaluation(pendingDemo);
+        setIsReviewDialogOpen(true);
+      }, 100);
+      clearAction();
+    }
+
+    if (currentAction === "closeReviewDialog") {
+      setIsReviewDialogOpen(false);
+      setSelectedEvaluation(null);
+      clearAction();
+    }
+
+    if (currentAction === "openMeetingDialog") {
+      // Ensure we're on reviewed tab with reviewed demo data
+      setDemoDataState("reviewed");
+      setSelectedTab("reviewed");
+      setTimeout(() => {
+        const reviewedDemo = {
+          id: "demo-eval-1",
+          employeeId: "demo-emp-1",
+          managerId: "current-manager",
+          reviewCycleId: "demo-cycle-1",
+          selfEvaluationData: { responses: [] },
+          selfEvaluationSubmittedAt: new Date().toISOString(),
+          managerEvaluationData: { questionRemarks: { q1: "Great work!" } },
+          managerEvaluationSubmittedAt: new Date().toISOString(),
+          overallRating: 4,
+          status: "reviewed",
+          meetingScheduledAt: null,
+          meetingNotes: null,
+          showNotesToEmployee: null,
+          meetingCompletedAt: null,
+          finalizedAt: null,
+          employee: {
+            id: "demo-emp-1",
+            firstName: "John",
+            lastName: "Doe",
+            email: "john.doe@company.com",
+            department: "Engineering",
+            designation: "Software Engineer",
+          },
+          questionnaireTemplate: {
+            id: "demo-template-1",
+            name: "Review",
+            questions: [],
+          },
+          appraisalType: "annual",
+          directReports: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as Evaluation;
+        setSelectedEvaluation(reviewedDemo);
+        setIsMeetingDialogOpen(true);
+      }, 100);
+      clearAction();
+    }
+
+    if (currentAction === "closeMeetingDialog") {
+      setIsMeetingDialogOpen(false);
+      clearAction();
+    }
+
+    if (currentAction === "openNotesDialog") {
+      // Ensure we're on reviewed tab with reviewed demo data
+      setDemoDataState("reviewed");
+      setSelectedTab("reviewed");
+      setTimeout(() => {
+        const reviewedDemo = {
+          id: "demo-eval-1",
+          employeeId: "demo-emp-1",
+          managerId: "current-manager",
+          reviewCycleId: "demo-cycle-1",
+          selfEvaluationData: { responses: [] },
+          selfEvaluationSubmittedAt: new Date().toISOString(),
+          managerEvaluationData: { questionRemarks: { q1: "Great work!" } },
+          managerEvaluationSubmittedAt: new Date().toISOString(),
+          overallRating: 4,
+          status: "reviewed",
+          meetingScheduledAt: new Date().toISOString(),
+          meetingNotes: null,
+          showNotesToEmployee: null,
+          meetingCompletedAt: new Date().toISOString(),
+          finalizedAt: null,
+          employee: {
+            id: "demo-emp-1",
+            firstName: "John",
+            lastName: "Doe",
+            email: "john.doe@company.com",
+            department: "Engineering",
+            designation: "Software Engineer",
+          },
+          questionnaireTemplate: {
+            id: "demo-template-1",
+            name: "Review",
+            questions: [],
+          },
+          appraisalType: "annual",
+          directReports: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as Evaluation;
+        setSelectedEvaluation(reviewedDemo);
+        setIsNotesDialogOpen(true);
+      }, 100);
+      clearAction();
+    }
+
+    if (currentAction === "closeNotesDialog") {
+      setIsNotesDialogOpen(false);
+      clearAction();
+    }
+
+    if (currentAction === "switchToReviewedTab") {
+      setDemoDataState("reviewed");
+      setSelectedTab("reviewed");
+      clearAction();
+    }
+
+    if (currentAction === "closeReviewAndSwitchToReviewed") {
+      setIsReviewDialogOpen(false);
+      setSelectedEvaluation(null);
+      setDemoDataState("reviewed");
+      setSelectedTab("reviewed");
+      clearAction();
+    }
+
+    if (currentAction === "switchToCompletedTab") {
+      setDemoDataState("completed");
+      setSelectedTab("completed");
+      clearAction();
+    }
+
+    if (currentAction === "closeNotesAndSwitchToCompleted") {
+      setIsNotesDialogOpen(false);
+      setDemoDataState("completed");
+      setSelectedTab("completed");
+      clearAction();
+    }
+  }, [currentAction, isTourMode, clearAction, setSelectedTab]);
+
   // Fetch manager submissions
-  const { data: evaluations = [], isLoading, refetch } = useQuery<Evaluation[]>({
-    queryKey: ['/api/evaluations/manager-submissions'],
+  const {
+    data: evaluations = [],
+    isLoading,
+    refetch,
+  } = useQuery<Evaluation[]>({
+    queryKey: ["/api/evaluations/manager-submissions"],
+
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        includeQuestionnaires: "true",
+      });
+      const response = await apiRequest(
+        "GET",
+        `/api/evaluations/manager-submissions?${params}`,
+      );
+      return response.json();
+    },
+    select: (data: any[]) => {
+      return data.map((evaluation: any) => ({
+        id: evaluation.Id,
+        employeeId: evaluation.EmployeeId,
+        managerId: evaluation.ManagerId,
+        reviewCycleId: evaluation.ReviewCycleId,
+        initiatedAppraisalId: evaluation.InitiatedAppraisalId,
+        selfEvaluationData: evaluation.SelfEvaluationData
+          ? typeof evaluation.SelfEvaluationData === "string"
+            ? JSON.parse(evaluation.SelfEvaluationData)
+            : evaluation.SelfEvaluationData
+          : null,
+        selfEvaluationSubmittedAt: evaluation.SelfEvaluationSubmittedAt,
+        managerEvaluationData: evaluation.ManagerEvaluationData
+          ? typeof evaluation.ManagerEvaluationData === "string"
+            ? JSON.parse(evaluation.ManagerEvaluationData)
+            : evaluation.ManagerEvaluationData
+          : null,
+        managerEvaluationSubmittedAt: evaluation.ManagerEvaluationSubmittedAt,
+        overallRating: evaluation.OverallRating,
+        meetingScheduledAt: evaluation.MeetingScheduledAt,
+        meetingNotes: evaluation.MeetingNotes,
+        meetingCompletedAt: evaluation.MeetingCompletedAt,
+        finalizedAt: evaluation.FinalizedAt,
+        showNotesToEmployee: evaluation.ShowNotesToEmployee,
+        calibratedRating: evaluation.CalibratedRating,
+        calibrationRemarks: evaluation.CalibrationRemarks,
+        calibratedBy: evaluation.CalibratedBy,
+        calibratedAt: evaluation.CalibratedAt,
+        status: evaluation.Status,
+        createdOn: evaluation.CreatedOn,
+        lastUpdatedOn: evaluation.LastUpdatedOn,
+        employee: evaluation.Employee
+          ? {
+              id: evaluation.Employee.Id,
+              firstName: evaluation.Employee.FirstName,
+              lastName: evaluation.Employee.LastName,
+              email: evaluation.Employee.Email,
+              department: evaluation.Employee.Department,
+              designation: evaluation.Employee.Designation,
+            }
+          : null,
+        questionnaireTemplate: (
+          evaluation.questionnaireTemplate ||
+          evaluation.questionnaires ||
+          []
+        ).map((q: any) => ({
+          id: q.Id,
+          name: q.Name,
+          description: q.Description,
+          targetRole: q.TargetRole,
+          questions:
+            typeof q.Questions === "string"
+              ? JSON.parse(q.Questions)
+              : q.Questions,
+        })),
+      }));
+    },
   });
 
   // Submit manager review mutation
   const submitReviewMutation = useMutation({
-    mutationFn: async (data: { evaluationId: string; reviewData: ManagerReviewData }) => {
-      const response = await apiRequest('PUT', `/api/evaluations/${data.evaluationId}/manager-review`, data.reviewData);
+    mutationFn: async (data: {
+      evaluationId: string;
+      reviewData: ManagerReviewData;
+    }) => {
+      const response = await apiRequest(
+        "PUT",
+        `/api/evaluations/${data.evaluationId}/manager-review`,
+        data.reviewData,
+      );
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/evaluations/manager-submissions'] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/evaluations/manager-submissions"],
+      });
       setIsReviewDialogOpen(false);
       setSelectedEvaluation(null);
       toast({
@@ -201,12 +687,21 @@ export default function ManagerSubmissions() {
 
   // Schedule meeting mutation
   const scheduleMeetingMutation = useMutation({
-    mutationFn: async (data: { evaluationId: string; meetingData: MeetingSchedule }) => {
-      const response = await apiRequest('POST', `/api/evaluations/${data.evaluationId}/schedule-meeting`, data.meetingData);
+    mutationFn: async (data: {
+      evaluationId: string;
+      meetingData: MeetingSchedule;
+    }) => {
+      const response = await apiRequest(
+        "POST",
+        `/api/evaluations/${data.evaluationId}/schedule-meeting`,
+        data.meetingData,
+      );
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/evaluations/manager-submissions'] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/evaluations/manager-submissions"],
+      });
       setIsMeetingDialogOpen(false);
       setSelectedEvaluation(null);
       toast({
@@ -225,12 +720,21 @@ export default function ManagerSubmissions() {
 
   // Save meeting notes mutation
   const saveNotesMutation = useMutation({
-    mutationFn: async (data: { evaluationId: string; notesData: MeetingNotesData }) => {
-      const response = await apiRequest('PUT', `/api/evaluations/${data.evaluationId}/meeting-notes`, data.notesData);
+    mutationFn: async (data: {
+      evaluationId: string;
+      notesData: MeetingNotesData;
+    }) => {
+      const response = await apiRequest(
+        "PUT",
+        `/api/evaluations/${data.evaluationId}/meeting-notes`,
+        data.notesData,
+      );
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/evaluations/manager-submissions'] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/evaluations/manager-submissions"],
+      });
       setIsNotesDialogOpen(false);
       setSelectedEvaluation(null);
       toast({
@@ -250,14 +754,20 @@ export default function ManagerSubmissions() {
   // Complete evaluation mutation
   const completeEvaluationMutation = useMutation({
     mutationFn: async (evaluationId: string) => {
-      const response = await apiRequest('POST', `/api/evaluations/${evaluationId}/complete`);
+      const response = await apiRequest(
+        "POST",
+        `/api/evaluations/${evaluationId}/complete`,
+      );
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/evaluations/manager-submissions'] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/evaluations/manager-submissions"],
+      });
       toast({
         title: "Evaluation Completed",
-        description: "Evaluation has been completed and notifications have been sent.",
+        description:
+          "Evaluation has been completed and notifications have been sent.",
       });
     },
     onError: (error: any) => {
@@ -271,31 +781,51 @@ export default function ManagerSubmissions() {
 
   // 360 Feedback - fetch peer employees when dialog is open
   const { data: peerEmployees = [] } = useQuery<PeerEmployee[]>({
-    queryKey: ['/api/feedback-requests/peer-employees'],
+    queryKey: ["/api/feedback-requests/peer-employees"],
     enabled: is360DialogOpen,
   });
 
   // 360 Feedback - fetch existing feedback requests for the selected employee
-  const { data: subjectFeedbackRequests = [], isLoading: isFeedbackLoading } = useQuery<FeedbackRequestData[]>({
-    queryKey: ['/api/feedback-requests/subject', selectedEvaluation?.employeeId],
-    enabled: is360DialogOpen && !!selectedEvaluation?.employeeId,
-  });
+  const { data: subjectFeedbackRequests = [], isLoading: isFeedbackLoading } =
+    useQuery<FeedbackRequestData[]>({
+      queryKey: [
+        "/api/feedback-requests/subject",
+        selectedEvaluation?.employeeId,
+      ],
+      enabled: is360DialogOpen && !!selectedEvaluation?.employeeId,
+    });
 
   // 360 Feedback - create feedback requests mutation
   const createFeedbackRequestsMutation = useMutation({
-    mutationFn: async (data: { subjectId: string; evaluationId: string; reviewerIds: string[]; externalEmails: string[] }) => {
-      const response = await apiRequest('POST', '/api/feedback-requests/create-for-team-member', data);
+    mutationFn: async (data: {
+      subjectId: string;
+      evaluationId: string;
+      reviewerIds: string[];
+      externalEmails: string[];
+    }) => {
+      const response = await apiRequest(
+        "POST",
+        "/api/feedback-requests/create-for-team-member",
+        data,
+      );
       return response.json();
     },
     onSuccess: (data) => {
-      setConfirmationResult({ success: true, emailsSent: data.emailsSent || [] });
+      setConfirmationResult({
+        success: true,
+        emailsSent: data.emailsSent || [],
+      });
       setSelectedPeerIds([]);
       setSelectedReporteeIds([]);
-      setExternalEmails('');
-      queryClient.invalidateQueries({ queryKey: ['/api/evaluations/manager-submissions'] });
+      setExternalEmails("");
+      queryClient.invalidateQueries({
+        queryKey: ["/api/evaluations/manager-submissions"],
+      });
       toast({
         title: "Feedback Requests Sent",
-        description: `Feedback requests have been sent to ${data.emailsSent?.length || 0} recipients.`,
+        description: `Feedback requests have been sent to ${
+          data.emailsSent?.length || 0
+        } recipients.`,
       });
     },
     onError: (error: any) => {
@@ -311,11 +841,11 @@ export default function ManagerSubmissions() {
   const open360Dialog = (evaluation: Evaluation) => {
     setSelectedEvaluation(evaluation);
     setIs360DialogOpen(true);
-    setSelected360Tab('feedback');
+    setSelected360Tab("feedback");
     setSelectedPeerIds([]);
     setSelectedReporteeIds([]);
-    setExternalEmails('');
-    setPeerSearchTerm('');
+    setExternalEmails("");
+    setPeerSearchTerm("");
     setConfirmationResult(null);
   };
 
@@ -325,13 +855,18 @@ export default function ManagerSubmissions() {
 
     const externalEmailList = externalEmails
       .split(/[,;\n]/)
-      .map(e => e.trim())
-      .filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+      .map((e) => e.trim())
+      .filter((e) => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
 
-    if (selectedPeerIds.length === 0 && selectedReporteeIds.length === 0 && externalEmailList.length === 0) {
+    if (
+      selectedPeerIds.length === 0 &&
+      selectedReporteeIds.length === 0 &&
+      externalEmailList.length === 0
+    ) {
       toast({
         title: "No Recipients",
-        description: "Please select at least one peer, reportee, or enter an external email.",
+        description:
+          "Please select at least one peer, reportee, or enter an external email.",
         variant: "destructive",
       });
       return;
@@ -349,8 +884,9 @@ export default function ManagerSubmissions() {
   };
 
   // Filter peer employees based on search term, excluding the subject employee
-  const filteredPeerEmployees = peerEmployees.filter(peer => {
-    if (selectedEvaluation && peer.id === selectedEvaluation.employeeId) return false;
+  const filteredPeerEmployees = peerEmployees.filter((peer) => {
+    if (selectedEvaluation && peer.id === selectedEvaluation.employeeId)
+      return false;
     if (!peerSearchTerm) return true;
     const searchLower = peerSearchTerm.toLowerCase();
     return (
@@ -363,34 +899,67 @@ export default function ManagerSubmissions() {
   });
 
   // Filter evaluations based on selected tab
-  const filteredEvaluations = evaluations.filter(evaluation => {
-    if (selectedTab === 'pending') {
-      return evaluation.selfEvaluationSubmittedAt && !evaluation.managerEvaluationSubmittedAt;
-    } else if (selectedTab === 'reviewed') {
+  const baseEvaluations =
+    showDemoData && isTourMode
+      ? [...evaluations, ...demoSubmissions]
+      : evaluations;
+
+  const filteredEvaluations = baseEvaluations.filter((evaluation) => {
+    if (selectedTab === "pending") {
+      return (
+        evaluation.selfEvaluationSubmittedAt &&
+        !evaluation.managerEvaluationSubmittedAt
+      );
+    } else if (selectedTab === "reviewed") {
       return evaluation.managerEvaluationSubmittedAt && !evaluation.finalizedAt;
-    } else { // completed
+    } else {
+      // completed
       return evaluation.finalizedAt;
     }
   });
 
   const getStatusBadge = (evaluation: Evaluation) => {
     if (evaluation.finalizedAt) {
-      return <Badge variant="default" className="bg-green-100 text-green-800">Completed</Badge>;
+      return (
+        <Badge variant="default" className="bg-green-100 text-green-800">
+          Completed
+        </Badge>
+      );
     } else if (evaluation.managerEvaluationSubmittedAt) {
-      return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Reviewed</Badge>;
+      return (
+        <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+          Reviewed
+        </Badge>
+      );
     } else if (evaluation.selfEvaluationSubmittedAt) {
-      return <Badge variant="outline" className="bg-orange-100 text-orange-800">Pending Review</Badge>;
+      return (
+        <Badge variant="outline" className="bg-orange-100 text-orange-800">
+          Pending Review
+        </Badge>
+      );
     } else {
       return <Badge variant="outline">Not Started</Badge>;
     }
   };
 
   const canScheduleMeeting = (evaluation: Evaluation) => {
-    return evaluation.managerEvaluationSubmittedAt && !evaluation.meetingScheduledAt;
+    return (
+      evaluation.managerEvaluationSubmittedAt && !evaluation.meetingScheduledAt
+    );
   };
 
   const canAddNotes = (evaluation: Evaluation) => {
-    return evaluation.meetingScheduledAt && !evaluation.finalizedAt;
+    if (!evaluation.meetingScheduledAt) {
+      return false;
+    }
+    // Check if the meeting time has passed
+    const meetingTime = new Date(evaluation.meetingScheduledAt);
+    const currentTime = new Date();
+    return meetingTime <= currentTime;
+  };
+
+  const isMeetingCompleted = (evaluation: Evaluation) => {
+    return !!evaluation.meetingCompletedAt;
   };
 
   const canCompleteEvaluation = (evaluation: Evaluation) => {
@@ -401,21 +970,31 @@ export default function ManagerSubmissions() {
   const renderQuestionnaireReview = (evaluation: Evaluation) => {
     const selfEvalData = evaluation.selfEvaluationData;
     const responses = selfEvalData?.responses || {};
-    const questionnaireTemplates = Array.isArray(evaluation.questionnaireTemplate) 
-      ? evaluation.questionnaireTemplate 
+    const questionnaireTemplates = Array.isArray(
+      evaluation.questionnaireTemplate,
+    )
+      ? evaluation.questionnaireTemplate
       : [evaluation.questionnaireTemplate].filter(Boolean);
 
     // Collect all questions from all questionnaires
-    const allQuestions: { question: Question; questionnaireId: string; questionnaireName: string }[] = [];
-    
+    const allQuestions: {
+      question: Question;
+      questionnaireId: string;
+      questionnaireName: string;
+      questionIndex: number;
+    }[] = [];
+
     questionnaireTemplates.forEach((template: any) => {
       if (template && template.questions) {
-        const questions = Array.isArray(template.questions) ? template.questions : JSON.parse(template.questions);
-        questions.forEach((question: Question) => {
+        const questions = Array.isArray(template.questions)
+          ? template.questions
+          : JSON.parse(template.questions);
+        questions.forEach((question: Question, index: number) => {
           allQuestions.push({
             question,
             questionnaireId: template.id,
-            questionnaireName: template.name
+            questionnaireName: template.name,
+            questionIndex: index,
           });
         });
       }
@@ -423,87 +1002,124 @@ export default function ManagerSubmissions() {
 
     return (
       <div className="space-y-6">
-        {allQuestions.map(({ question, questionnaireId, questionnaireName }) => {
-          const responseKey = `${questionnaireId}_${question.id}`;
-          const employeeResponse: EmployeeResponse = responses[responseKey];
-          
-          if (!employeeResponse) return null;
+        {allQuestions.map(
+          ({ question, questionnaireId, questionnaireName, questionIndex }) => {
+            const responseKey = `${questionnaireId}_${questionIndex}`;
+            const employeeResponse: EmployeeResponse = responses[responseKey];
 
-          return (
-            <div key={responseKey} className="border rounded-lg p-6 space-y-4">
-              {/* Question */}
-              <div className="space-y-2">
-                <h4 className="font-semibold text-lg text-gray-900">{question.text}</h4>
-                <p className="text-sm text-gray-500">From: {questionnaireName}</p>
-              </div>
+            if (!employeeResponse) return null;
 
-              {/* Employee Response */}
-              <div className="bg-blue-50 rounded-lg p-4 space-y-3">
-                <h5 className="font-medium text-blue-900">Employee's Response</h5>
+            return (
+              <div
+                key={responseKey}
+                className="border rounded-lg p-6 space-y-4"
+              >
+                {/* Question */}
                 <div className="space-y-2">
-                  <div>
-                    <p className="text-sm font-medium text-blue-800">Answer:</p>
-                    <p className="text-gray-700 bg-white p-3 rounded border">{employeeResponse.response}</p>
-                  </div>
-                  
-                  {question.type === 'rating' && employeeResponse.rating && (
-                    <div>
-                      <p className="text-sm font-medium text-blue-800">Rating:</p>
-                      <div className="flex items-center space-x-2">
-                        <div className="flex items-center space-x-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={cn(
-                                "h-4 w-4",
-                                star <= employeeResponse.rating! ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-                              )}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-sm font-medium">{employeeResponse.rating}/5</span>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {employeeResponse.remarks && (
-                    <div>
-                      <p className="text-sm font-medium text-blue-800">Employee's Remarks:</p>
-                      <p className="text-gray-700 bg-white p-3 rounded border">{employeeResponse.remarks}</p>
-                    </div>
-                  )}
+                  <h4 className="font-semibold text-lg text-gray-900">
+                    {question.text || (question as any).Text}
+                  </h4>
+                  <p className="text-sm text-gray-500">
+                    From: {questionnaireName}
+                  </p>
                 </div>
-              </div>
 
-              {/* Manager Remarks Input */}
-              <div className="bg-green-50 rounded-lg p-4 space-y-3">
-                <h5 className="font-medium text-green-900">Your Manager Remarks</h5>
-                <div>
-                  <Label htmlFor={`manager-remarks-${responseKey}`} className="text-sm font-medium text-green-800">
-                    Add your feedback and comments for this response:
-                  </Label>
-                  <Textarea
-                    id={`manager-remarks-${responseKey}`}
-                    placeholder="Enter your manager remarks for this question..."
-                    rows={3}
-                    className="mt-2 border-green-200 focus:border-green-400"
-                    value={reviewData.managerEvaluationData.questionRemarks?.[responseKey] || ''}
-                    onChange={(e) => setReviewData(prev => ({
-                      ...prev,
-                      managerEvaluationData: {
-                        ...prev.managerEvaluationData,
-                        questionRemarks: {
-                          ...prev.managerEvaluationData.questionRemarks,
-                          [responseKey]: e.target.value
-                        }
+                {/* Employee Response */}
+                <div className="bg-blue-50 rounded-lg p-4 space-y-3">
+                  <h5 className="font-medium text-blue-900">
+                    Employee's Response
+                  </h5>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">
+                        Answer:
+                      </p>
+                      <p className="text-gray-700 bg-white p-3 rounded border">
+                        {employeeResponse.response}
+                      </p>
+                    </div>
+
+                    {question.type === "rating" && employeeResponse.rating && (
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">
+                          Rating:
+                        </p>
+                        <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={cn(
+                                  "h-4 w-4",
+                                  star <= employeeResponse.rating!
+                                    ? "fill-yellow-400 text-yellow-400"
+                                    : "text-gray-300",
+                                )}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-sm font-medium">
+                            {employeeResponse.rating}/5
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {employeeResponse.remarks && (
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">
+                          Employee's Remarks:
+                        </p>
+                        <p className="text-gray-700 bg-white p-3 rounded border">
+                          {employeeResponse.remarks}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Manager Remarks Input */}
+                <div className="bg-green-50 rounded-lg p-4 space-y-3">
+                  <h5 className="font-medium text-green-900">
+                    Your Manager Remarks
+                  </h5>
+                  <div>
+                    <Label
+                      htmlFor={`manager-remarks-${responseKey}`}
+                      className="text-sm font-medium text-green-800"
+                    >
+                      Add your feedback and comments for this response:
+                    </Label>
+                    <Textarea
+                      id={`manager-remarks-${responseKey}`}
+                      placeholder="Enter your manager remarks for this question..."
+                      rows={3}
+                      className="mt-2 border-green-200 focus:border-green-400"
+                      data-testid={`manager-remarks-${questionIndex}`}
+                      value={
+                        reviewData.managerEvaluationData.questionRemarks?.[
+                          responseKey
+                        ] || ""
                       }
-                    }))}
-                  />
+                      onChange={(e) =>
+                        setReviewData((prev) => ({
+                          ...prev,
+                          managerEvaluationData: {
+                            ...prev.managerEvaluationData,
+                            questionRemarks: {
+                              ...prev.managerEvaluationData.questionRemarks,
+                              [responseKey]: e.target.value,
+                            },
+                          },
+                        }))
+                      }
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          },
+        )}
 
         {/* Final Rating */}
         <div className="border-t pt-6">
@@ -511,14 +1127,24 @@ export default function ManagerSubmissions() {
             <Label htmlFor="final-rating">Final Rating (1-5)</Label>
             <Select
               value={String(reviewData.finalRating)}
-              onValueChange={(value) => setReviewData(prev => ({ ...prev, finalRating: parseInt(value) }))}
+              onValueChange={(value) =>
+                setReviewData((prev) => ({
+                  ...prev,
+                  finalRating: parseInt(value),
+                }))
+              }
             >
-              <SelectTrigger id="final-rating" data-testid="final-rating-select">
+              <SelectTrigger
+                id="final-rating"
+                data-testid="final-rating-select"
+              >
                 <SelectValue placeholder="Select rating" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="1">1 - Below Expectations</SelectItem>
-                <SelectItem value="2">2 - Partially Meets Expectations</SelectItem>
+                <SelectItem value="2">
+                  2 - Partially Meets Expectations
+                </SelectItem>
                 <SelectItem value="3">3 - Meets Expectations</SelectItem>
                 <SelectItem value="4">4 - Exceeds Expectations</SelectItem>
                 <SelectItem value="5">5 - Outstanding</SelectItem>
@@ -547,10 +1173,12 @@ export default function ManagerSubmissions() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Employee Submissions</h1>
-            <p className="text-muted-foreground">Review and manage employee performance evaluations</p>
+            <p className="text-muted-foreground">
+              Review and manage employee performance evaluations
+            </p>
           </div>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => refetch()}
             data-testid="refresh-submissions"
           >
@@ -560,16 +1188,34 @@ export default function ManagerSubmissions() {
         </div>
 
         {/* Tabs for different evaluation states */}
-        <Tabs value={selectedTab} onValueChange={(value) => setSelectedTab(value as typeof selectedTab)} className="w-full">
+        <Tabs
+          value={selectedTab}
+          onValueChange={(value) => setSelectedTab(value as typeof selectedTab)}
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="pending" data-testid="tab-pending">
-              Pending Review ({evaluations.filter(e => e.selfEvaluationSubmittedAt && !e.managerEvaluationSubmittedAt).length})
+              Pending Review (
+              {
+                evaluations.filter(
+                  (e) =>
+                    e.selfEvaluationSubmittedAt &&
+                    !e.managerEvaluationSubmittedAt,
+                ).length
+              }
+              )
             </TabsTrigger>
             <TabsTrigger value="reviewed" data-testid="tab-reviewed">
-              Reviewed ({evaluations.filter(e => e.managerEvaluationSubmittedAt && !e.finalizedAt).length})
+              Reviewed (
+              {
+                evaluations.filter(
+                  (e) => e.managerEvaluationSubmittedAt && !e.finalizedAt,
+                ).length
+              }
+              )
             </TabsTrigger>
             <TabsTrigger value="completed" data-testid="tab-completed">
-              Completed ({evaluations.filter(e => e.finalizedAt).length})
+              Completed ({evaluations.filter((e) => e.finalizedAt).length})
             </TabsTrigger>
           </TabsList>
 
@@ -577,17 +1223,26 @@ export default function ManagerSubmissions() {
             {filteredEvaluations.length === 0 ? (
               <div className="text-center py-12">
                 <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-muted-foreground">No evaluations found</h3>
+                <h3 className="text-lg font-medium text-muted-foreground">
+                  No evaluations found
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  {selectedTab === 'pending' && "No employee submissions are pending your review."}
-                  {selectedTab === 'reviewed' && "No evaluations are in reviewed status."}
-                  {selectedTab === 'completed' && "No evaluations have been completed yet."}
+                  {selectedTab === "pending" &&
+                    "No employee submissions are pending your review."}
+                  {selectedTab === "reviewed" &&
+                    "No evaluations are in reviewed status."}
+                  {selectedTab === "completed" &&
+                    "No evaluations have been completed yet."}
                 </p>
               </div>
             ) : (
               <div className="grid gap-6">
-                {filteredEvaluations.map((evaluation) => (
-                  <Card key={evaluation.id} className="w-full" data-testid={`evaluation-card-${evaluation.id}`}>
+                {filteredEvaluations.map((evaluation, index) => (
+                  <Card
+                    key={evaluation.id}
+                    className="w-full"
+                    data-testid={`submission-card-${index}`}
+                  >
                     <CardHeader className="pb-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
@@ -596,10 +1251,12 @@ export default function ManagerSubmissions() {
                           </div>
                           <div>
                             <CardTitle className="text-lg">
-                              {evaluation.employee?.firstName} {evaluation.employee?.lastName}
+                              {evaluation.employee?.firstName}{" "}
+                              {evaluation.employee?.lastName}
                             </CardTitle>
                             <CardDescription>
-                              {evaluation.employee?.designation} • {evaluation.employee?.department}
+                              {evaluation.employee?.designation} •{" "}
+                              {evaluation.employee?.department}
                             </CardDescription>
                           </div>
                         </div>
@@ -610,48 +1267,70 @@ export default function ManagerSubmissions() {
                       <div className="space-y-4">
                         {/* Timeline */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                          <div className={cn(
-                            "flex items-center space-x-2 p-3 rounded-lg",
-                            evaluation.selfEvaluationSubmittedAt ? "bg-green-50 text-green-700" : "bg-gray-50 text-gray-500"
-                          )}>
+                          <div
+                            className={cn(
+                              "flex items-center space-x-2 p-3 rounded-lg",
+                              evaluation.selfEvaluationSubmittedAt
+                                ? "bg-green-50 text-green-700"
+                                : "bg-gray-50 text-gray-500",
+                            )}
+                          >
                             <CheckCircle className="h-4 w-4" />
                             <div>
                               <p className="font-medium">Employee Submitted</p>
                               <p className="text-xs">
-                                {evaluation.selfEvaluationSubmittedAt ? 
-                                  format(new Date(evaluation.selfEvaluationSubmittedAt), 'MMM dd, yyyy') : 
-                                  'Not submitted'
-                                }
+                                {evaluation.selfEvaluationSubmittedAt
+                                  ? format(
+                                      new Date(
+                                        evaluation.selfEvaluationSubmittedAt,
+                                      ),
+                                      "MMM dd, yyyy",
+                                    )
+                                  : "Not submitted"}
                               </p>
                             </div>
                           </div>
-                          <div className={cn(
-                            "flex items-center space-x-2 p-3 rounded-lg",
-                            evaluation.managerEvaluationSubmittedAt ? "bg-green-50 text-green-700" : "bg-gray-50 text-gray-500"
-                          )}>
+                          <div
+                            className={cn(
+                              "flex items-center space-x-2 p-3 rounded-lg",
+                              evaluation.managerEvaluationSubmittedAt
+                                ? "bg-green-50 text-green-700"
+                                : "bg-gray-50 text-gray-500",
+                            )}
+                          >
                             <Star className="h-4 w-4" />
                             <div>
                               <p className="font-medium">Manager Reviewed</p>
                               <p className="text-xs">
-                                {evaluation.managerEvaluationSubmittedAt ? 
-                                  format(new Date(evaluation.managerEvaluationSubmittedAt), 'MMM dd, yyyy') : 
-                                  'Pending'
-                                }
+                                {evaluation.managerEvaluationSubmittedAt
+                                  ? format(
+                                      new Date(
+                                        evaluation.managerEvaluationSubmittedAt,
+                                      ),
+                                      "MMM dd, yyyy",
+                                    )
+                                  : "Pending"}
                               </p>
                             </div>
                           </div>
-                          <div className={cn(
-                            "flex items-center space-x-2 p-3 rounded-lg",
-                            evaluation.finalizedAt ? "bg-green-50 text-green-700" : "bg-gray-50 text-gray-500"
-                          )}>
+                          <div
+                            className={cn(
+                              "flex items-center space-x-2 p-3 rounded-lg",
+                              evaluation.finalizedAt
+                                ? "bg-green-50 text-green-700"
+                                : "bg-gray-50 text-gray-500",
+                            )}
+                          >
                             <CheckCircle className="h-4 w-4" />
                             <div>
                               <p className="font-medium">Completed</p>
                               <p className="text-xs">
-                                {evaluation.finalizedAt ? 
-                                  format(new Date(evaluation.finalizedAt), 'MMM dd, yyyy') : 
-                                  'Not completed'
-                                }
+                                {evaluation.finalizedAt
+                                  ? format(
+                                      new Date(evaluation.finalizedAt),
+                                      "MMM dd, yyyy",
+                                    )
+                                  : "Not completed"}
                               </p>
                             </div>
                           </div>
@@ -660,18 +1339,24 @@ export default function ManagerSubmissions() {
                         {/* Ratings */}
                         {evaluation.overallRating && (
                           <div className="flex items-center space-x-2">
-                            <span className="text-sm font-medium">Final Rating:</span>
+                            <span className="text-sm font-medium">
+                              Final Rating:
+                            </span>
                             <div className="flex items-center space-x-1">
                               {[1, 2, 3, 4, 5].map((star) => (
                                 <Star
                                   key={star}
                                   className={cn(
                                     "h-4 w-4",
-                                    star <= evaluation.overallRating! ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                                    star <= evaluation.overallRating!
+                                      ? "fill-yellow-400 text-yellow-400"
+                                      : "text-gray-300",
                                   )}
                                 />
                               ))}
-                              <span className="text-sm font-medium ml-2">{evaluation.overallRating}/5</span>
+                              <span className="text-sm font-medium ml-2">
+                                {evaluation.overallRating}/5
+                              </span>
                             </div>
                           </div>
                         )}
@@ -681,10 +1366,16 @@ export default function ManagerSubmissions() {
                           <div className="flex items-center space-x-2 text-sm">
                             <CalendarIcon className="h-4 w-4" />
                             <span>
-                              Meeting scheduled: {format(new Date(evaluation.meetingScheduledAt), 'MMM dd, yyyy at h:mm a')}
+                              Meeting scheduled:{" "}
+                              {format(
+                                new Date(evaluation.meetingScheduledAt),
+                                "MMM dd, yyyy 'at' h:mm a",
+                              )}
                             </span>
                             {evaluation.meetingCompletedAt && (
-                              <Badge variant="secondary" className="ml-2">Completed</Badge>
+                              <Badge variant="secondary" className="ml-2">
+                                Completed
+                              </Badge>
                             )}
                           </div>
                         )}
@@ -692,28 +1383,31 @@ export default function ManagerSubmissions() {
                         {/* Action buttons */}
                         <Separator />
                         <div className="flex flex-wrap gap-2">
-                          {selectedTab === 'pending' && evaluation.appraisalType === 'mbo_based' && (
-                            <Button
-                              variant="outline"
-                              onClick={() => open360Dialog(evaluation)}
-                              data-testid={`360-feedback-button-${evaluation.id}`}
-                            >
-                              <Users className="h-4 w-4 mr-2" />
-                              360° Feedback
-                            </Button>
-                          )}
+                          {selectedTab === "pending" &&
+                            evaluation.appraisalType === "mbo_based" && (
+                              <Button
+                                variant="outline"
+                                onClick={() => open360Dialog(evaluation)}
+                                data-testid={`360-feedback-button-${evaluation.id}`}
+                              >
+                                <Users className="h-4 w-4 mr-2" />
+                                360° Feedback
+                              </Button>
+                            )}
 
-                          {selectedTab === 'pending' && (
+                          {selectedTab === "pending" && (
                             <Button
                               onClick={() => {
                                 setSelectedEvaluation(evaluation);
-                                setReviewData({ 
-                                  managerEvaluationData: { questionRemarks: {} },
-                                  finalRating: 5
+                                setReviewData({
+                                  managerEvaluationData: {
+                                    questionRemarks: {},
+                                  },
+                                  finalRating: 5,
                                 });
                                 setIsReviewDialogOpen(true);
                               }}
-                              data-testid={`review-button-${evaluation.id}`}
+                              data-testid={`review-btn-${index}`}
                             >
                               <Star className="h-4 w-4 mr-2" />
                               Review Submission
@@ -727,7 +1421,7 @@ export default function ManagerSubmissions() {
                                 setSelectedEvaluation(evaluation);
                                 setIsMeetingDialogOpen(true);
                               }}
-                              data-testid={`schedule-meeting-button-${evaluation.id}`}
+                              data-testid={`schedule-meeting-btn-${index}`}
                             >
                               <CalendarIcon className="h-4 w-4 mr-2" />
                               Schedule Meeting
@@ -739,24 +1433,32 @@ export default function ManagerSubmissions() {
                               variant="outline"
                               onClick={() => {
                                 setSelectedEvaluation(evaluation);
-                                setNotesData({ 
-                                  meetingNotes: evaluation.meetingNotes || '',
-                                  finalRating: evaluation.overallRating || undefined,
-                                  showNotesToEmployee: evaluation.showNotesToEmployee ?? false
+                                setNotesData({
+                                  meetingNotes:
+                                    evaluation.meetingNotes || "",
+                                  finalRating:
+                                    evaluation.overallRating || undefined,
+                                  showNotesToEmployee:
+                                    evaluation.showNotesToEmployee ??
+                                    false,
                                 });
                                 setIsNotesDialogOpen(true);
                               }}
                               data-testid={`meeting-notes-button-${evaluation.id}`}
                             >
                               <MessageSquare className="h-4 w-4 mr-2" />
-                              {evaluation.meetingNotes ? 'Edit Notes' : 'Add Meeting Notes'}
+                              {evaluation.meetingNotes
+                                ? "Edit Notes"
+                                : "Add Meeting Notes"}
                             </Button>
                           )}
 
                           {canCompleteEvaluation(evaluation) && (
                             <Button
                               variant="default"
-                              onClick={() => completeEvaluationMutation.mutate(evaluation.id)}
+                              onClick={() =>
+                                completeEvaluationMutation.mutate(evaluation.id)
+                              }
                               disabled={completeEvaluationMutation.isPending}
                               data-testid={`complete-evaluation-button-${evaluation.id}`}
                             >
@@ -775,29 +1477,47 @@ export default function ManagerSubmissions() {
         </Tabs>
 
         {/* Review Dialog */}
-        <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <Dialog
+          open={isReviewDialogOpen}
+          onOpenChange={(open) => {
+            // Prevent closing during tour mode unless explicitly triggered by action
+            if (!open && isTourMode) return;
+            setIsReviewDialogOpen(open);
+          }}
+        >
+          <DialogContent
+            className={`max-w-4xl max-h-[80vh] overflow-y-auto ${isTourMode ? "z-[9997]" : ""}`}
+            data-testid="evaluation-dialog"
+          >
             <DialogHeader>
               <DialogTitle>Review Employee Submission</DialogTitle>
               <DialogDescription>
-                Review {selectedEvaluation?.employee?.firstName} {selectedEvaluation?.employee?.lastName}'s evaluation and provide your feedback
+                Review {selectedEvaluation?.employee?.firstName}{" "}
+                {selectedEvaluation?.employee?.lastName}'s evaluation and
+                provide your feedback
               </DialogDescription>
             </DialogHeader>
 
             {selectedEvaluation && (
               <div className="space-y-6">
                 {/* Employee's Self Evaluation with Manager Review */}
-                {selectedEvaluation.selfEvaluationData && selectedEvaluation.questionnaireTemplate && (
-                  <div className="space-y-6">
-                    <h3 className="text-lg font-semibold">Employee's Self Evaluation & Your Review</h3>
-                    {renderQuestionnaireReview(selectedEvaluation)}
-                  </div>
-                )}
+                {selectedEvaluation.selfEvaluationData &&
+                  selectedEvaluation.questionnaireTemplate && (
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-semibold">
+                        Employee's Self Evaluation & Your Review
+                      </h3>
+                      {renderQuestionnaireReview(selectedEvaluation)}
+                    </div>
+                  )}
               </div>
             )}
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsReviewDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setIsReviewDialogOpen(false)}
+              >
                 Cancel
               </Button>
               <Button
@@ -805,7 +1525,7 @@ export default function ManagerSubmissions() {
                   if (selectedEvaluation) {
                     submitReviewMutation.mutate({
                       evaluationId: selectedEvaluation.id,
-                      reviewData
+                      reviewData,
                     });
                   }
                 }}
@@ -820,12 +1540,25 @@ export default function ManagerSubmissions() {
         </Dialog>
 
         {/* Meeting Schedule Dialog */}
-        <Dialog open={isMeetingDialogOpen} onOpenChange={setIsMeetingDialogOpen}>
-          <DialogContent className="max-w-2xl">
+        <Dialog
+          open={isMeetingDialogOpen}
+          onOpenChange={(open) => {
+            // Prevent closing during tour mode unless explicitly triggered by action
+            if (!open && isTourMode) return;
+            setIsMeetingDialogOpen(open);
+          }}
+        >
+          <DialogContent
+            className="max-w-2xl z-[9997]"
+            data-testid="meeting-dialog"
+          >
             <DialogHeader>
               <DialogTitle>Schedule One-on-One Meeting</DialogTitle>
               <DialogDescription>
-                Schedule a meeting with {selectedEvaluation?.employee?.firstName} {selectedEvaluation?.employee?.lastName} to discuss their performance review
+                Schedule a meeting with{" "}
+                {selectedEvaluation?.employee?.firstName}{" "}
+                {selectedEvaluation?.employee?.lastName} to discuss their
+                performance review
               </DialogDescription>
             </DialogHeader>
 
@@ -835,16 +1568,28 @@ export default function ManagerSubmissions() {
                   <Label htmlFor="meeting-date">Meeting Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start text-left">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left"
+                        data-testid="meeting-date-picker"
+                      >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {meetingData.meetingDate ? format(meetingData.meetingDate, "PPP") : "Pick a date"}
+                        {meetingData.meetingDate
+                          ? format(meetingData.meetingDate, "PPP")
+                          : "Pick a date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
                         selected={meetingData.meetingDate}
-                        onSelect={(date) => date && setMeetingData(prev => ({ ...prev, meetingDate: date }))}
+                        onSelect={(date) =>
+                          date &&
+                          setMeetingData((prev) => ({
+                            ...prev,
+                            meetingDate: date,
+                          }))
+                        }
                         initialFocus
                         disabled={(date) => date < new Date()}
                       />
@@ -855,9 +1600,17 @@ export default function ManagerSubmissions() {
                   <Label htmlFor="meeting-time">Meeting Time</Label>
                   <Select
                     value={meetingData.meetingTime}
-                    onValueChange={(value) => setMeetingData(prev => ({ ...prev, meetingTime: value }))}
+                    onValueChange={(value) =>
+                      setMeetingData((prev) => ({
+                        ...prev,
+                        meetingTime: value,
+                      }))
+                    }
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger
+                      className="w-full"
+                      data-testid="meeting-time-select"
+                    >
                       <SelectValue placeholder="Select time" />
                     </SelectTrigger>
                     <SelectContent>
@@ -891,7 +1644,12 @@ export default function ManagerSubmissions() {
                 <Input
                   id="meeting-title"
                   value={meetingData.meetingTitle}
-                  onChange={(e) => setMeetingData(prev => ({ ...prev, meetingTitle: e.target.value }))}
+                  onChange={(e) =>
+                    setMeetingData((prev) => ({
+                      ...prev,
+                      meetingTitle: e.target.value,
+                    }))
+                  }
                 />
               </div>
               <div>
@@ -900,29 +1658,39 @@ export default function ManagerSubmissions() {
                   id="meeting-description"
                   rows={3}
                   value={meetingData.meetingDescription}
-                  onChange={(e) => setMeetingData(prev => ({ ...prev, meetingDescription: e.target.value }))}
+                  onChange={(e) =>
+                    setMeetingData((prev) => ({
+                      ...prev,
+                      meetingDescription: e.target.value,
+                    }))
+                  }
                 />
               </div>
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsMeetingDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setIsMeetingDialogOpen(false)}
+              >
                 Cancel
               </Button>
               <Button
                 onClick={() => {
                   if (selectedEvaluation) {
                     // Combine date and time into a single Date object
-                    const [hours, minutes] = meetingData.meetingTime.split(':').map(Number);
+                    const [hours, minutes] = meetingData.meetingTime
+                      .split(":")
+                      .map(Number);
                     const combinedDateTime = new Date(meetingData.meetingDate);
                     combinedDateTime.setHours(hours, minutes, 0, 0);
-                    
+
                     scheduleMeetingMutation.mutate({
                       evaluationId: selectedEvaluation.id,
                       meetingData: {
                         ...meetingData,
-                        meetingDate: combinedDateTime
-                      }
+                        meetingDate: combinedDateTime,
+                      },
                     });
                   }
                 }}
@@ -937,12 +1705,24 @@ export default function ManagerSubmissions() {
         </Dialog>
 
         {/* Meeting Notes Dialog */}
-        <Dialog open={isNotesDialogOpen} onOpenChange={setIsNotesDialogOpen}>
-          <DialogContent className="max-w-2xl">
+        <Dialog
+          open={isNotesDialogOpen}
+          onOpenChange={(open) => {
+            // Prevent closing during tour mode unless explicitly triggered by action
+            if (!open && isTourMode) return;
+            setIsNotesDialogOpen(open);
+          }}
+        >
+          <DialogContent
+            className="max-w-2xl z-[9997]"
+            data-testid="meeting-notes-dialog"
+          >
             <DialogHeader>
               <DialogTitle>Meeting Notes</DialogTitle>
               <DialogDescription>
-                Add notes from your one-on-one meeting with {selectedEvaluation?.employee?.firstName} {selectedEvaluation?.employee?.lastName}
+                Add notes from your one-on-one meeting with{" "}
+                {selectedEvaluation?.employee?.firstName}{" "}
+                {selectedEvaluation?.employee?.lastName}
               </DialogDescription>
             </DialogHeader>
 
@@ -954,21 +1734,40 @@ export default function ManagerSubmissions() {
                   rows={8}
                   placeholder="Enter detailed notes from your meeting..."
                   value={notesData.meetingNotes}
-                  onChange={(e) => setNotesData(prev => ({ ...prev, meetingNotes: e.target.value }))}
+                  data-testid="meeting-notes-textarea"
+                  onChange={(e) =>
+                    setNotesData((prev) => ({
+                      ...prev,
+                      meetingNotes: e.target.value,
+                    }))
+                  }
                 />
               </div>
               <div>
-                <Label htmlFor="updated-rating">Update Final Rating (Optional)</Label>
+                <Label htmlFor="updated-rating">
+                  Update Final Rating (Optional)
+                </Label>
                 <Select
-                  value={notesData.finalRating ? String(notesData.finalRating) : undefined}
-                  onValueChange={(value) => setNotesData(prev => ({ ...prev, finalRating: value ? parseInt(value) : undefined }))}
+                  value={
+                    notesData.finalRating
+                      ? String(notesData.finalRating)
+                      : undefined
+                  }
+                  onValueChange={(value) =>
+                    setNotesData((prev) => ({
+                      ...prev,
+                      finalRating: value ? parseInt(value) : undefined,
+                    }))
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Keep current rating or update" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[9998]">
                     <SelectItem value="1">1 - Below Expectations</SelectItem>
-                    <SelectItem value="2">2 - Partially Meets Expectations</SelectItem>
+                    <SelectItem value="2">
+                      2 - Partially Meets Expectations
+                    </SelectItem>
                     <SelectItem value="3">3 - Meets Expectations</SelectItem>
                     <SelectItem value="4">4 - Exceeds Expectations</SelectItem>
                     <SelectItem value="5">5 - Outstanding</SelectItem>
@@ -979,24 +1778,42 @@ export default function ManagerSubmissions() {
                 <Label>Show Meeting Notes to Employee</Label>
                 <RadioGroup
                   value={notesData.showNotesToEmployee ? "yes" : "no"}
-                  onValueChange={(value) => setNotesData(prev => ({ ...prev, showNotesToEmployee: value === "yes" }))}
+                  onValueChange={(value) =>
+                    setNotesData((prev) => ({
+                      ...prev,
+                      showNotesToEmployee: value === "yes",
+                    }))
+                  }
                   className="flex gap-4 mt-2"
                   data-testid="show-notes-radio"
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="yes" id="show-yes" />
-                    <Label htmlFor="show-yes" className="font-normal cursor-pointer">Yes</Label>
+                    <Label
+                      htmlFor="show-yes"
+                      className="font-normal cursor-pointer"
+                    >
+                      Yes
+                    </Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="no" id="show-no" />
-                    <Label htmlFor="show-no" className="font-normal cursor-pointer">No</Label>
+                    <Label
+                      htmlFor="show-no"
+                      className="font-normal cursor-pointer"
+                    >
+                      No
+                    </Label>
                   </div>
                 </RadioGroup>
               </div>
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsNotesDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setIsNotesDialogOpen(false)}
+              >
                 Cancel
               </Button>
               <Button
@@ -1004,7 +1821,7 @@ export default function ManagerSubmissions() {
                   if (selectedEvaluation) {
                     saveNotesMutation.mutate({
                       evaluationId: selectedEvaluation.id,
-                      notesData
+                      notesData,
                     });
                   }
                 }}
@@ -1019,12 +1836,15 @@ export default function ManagerSubmissions() {
         </Dialog>
 
         {/* 360 Degree Feedback Dialog */}
-        <Dialog open={is360DialogOpen} onOpenChange={(open) => {
-          setIs360DialogOpen(open);
-          if (!open) {
-            setConfirmationResult(null);
-          }
-        }}>
+        <Dialog
+          open={is360DialogOpen}
+          onOpenChange={(open) => {
+            setIs360DialogOpen(open);
+            if (!open) {
+              setConfirmationResult(null);
+            }
+          }}
+        >
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -1032,7 +1852,9 @@ export default function ManagerSubmissions() {
                 360° Feedback Request
               </DialogTitle>
               <DialogDescription>
-                Request feedback for {selectedEvaluation?.employee?.firstName} {selectedEvaluation?.employee?.lastName} from peers, direct reports, or external contacts.
+                Request feedback for {selectedEvaluation?.employee?.firstName}{" "}
+                {selectedEvaluation?.employee?.lastName} from peers, direct
+                reports, or external contacts.
               </DialogDescription>
             </DialogHeader>
 
@@ -1040,7 +1862,9 @@ export default function ManagerSubmissions() {
               <div className="space-y-4 py-4">
                 <div className="flex items-center gap-2 text-green-600">
                   <CheckCircle className="h-5 w-5" />
-                  <span className="font-medium">Feedback requests sent successfully!</span>
+                  <span className="font-medium">
+                    Feedback requests sent successfully!
+                  </span>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4">
                   <h4 className="font-medium mb-2">Emails sent to:</h4>
@@ -1061,9 +1885,18 @@ export default function ManagerSubmissions() {
               </div>
             ) : (
               <>
-                <Tabs value={selected360Tab} onValueChange={(v) => setSelected360Tab(v as typeof selected360Tab)} className="flex-1 overflow-hidden flex flex-col">
+                <Tabs
+                  value={selected360Tab}
+                  onValueChange={(v) =>
+                    setSelected360Tab(v as typeof selected360Tab)
+                  }
+                  className="flex-1 overflow-hidden flex flex-col"
+                >
                   <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="feedback" data-testid="360-tab-feedback">
+                    <TabsTrigger
+                      value="feedback"
+                      data-testid="360-tab-feedback"
+                    >
                       <Eye className="h-4 w-4 mr-1" />
                       View ({subjectFeedbackRequests.length})
                     </TabsTrigger>
@@ -1071,7 +1904,10 @@ export default function ManagerSubmissions() {
                       <UserPlus className="h-4 w-4 mr-1" />
                       Peers ({selectedPeerIds.length})
                     </TabsTrigger>
-                    <TabsTrigger value="reportees" data-testid="360-tab-reportees">
+                    <TabsTrigger
+                      value="reportees"
+                      data-testid="360-tab-reportees"
+                    >
                       <Users className="h-4 w-4 mr-1" />
                       Reportees ({selectedReporteeIds.length})
                     </TabsTrigger>
@@ -1081,7 +1917,10 @@ export default function ManagerSubmissions() {
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="feedback" className="flex-1 overflow-hidden flex flex-col mt-4">
+                  <TabsContent
+                    value="feedback"
+                    className="flex-1 overflow-hidden flex flex-col mt-4"
+                  >
                     {isFeedbackLoading ? (
                       <div className="flex items-center justify-center py-8">
                         <Clock className="h-5 w-5 animate-spin mr-2" />
@@ -1091,7 +1930,10 @@ export default function ManagerSubmissions() {
                       <div className="text-center py-8 text-gray-500">
                         <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                         <p className="font-medium">No feedback requests yet</p>
-                        <p className="text-sm mt-1">Use the other tabs to request feedback from peers, reportees, or external contacts.</p>
+                        <p className="text-sm mt-1">
+                          Use the other tabs to request feedback from peers,
+                          reportees, or external contacts.
+                        </p>
                       </div>
                     ) : (
                       <ScrollArea className="border rounded-lg max-h-[350px] overflow-y-auto">
@@ -1101,133 +1943,226 @@ export default function ManagerSubmissions() {
                               key={request.id}
                               className={cn(
                                 "p-4 rounded-lg border relative",
-                                request.status === 'submitted' ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"
+                                request.status === "submitted"
+                                  ? "bg-green-50 border-green-200"
+                                  : "bg-gray-50 border-gray-200",
                               )}
                             >
-                              {request.status === 'submitted' && request.feedbackResponse?.recommendedRating && (
-                                <div className="absolute top-3 right-3 flex items-center gap-1 bg-primary text-white px-3 py-1.5 rounded-full shadow-sm">
-                                  <Star className="h-4 w-4 fill-current" />
-                                  <span className="font-bold text-lg">{request.feedbackResponse.recommendedRating}</span>
-                                  <span className="text-xs opacity-90">/5</span>
-                                </div>
-                              )}
+                              {request.status === "submitted" &&
+                                request.feedbackResponse?.recommendedRating && (
+                                  <div className="absolute top-3 right-3 flex items-center gap-1 bg-primary text-white px-3 py-1.5 rounded-full shadow-sm">
+                                    <Star className="h-4 w-4 fill-current" />
+                                    <span className="font-bold text-lg">
+                                      {
+                                        request.feedbackResponse
+                                          .recommendedRating
+                                      }
+                                    </span>
+                                    <span className="text-xs opacity-90">
+                                      /5
+                                    </span>
+                                  </div>
+                                )}
 
                               <div className="flex items-center gap-2 pr-20">
                                 <User className="h-4 w-4 text-gray-500" />
-                                <span className="font-medium">{request.reviewerDisplay}</span>
+                                <span className="font-medium">
+                                  {request.reviewerDisplay}
+                                </span>
                                 {request.reviewer?.designation && (
-                                  <span className="text-xs text-gray-500">• {request.reviewer.designation}</span>
+                                  <span className="text-xs text-gray-500">
+                                    • {request.reviewer.designation}
+                                  </span>
                                 )}
                               </div>
 
                               <div className="mt-2 text-sm text-gray-500">
                                 <Clock className="h-4 w-4 inline mr-1" />
-                                Requested on {format(new Date(request.createdAt), 'MMM d, yyyy')}
+                                Requested on{" "}
+                                {format(
+                                  new Date(request.createdAt),
+                                  "MMM d, yyyy",
+                                )}
                               </div>
 
                               <div className="mt-2 flex items-center gap-2">
-                                <span className="text-sm text-gray-500">Status:</span>
-                                <Badge variant={request.status === 'submitted' ? 'default' : 'secondary'}>
-                                  {request.status === 'submitted' ? 'Submitted' : 'Pending'}
+                                <span className="text-sm text-gray-500">
+                                  Status:
+                                </span>
+                                <Badge
+                                  variant={
+                                    request.status === "submitted"
+                                      ? "default"
+                                      : "secondary"
+                                  }
+                                >
+                                  {request.status === "submitted"
+                                    ? "Submitted"
+                                    : "Pending"}
                                 </Badge>
                               </div>
 
-                              {request.status === 'submitted' && request.feedbackResponse && (
-                                <div className="mt-3">
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        setExpandedFeedbackIds(prev => {
-                                          const newSet = new Set(prev);
-                                          if (newSet.has(request.id)) {
-                                            newSet.delete(request.id);
-                                          } else {
-                                            newSet.add(request.id);
-                                          }
-                                          return newSet;
-                                        });
-                                      }}
-                                      className="flex items-center gap-1"
-                                      data-testid={`view-feedback-btn-${request.id}`}
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                      {expandedFeedbackIds.has(request.id) ? 'Hide Feedback' : 'View Feedback'}
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        window.open(`/api/feedback-requests/${request.id}/pdf`, '_blank');
-                                      }}
-                                      className="flex items-center gap-1"
-                                      data-testid={`download-feedback-btn-${request.id}`}
-                                    >
-                                      <Download className="h-4 w-4" />
-                                      Download PDF
-                                    </Button>
-                                  </div>
-
-                                  {expandedFeedbackIds.has(request.id) && (
-                                    <div className="mt-3 space-y-3 text-sm border-t pt-3">
-                                      <div className="grid grid-cols-2 gap-2">
-                                        <div>
-                                          <span className="text-gray-500">Collaboration:</span>
-                                          <Badge variant="outline" className="ml-2 capitalize">
-                                            {request.feedbackResponse.collaborationRating?.replace('_', ' ') || '-'}
-                                          </Badge>
-                                        </div>
-                                        <div>
-                                          <span className="text-gray-500">Communication:</span>
-                                          <Badge variant="outline" className="ml-2 capitalize">
-                                            {request.feedbackResponse.communicationRating?.replace('_', ' ') || '-'}
-                                          </Badge>
-                                        </div>
-                                        <div>
-                                          <span className="text-gray-500">Reliability:</span>
-                                          <Badge variant="outline" className="ml-2 capitalize">
-                                            {request.feedbackResponse.reliabilityRating?.replace('_', ' ') || '-'}
-                                          </Badge>
-                                        </div>
-                                        <div>
-                                          <span className="text-gray-500">Problem Solving:</span>
-                                          <Badge variant="outline" className="ml-2 capitalize">
-                                            {request.feedbackResponse.problemSolvingRating?.replace('_', ' ') || '-'}
-                                          </Badge>
-                                        </div>
-                                      </div>
-
-                                      {request.feedbackResponse.strengths && (
-                                        <div>
-                                          <p className="text-gray-500 font-medium">Strengths:</p>
-                                          <p className="text-gray-700 bg-white p-2 rounded border mt-1">{request.feedbackResponse.strengths}</p>
-                                        </div>
-                                      )}
-
-                                      {request.feedbackResponse.areasForImprovement && (
-                                        <div>
-                                          <p className="text-gray-500 font-medium">Areas for Improvement:</p>
-                                          <p className="text-gray-700 bg-white p-2 rounded border mt-1">{request.feedbackResponse.areasForImprovement}</p>
-                                        </div>
-                                      )}
-
-                                      {request.feedbackResponse.additionalComments && (
-                                        <div>
-                                          <p className="text-gray-500 font-medium">Additional Comments:</p>
-                                          <p className="text-gray-700 bg-white p-2 rounded border mt-1">{request.feedbackResponse.additionalComments}</p>
-                                        </div>
-                                      )}
-
-                                      {request.submittedAt && (
-                                        <p className="text-xs text-gray-400 mt-2">
-                                          Submitted on {format(new Date(request.submittedAt), 'MMM d, yyyy')}
-                                        </p>
-                                      )}
+                              {request.status === "submitted" &&
+                                request.feedbackResponse && (
+                                  <div className="mt-3">
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          setExpandedFeedbackIds((prev) => {
+                                            const newSet = new Set(prev);
+                                            if (newSet.has(request.id)) {
+                                              newSet.delete(request.id);
+                                            } else {
+                                              newSet.add(request.id);
+                                            }
+                                            return newSet;
+                                          });
+                                        }}
+                                        className="flex items-center gap-1"
+                                        data-testid={`view-feedback-btn-${request.id}`}
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                        {expandedFeedbackIds.has(request.id)
+                                          ? "Hide Feedback"
+                                          : "View Feedback"}
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          window.open(
+                                            `/api/feedback-requests/${request.id}/pdf`,
+                                            "_blank",
+                                          );
+                                        }}
+                                        className="flex items-center gap-1"
+                                        data-testid={`download-feedback-btn-${request.id}`}
+                                      >
+                                        <Download className="h-4 w-4" />
+                                        Download PDF
+                                      </Button>
                                     </div>
-                                  )}
-                                </div>
-                              )}
+
+                                    {expandedFeedbackIds.has(request.id) && (
+                                      <div className="mt-3 space-y-3 text-sm border-t pt-3">
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div>
+                                            <span className="text-gray-500">
+                                              Collaboration:
+                                            </span>
+                                            <Badge
+                                              variant="outline"
+                                              className="ml-2 capitalize"
+                                            >
+                                              {request.feedbackResponse.collaborationRating?.replace(
+                                                "_",
+                                                " ",
+                                              ) || "-"}
+                                            </Badge>
+                                          </div>
+                                          <div>
+                                            <span className="text-gray-500">
+                                              Communication:
+                                            </span>
+                                            <Badge
+                                              variant="outline"
+                                              className="ml-2 capitalize"
+                                            >
+                                              {request.feedbackResponse.communicationRating?.replace(
+                                                "_",
+                                                " ",
+                                              ) || "-"}
+                                            </Badge>
+                                          </div>
+                                          <div>
+                                            <span className="text-gray-500">
+                                              Reliability:
+                                            </span>
+                                            <Badge
+                                              variant="outline"
+                                              className="ml-2 capitalize"
+                                            >
+                                              {request.feedbackResponse.reliabilityRating?.replace(
+                                                "_",
+                                                " ",
+                                              ) || "-"}
+                                            </Badge>
+                                          </div>
+                                          <div>
+                                            <span className="text-gray-500">
+                                              Problem Solving:
+                                            </span>
+                                            <Badge
+                                              variant="outline"
+                                              className="ml-2 capitalize"
+                                            >
+                                              {request.feedbackResponse.problemSolvingRating?.replace(
+                                                "_",
+                                                " ",
+                                              ) || "-"}
+                                            </Badge>
+                                          </div>
+                                        </div>
+
+                                        {request.feedbackResponse.strengths && (
+                                          <div>
+                                            <p className="text-gray-500 font-medium">
+                                              Strengths:
+                                            </p>
+                                            <p className="text-gray-700 bg-white p-2 rounded border mt-1">
+                                              {
+                                                request.feedbackResponse
+                                                  .strengths
+                                              }
+                                            </p>
+                                          </div>
+                                        )}
+
+                                        {request.feedbackResponse
+                                          .areasForImprovement && (
+                                          <div>
+                                            <p className="text-gray-500 font-medium">
+                                              Areas for Improvement:
+                                            </p>
+                                            <p className="text-gray-700 bg-white p-2 rounded border mt-1">
+                                              {
+                                                request.feedbackResponse
+                                                  .areasForImprovement
+                                              }
+                                            </p>
+                                          </div>
+                                        )}
+
+                                        {request.feedbackResponse
+                                          .additionalComments && (
+                                          <div>
+                                            <p className="text-gray-500 font-medium">
+                                              Additional Comments:
+                                            </p>
+                                            <p className="text-gray-700 bg-white p-2 rounded border mt-1">
+                                              {
+                                                request.feedbackResponse
+                                                  .additionalComments
+                                              }
+                                            </p>
+                                          </div>
+                                        )}
+
+                                        {request.submittedAt && (
+                                          <p className="text-xs text-gray-400 mt-2">
+                                            Submitted on{" "}
+                                            {format(
+                                              new Date(request.submittedAt),
+                                              "MMM d, yyyy",
+                                            )}
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                             </div>
                           ))}
                         </div>
@@ -1235,7 +2170,10 @@ export default function ManagerSubmissions() {
                     )}
                   </TabsContent>
 
-                  <TabsContent value="peers" className="flex-1 overflow-hidden flex flex-col mt-4">
+                  <TabsContent
+                    value="peers"
+                    className="flex-1 overflow-hidden flex flex-col mt-4"
+                  >
                     <div className="relative mb-3">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
@@ -1258,13 +2196,15 @@ export default function ManagerSubmissions() {
                               key={peer.id}
                               className={cn(
                                 "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors",
-                                selectedPeerIds.includes(peer.id) ? "bg-primary/10 border border-primary/30" : "hover:bg-gray-50"
+                                selectedPeerIds.includes(peer.id)
+                                  ? "bg-primary/10 border border-primary/30"
+                                  : "hover:bg-gray-50",
                               )}
                               onClick={() => {
-                                setSelectedPeerIds(prev =>
+                                setSelectedPeerIds((prev) =>
                                   prev.includes(peer.id)
-                                    ? prev.filter(id => id !== peer.id)
-                                    : [...prev, peer.id]
+                                    ? prev.filter((id) => id !== peer.id)
+                                    : [...prev, peer.id],
                                 );
                               }}
                               data-testid={`peer-item-${peer.id}`}
@@ -1273,19 +2213,27 @@ export default function ManagerSubmissions() {
                                 checked={selectedPeerIds.includes(peer.id)}
                                 onClick={(e) => e.stopPropagation()}
                                 onCheckedChange={(checked) => {
-                                  setSelectedPeerIds(prev =>
+                                  setSelectedPeerIds((prev) =>
                                     checked
                                       ? [...prev, peer.id]
-                                      : prev.filter(id => id !== peer.id)
+                                      : prev.filter((id) => id !== peer.id),
                                   );
                                 }}
                               />
                               <div className="flex-1">
-                                <p className="font-medium">{peer.firstName} {peer.lastName}</p>
-                                <p className="text-sm text-gray-500">{peer.email}</p>
+                                <p className="font-medium">
+                                  {peer.firstName} {peer.lastName}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  {peer.email}
+                                </p>
                                 {(peer.department || peer.designation) && (
                                   <p className="text-xs text-gray-400">
-                                    {peer.designation}{peer.department && peer.designation ? ' • ' : ''}{peer.department}
+                                    {peer.designation}
+                                    {peer.department && peer.designation
+                                      ? " • "
+                                      : ""}
+                                    {peer.department}
                                   </p>
                                 )}
                               </div>
@@ -1296,14 +2244,22 @@ export default function ManagerSubmissions() {
                     </ScrollArea>
                   </TabsContent>
 
-                  <TabsContent value="reportees" className="flex-1 overflow-hidden flex flex-col mt-4">
+                  <TabsContent
+                    value="reportees"
+                    className="flex-1 overflow-hidden flex flex-col mt-4"
+                  >
                     <ScrollArea className="border rounded-lg max-h-[350px] overflow-y-auto">
                       <div className="p-2 space-y-1">
-                        {(!selectedEvaluation?.directReports || selectedEvaluation.directReports.length === 0) ? (
+                        {!selectedEvaluation?.directReports ||
+                        selectedEvaluation.directReports.length === 0 ? (
                           <div className="text-center py-8 text-gray-500">
                             <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                            <p className="font-medium">No direct reports found</p>
-                            <p className="text-sm mt-1">This employee doesn't have any direct reports.</p>
+                            <p className="font-medium">
+                              No direct reports found
+                            </p>
+                            <p className="text-sm mt-1">
+                              This employee doesn't have any direct reports.
+                            </p>
                           </div>
                         ) : (
                           selectedEvaluation.directReports.map((reportee) => (
@@ -1311,34 +2267,47 @@ export default function ManagerSubmissions() {
                               key={reportee.id}
                               className={cn(
                                 "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors",
-                                selectedReporteeIds.includes(reportee.id) ? "bg-primary/10 border border-primary/30" : "hover:bg-gray-50"
+                                selectedReporteeIds.includes(reportee.id)
+                                  ? "bg-primary/10 border border-primary/30"
+                                  : "hover:bg-gray-50",
                               )}
                               onClick={() => {
-                                setSelectedReporteeIds(prev =>
+                                setSelectedReporteeIds((prev) =>
                                   prev.includes(reportee.id)
-                                    ? prev.filter(id => id !== reportee.id)
-                                    : [...prev, reportee.id]
+                                    ? prev.filter((id) => id !== reportee.id)
+                                    : [...prev, reportee.id],
                                 );
                               }}
                               data-testid={`reportee-item-${reportee.id}`}
                             >
                               <Checkbox
-                                checked={selectedReporteeIds.includes(reportee.id)}
+                                checked={selectedReporteeIds.includes(
+                                  reportee.id,
+                                )}
                                 onClick={(e) => e.stopPropagation()}
                                 onCheckedChange={(checked) => {
-                                  setSelectedReporteeIds(prev =>
+                                  setSelectedReporteeIds((prev) =>
                                     checked
                                       ? [...prev, reportee.id]
-                                      : prev.filter(id => id !== reportee.id)
+                                      : prev.filter((id) => id !== reportee.id),
                                   );
                                 }}
                               />
                               <div className="flex-1">
-                                <p className="font-medium">{reportee.firstName} {reportee.lastName}</p>
-                                <p className="text-sm text-gray-500">{reportee.email}</p>
-                                {(reportee.department || reportee.designation) && (
+                                <p className="font-medium">
+                                  {reportee.firstName} {reportee.lastName}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  {reportee.email}
+                                </p>
+                                {(reportee.department ||
+                                  reportee.designation) && (
                                   <p className="text-xs text-gray-400">
-                                    {reportee.designation}{reportee.department && reportee.designation ? ' • ' : ''}{reportee.department}
+                                    {reportee.designation}
+                                    {reportee.department && reportee.designation
+                                      ? " • "
+                                      : ""}
+                                    {reportee.department}
                                   </p>
                                 )}
                               </div>
@@ -1349,10 +2318,15 @@ export default function ManagerSubmissions() {
                     </ScrollArea>
                   </TabsContent>
 
-                  <TabsContent value="others" className="flex-1 overflow-hidden flex flex-col mt-4">
+                  <TabsContent
+                    value="others"
+                    className="flex-1 overflow-hidden flex flex-col mt-4"
+                  >
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor="external-emails">External Email Addresses</Label>
+                        <Label htmlFor="external-emails">
+                          External Email Addresses
+                        </Label>
                         <Textarea
                           id="external-emails"
                           placeholder="Enter email addresses separated by commas, semicolons, or new lines..."
@@ -1362,7 +2336,8 @@ export default function ManagerSubmissions() {
                           data-testid="external-emails-input"
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          You can enter multiple email addresses separated by commas, semicolons, or new lines.
+                          You can enter multiple email addresses separated by
+                          commas, semicolons, or new lines.
                         </p>
                       </div>
                     </div>
@@ -1370,16 +2345,26 @@ export default function ManagerSubmissions() {
                 </Tabs>
 
                 <DialogFooter className="mt-4">
-                  <Button variant="outline" onClick={() => setIs360DialogOpen(false)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIs360DialogOpen(false)}
+                  >
                     Cancel
                   </Button>
                   <Button
                     onClick={handleSend360Requests}
-                    disabled={createFeedbackRequestsMutation.isPending || (selectedPeerIds.length === 0 && selectedReporteeIds.length === 0 && !externalEmails.trim())}
+                    disabled={
+                      createFeedbackRequestsMutation.isPending ||
+                      (selectedPeerIds.length === 0 &&
+                        selectedReporteeIds.length === 0 &&
+                        !externalEmails.trim())
+                    }
                     data-testid="send-360-requests-button"
                   >
                     <Send className="h-4 w-4 mr-2" />
-                    {createFeedbackRequestsMutation.isPending ? 'Sending...' : 'Send Feedback Requests'}
+                    {createFeedbackRequestsMutation.isPending
+                      ? "Sending..."
+                      : "Send Feedback Requests"}
                   </Button>
                 </DialogFooter>
               </>

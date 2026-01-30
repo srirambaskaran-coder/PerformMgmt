@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Card,
@@ -27,6 +27,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { RoleGuard } from "@/components/RoleGuard";
 import { format } from "date-fns";
+import { useTour } from "@/contexts/TourContext";
 import {
   Target,
   Search,
@@ -102,39 +103,255 @@ export default function MemberDevelopmentGoals() {
   });
 
   const { user } = useAuth();
+  const { isTourMode, currentAction, clearAction } = useTour();
+  const [showDemoData, setShowDemoData] = useState(false);
+  const [expandedAccordions, setExpandedAccordions] = useState<string[]>([]);
+
+  // Demo goals for tour
+  const demoGoals: GoalWithDetails[] = [
+    {
+      id: "demo-goal-1",
+      evaluationId: "demo-eval-1",
+      employeeId: "demo-emp-1",
+      description: "Complete React Advanced Training Course",
+      plannedOutcome:
+        "Gain expertise in React hooks, context API, and performance optimization techniques",
+      targetDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+      progress: 65,
+      status: "in_progress",
+      createdOn: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      createdBy: "manager-1",
+      lastUpdatedOn: new Date(
+        Date.now() - 2 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      lastUpdatedBy: "demo-emp-1",
+      employee: {
+        id: "demo-emp-1",
+        code: "EMP001",
+        firstName: "John",
+        lastName: "Doe",
+        email: "john.doe@company.com",
+        department: "Engineering",
+        designation: "Software Engineer",
+        locationId: "loc-1",
+        levelId: "level-3",
+        gradeId: "grade-b",
+        managerId: user?.id || null,
+      },
+      evaluation: {
+        id: "demo-eval-1",
+        status: "pending_manager_review",
+        meetingCompletedAt: null,
+        overallRating: null,
+      },
+      appraisalCycle: {
+        id: "cycle-2024",
+        code: "Q4-2024",
+        description: "Q4 2024 Performance Review",
+      },
+      appraisalGroup: {
+        id: "group-eng",
+        name: "Engineering Team",
+      },
+      frequencyCalendarPeriod: {
+        displayName: "October - December 2024",
+        startDate: "2024-10-01",
+        endDate: "2024-12-31",
+      },
+    },
+    {
+      id: "demo-goal-2",
+      evaluationId: "demo-eval-2",
+      employeeId: "demo-emp-2",
+      description: "Lead team migration to TypeScript",
+      plannedOutcome:
+        "Successfully migrate all legacy JavaScript code to TypeScript, improve code quality and developer experience",
+      targetDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+      progress: 40,
+      status: "in_progress",
+      createdOn: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+      createdBy: "manager-1",
+      lastUpdatedOn: new Date(
+        Date.now() - 5 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      lastUpdatedBy: "demo-emp-2",
+      employee: {
+        id: "demo-emp-2",
+        code: "EMP002",
+        firstName: "Jane",
+        lastName: "Smith",
+        email: "jane.smith@company.com",
+        department: "Engineering",
+        designation: "Senior Developer",
+        locationId: "loc-1",
+        levelId: "level-4",
+        gradeId: "grade-a",
+        managerId: user?.id || null,
+      },
+      evaluation: {
+        id: "demo-eval-2",
+        status: "pending_manager_review",
+        meetingCompletedAt: null,
+        overallRating: null,
+      },
+      appraisalCycle: {
+        id: "cycle-2024",
+        code: "Q4-2024",
+        description: "Q4 2024 Performance Review",
+      },
+      appraisalGroup: {
+        id: "group-eng",
+        name: "Engineering Team",
+      },
+      frequencyCalendarPeriod: {
+        displayName: "October - December 2024",
+        startDate: "2024-10-01",
+        endDate: "2024-12-31",
+      },
+    },
+    {
+      id: "demo-goal-3",
+      evaluationId: "demo-eval-1",
+      employeeId: "demo-emp-1",
+      description: "Improve code review practices",
+      plannedOutcome:
+        "Establish clear code review guidelines and reduce review turnaround time by 30%",
+      targetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      progress: 85,
+      status: "in_progress",
+      createdOn: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+      createdBy: "manager-1",
+      lastUpdatedOn: new Date(
+        Date.now() - 1 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      lastUpdatedBy: "demo-emp-1",
+      employee: {
+        id: "demo-emp-1",
+        code: "EMP001",
+        firstName: "John",
+        lastName: "Doe",
+        email: "john.doe@company.com",
+        department: "Engineering",
+        designation: "Software Engineer",
+        locationId: "loc-1",
+        levelId: "level-3",
+        gradeId: "grade-b",
+        managerId: user?.id || null,
+      },
+      evaluation: {
+        id: "demo-eval-1",
+        status: "pending_manager_review",
+        meetingCompletedAt: null,
+        overallRating: null,
+      },
+      appraisalCycle: {
+        id: "cycle-2024",
+        code: "Q4-2024",
+        description: "Q4 2024 Performance Review",
+      },
+      appraisalGroup: {
+        id: "group-eng",
+        name: "Engineering Team",
+      },
+      frequencyCalendarPeriod: {
+        displayName: "October - December 2024",
+        startDate: "2024-10-01",
+        endDate: "2024-12-31",
+      },
+    },
+  ];
+
+  // Normalize goal data from PascalCase API response to camelCase
+  const normalizeGoal = (goal: any): GoalWithDetails => ({
+    id: goal.Id || goal.id,
+    evaluationId: goal.EvaluationId || goal.evaluationId,
+    employeeId: goal.EmployeeId || goal.employeeId,
+    description: goal.Description || goal.description,
+    plannedOutcome: goal.PlannedOutcome || goal.plannedOutcome,
+    targetDate: goal.TargetDate || goal.targetDate,
+    progress: goal.Progress ?? goal.progress ?? 0,
+    status: goal.Status ?? goal.status,
+    createdOn: goal.CreatedOn || goal.createdOn,
+    createdBy: goal.CreatedBy || goal.createdBy,
+    lastUpdatedOn: goal.LastUpdatedOn || goal.lastUpdatedOn,
+    lastUpdatedBy: goal.LastUpdatedBy || goal.lastUpdatedBy,
+    // Nested objects are already in camelCase from API
+    employee: goal.employee,
+    evaluation: goal.evaluation,
+    appraisalCycle: goal.appraisalCycle,
+    appraisalGroup: goal.appraisalGroup,
+    frequencyCalendarPeriod: goal.frequencyCalendarPeriod,
+  });
 
   const { data: goals = [], isLoading: isLoadingGoals } = useQuery<
     GoalWithDetails[]
   >({
     queryKey: ["/api/development-goals/team"],
+    select: (data: any[]) => data.map(normalizeGoal),
   });
+
+  // Merge demo data with real data when in tour mode
+  const baseGoals =
+    showDemoData && isTourMode ? [...goals, ...demoGoals] : goals;
+
+  // Handle tour actions
+  useEffect(() => {
+    // Reset demo data when tour ends
+    if (!isTourMode) {
+      setShowDemoData(false);
+      setExpandedAccordions([]);
+      return;
+    }
+
+    if (!currentAction) return;
+
+    if (currentAction === "showDemoGoals") {
+      setShowDemoData(true);
+      clearAction();
+    }
+
+    if (currentAction === "expandFirstEmployee") {
+      // Expand the first employee's accordion to show their goals
+      // Use demo employee ID when demo data is shown
+      if (showDemoData) {
+        setExpandedAccordions(["demo-emp-1"]);
+      } else {
+        // Get the first employee ID from goals
+        const firstEmployeeId = goals[0]?.employee?.id;
+        if (firstEmployeeId) {
+          setExpandedAccordions([firstEmployeeId]);
+        }
+      }
+      clearAction();
+    }
+  }, [isTourMode, currentAction, clearAction, showDemoData, goals]);
 
   // Extract unique values from goals data instead of making separate API calls
   const appraisalCycles = useMemo(() => {
     const cycles = new Map();
-    goals.forEach((goal) => {
+    baseGoals.forEach((goal) => {
       if (goal.appraisalCycle) {
         cycles.set(goal.appraisalCycle.id, goal.appraisalCycle);
       }
     });
     return Array.from(cycles.values());
-  }, [goals]);
+  }, [baseGoals]);
 
   const appraisalGroups = useMemo(() => {
     const groups = new Map();
-    goals.forEach((goal) => {
+    baseGoals.forEach((goal) => {
       if (goal.appraisalGroup) {
         groups.set(goal.appraisalGroup.id, goal.appraisalGroup);
       }
     });
     return Array.from(groups.values());
-  }, [goals]);
+  }, [baseGoals]);
 
   // For these filters, we only have IDs, so we'll just show unique IDs
   // In a future enhancement, we could add these details to the goals API response
   const locations = useMemo(() => {
     const locs = new Set<string>();
-    goals.forEach((goal) => {
+    baseGoals.forEach((goal) => {
       if (goal.employee?.locationId) {
         locs.add(goal.employee.locationId);
       }
@@ -143,11 +360,11 @@ export default function MemberDevelopmentGoals() {
       id,
       name: `Location ${id.substring(0, 8)}...`,
     }));
-  }, [goals]);
+  }, [baseGoals]);
 
   const levels = useMemo(() => {
     const lvls = new Set<string>();
-    goals.forEach((goal) => {
+    baseGoals.forEach((goal) => {
       if (goal.employee?.levelId) {
         lvls.add(goal.employee.levelId);
       }
@@ -156,11 +373,11 @@ export default function MemberDevelopmentGoals() {
       id,
       name: `Level ${id.substring(0, 8)}...`,
     }));
-  }, [goals]);
+  }, [baseGoals]);
 
   const grades = useMemo(() => {
     const grds = new Set<string>();
-    goals.forEach((goal) => {
+    baseGoals.forEach((goal) => {
       if (goal.employee?.gradeId) {
         grds.add(goal.employee.gradeId);
       }
@@ -169,11 +386,11 @@ export default function MemberDevelopmentGoals() {
       id,
       name: `Grade ${id.substring(0, 8)}...`,
     }));
-  }, [goals]);
+  }, [baseGoals]);
 
   const managers = useMemo(() => {
     const mgrs = new Set<string>();
-    goals.forEach((goal) => {
+    baseGoals.forEach((goal) => {
       if (goal.employee?.managerId) {
         mgrs.add(goal.employee.managerId);
       }
@@ -182,10 +399,10 @@ export default function MemberDevelopmentGoals() {
       id,
       name: `Manager ${id.substring(0, 8)}...`,
     }));
-  }, [goals]);
+  }, [baseGoals]);
 
   const filteredGoals = useMemo(() => {
-    return goals.filter((goal) => {
+    return baseGoals.filter((goal) => {
       if (
         filters.appraisalCycle !== "all" &&
         goal.appraisalCycle?.id !== filters.appraisalCycle
@@ -245,7 +462,7 @@ export default function MemberDevelopmentGoals() {
 
       return true;
     });
-  }, [goals, filters]);
+  }, [baseGoals, filters]);
 
   const groupedGoals = useMemo(() => {
     const grouped: Record<string, GoalWithDetails[]> = {};
@@ -310,17 +527,20 @@ export default function MemberDevelopmentGoals() {
 
   const uniqueDepartments = useMemo(() => {
     const depts = new Set<string>();
-    goals.forEach((goal) => {
+    baseGoals.forEach((goal) => {
       if (goal.employee?.department) {
         depts.add(goal.employee.department);
       }
     });
     return Array.from(depts).sort();
-  }, [goals]);
+  }, [baseGoals]);
 
   return (
     <RoleGuard allowedRoles={["manager"]}>
-      <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div
+        className="p-6 max-w-7xl mx-auto space-y-6"
+        data-testid="member-development-goals"
+      >
         <div className="flex items-center justify-between">
           <div>
             <h1
@@ -561,9 +781,14 @@ export default function MemberDevelopmentGoals() {
               {Object.keys(groupedGoals).length} team member(s)
             </p>
 
-            <Accordion type="multiple" className="space-y-4">
+            <Accordion
+              type="multiple"
+              className="space-y-4"
+              value={expandedAccordions}
+              onValueChange={setExpandedAccordions}
+            >
               {Object.entries(groupedGoals).map(
-                ([employeeId, employeeGoals]) => {
+                ([employeeId, employeeGoals], empIndex) => {
                   const employee = employeeGoals[0]?.employee;
                   if (!employee) return null;
 
@@ -572,6 +797,7 @@ export default function MemberDevelopmentGoals() {
                       key={employeeId}
                       value={employeeId}
                       className="border rounded-lg"
+                      data-testid={`employee-goals-${empIndex}`}
                     >
                       <AccordionTrigger className="px-4 hover:no-underline">
                         <div className="flex items-center gap-4 w-full">
@@ -595,10 +821,11 @@ export default function MemberDevelopmentGoals() {
                       </AccordionTrigger>
                       <AccordionContent className="px-4 pb-4">
                         <div className="space-y-4 mt-2">
-                          {employeeGoals.map((goal) => (
+                          {employeeGoals.map((goal, goalIndex) => (
                             <Card
                               key={goal.id}
                               className="border-l-4 border-l-primary"
+                              data-testid={`goal-card-${empIndex}-${goalIndex}`}
                             >
                               <CardContent className="pt-4">
                                 <div className="flex items-start justify-between mb-3">
@@ -631,7 +858,7 @@ export default function MemberDevelopmentGoals() {
                                         {goal.targetDate
                                           ? format(
                                               new Date(goal.targetDate),
-                                              "MMM d, yyyy"
+                                              "MMM d, yyyy",
                                             )
                                           : "Not set"}
                                       </span>
@@ -661,6 +888,7 @@ export default function MemberDevelopmentGoals() {
                                   <Progress
                                     value={goal.progress || 0}
                                     className="h-2"
+                                    data-testid={`progress-bar-${empIndex}-${goalIndex}`}
                                   />
                                 </div>
                               </CardContent>
@@ -670,7 +898,7 @@ export default function MemberDevelopmentGoals() {
                       </AccordionContent>
                     </AccordionItem>
                   );
-                }
+                },
               )}
             </Accordion>
           </div>

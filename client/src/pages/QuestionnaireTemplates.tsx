@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
@@ -65,10 +65,12 @@ import {
   type InsertQuestionnaireTemplate,
 } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { getClientIdFromSession } from "@/lib/ssoAuth";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useAuth } from "@/hooks/useAuth";
+import { useTour } from "@/contexts/TourContext";
 import {
   Copy,
   Edit,
@@ -77,7 +79,7 @@ import {
   Minus,
   Plus,
   Search,
-  Trash2,
+  Ban,
   Check,
   ChevronDown,
   X as XIcon,
@@ -321,40 +323,122 @@ function SortableQuestion({
 
 export default function QuestionnaireTemplates() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilters, setRoleFilters] = useState<string[]>([]);
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [companyFilters, setCompanyFilters] = useState<string[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] =
     useState<QuestionnaireTemplate | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [deleteTemplateId, setDeleteTemplateId] = useState<string | null>(null);
+  const [tourDemoQuestionnaire, setTourDemoQuestionnaire] =
+    useState<QuestionnaireTemplate | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
-  const isSuperAdmin = currentUser?.role === "super_admin";
+  const { isRunning: isTourMode, currentAction, clearAction } = useTour();
+  const currentUserRole =
+    (currentUser as any)?.role || (currentUser as any)?.Role || "";
+  const isSuperAdmin = currentUserRole === "super_admin";
+  const currentUserCompanyId =
+    (currentUser as any)?.companyId || (currentUser as any)?.CompanyId;
 
-  const { data: templates = [], isLoading } = useQuery<QuestionnaireTemplate[]>(
-    {
-      queryKey: ["/api/questionnaire-templates"],
-    }
+  const { data: templatesRaw = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/questionnaire-templates"],
+  });
+
+  // Normalize templates to handle API response with uppercase keys
+  const templates: QuestionnaireTemplate[] = templatesRaw.map(
+    (template: any) => ({
+      id: template.Id || template.id,
+      name: template.Name || template.name,
+      description: template.Description || template.description,
+      companyId:
+        template.ClientId || template.CompanyId || template.companyId
+          ? String(template.ClientId || template.CompanyId || template.companyId)
+          : null,
+      applicableLevelId:
+        template.ApplicableLevelId || template.applicableLevelId
+          ? String(template.ApplicableLevelId || template.applicableLevelId)
+          : null,
+      applicableGradeId:
+        template.ApplicableGradeId || template.applicableGradeId
+          ? String(template.ApplicableGradeId || template.applicableGradeId)
+          : null,
+      applicableLocationId:
+        template.ApplicableLocationId || template.applicableLocationId
+          ? String(
+              template.ApplicableLocationId || template.applicableLocationId,
+            )
+          : null,
+      // sendOnMail: template.SendOnMail || template.sendOnMail,
+      status: template.Status ? "active" : "inactive",
+      questions:
+        typeof template.Questions === "string"
+          ? JSON.parse(template.Questions || "[]").map((q: any) => ({
+              id: q.Id || q.id,
+              text: q.Text || q.text,
+              type: q.Type || q.type,
+              required: q.Required ?? q.required,
+              options: q.Options || q.options,
+            }))
+          : template.questions || [],
+      createdBy: template.CreatedBy || template.createdBy,
+      createdAt: template.CreatedOn || template.createdAt,
+      updatedBy: template.LastUpdatedBy || template.updatedBy,
+      updatedAt: template.LastUpdatedOn || template.updatedAt,
+    }),
   );
 
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations"],
+    select: (data: any[]) => {
+      return data.map((location: any) => ({
+        id: String(location.Id),
+        name: location.LocationName || location.Name,
+        code: location.LocationCode || location.Code,
+        companyId: String(
+          location.ClientID || location.CompanyId || location.companyId || ""
+        ),
+        status: location.Status === 1 || location.Status === true,
+      }));
+    },
   });
 
   const { data: levels = [] } = useQuery<any[]>({
     queryKey: ["/api/levels"],
+    select: (data: any[]) => {
+      return data.map((level: any) => ({
+        id: String(level.Id),
+        code: level.Code,
+        name: level.Name,
+        companyId: String(level.ClientId || level.CompanyId || level.companyId || ""),
+        status: level.Status === 1 || level.Status === true,
+      }));
+    },
   });
 
   const { data: grades = [] } = useQuery<any[]>({
     queryKey: ["/api/grades"],
+    select: (data: any[]) => {
+      return data.map((grade: any) => ({
+        id: String(grade.Id),
+        code: grade.Code,
+        description: grade.Description,
+        companyId: String(grade.ClientId || grade.CompanyId || grade.companyId || ""),
+        status: grade.Status === 1 || grade.Status === true,
+      }));
+    },
   });
 
   const { data: companies = [] } = useQuery<any[]>({
     queryKey: ["/api/companies"],
-    enabled: isSuperAdmin,
+    select: (data: any[]) => {
+      return data.map((company: any) => ({
+        id: String(company.Id || company.id),
+        name: company.Name || company.name,
+      }));
+    },
   });
 
   const { data: users = [] } = useQuery<any[]>({
@@ -364,19 +448,49 @@ export default function QuestionnaireTemplates() {
 
   const createTemplateMutation = useMutation({
     mutationFn: async (templateData: InsertQuestionnaireTemplate) => {
-      await apiRequest("POST", "/api/questionnaire-templates", templateData);
+      // Transform to PascalCase and convert status to boolean
+      const payload = {
+        Name: templateData.name,
+        Description: templateData.description,
+        ClientId: getClientIdFromSession(),
+        ApplicableLevelId: templateData.applicableLevelId
+          ? Number(templateData.applicableLevelId)
+          : null,
+        ApplicableGradeId: templateData.applicableGradeId
+          ? Number(templateData.applicableGradeId)
+          : null,
+        ApplicableLocationId: templateData.applicableLocationId
+          ? Number(templateData.applicableLocationId)
+          : null,
+        Questions: templateData.questions?.map((q: any) => ({
+          Id: q.id,
+          Text: q.text,
+          Type: q.type,
+          Required: q.required,
+          Options: q.options,
+        })),
+        Status:
+          templateData.status === "active"
+            ? true
+            : templateData.status === "inactive"
+              ? false
+              : templateData.status,
+      };
+      await apiRequest("POST", "/api/questionnaire-templates", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["/api/questionnaire-templates"],
       });
       setIsCreateModalOpen(false);
+      resetForm();
       toast({
         title: "Success",
         description: "Questionnaire template created successfully",
       });
     },
     onError: (error) => {
+      console.error("Error creating questionnaire template:", error);
       toast({
         title: "Error",
         description: "Failed to create questionnaire template",
@@ -393,23 +507,58 @@ export default function QuestionnaireTemplates() {
       id: string;
       templateData: Partial<InsertQuestionnaireTemplate>;
     }) => {
-      await apiRequest(
-        "PUT",
-        `/api/questionnaire-templates/${id}`,
-        templateData
-      );
+      // Transform to PascalCase and convert status to boolean
+      const payload: any = {};
+      if (templateData.name !== undefined) payload.Name = templateData.name;
+      if (templateData.description !== undefined)
+        payload.Description = templateData.description;
+      if (templateData.companyId !== undefined)
+        payload.ClientId = getClientIdFromSession();
+      if (templateData.applicableLevelId !== undefined)
+        payload.ApplicableLevelId = templateData.applicableLevelId
+          ? Number(templateData.applicableLevelId)
+          : null;
+      if (templateData.applicableGradeId !== undefined)
+        payload.ApplicableGradeId = templateData.applicableGradeId
+          ? Number(templateData.applicableGradeId)
+          : null;
+      if (templateData.applicableLocationId !== undefined)
+        payload.ApplicableLocationId = templateData.applicableLocationId
+          ? Number(templateData.applicableLocationId)
+          : null;
+      if (templateData.questions !== undefined) {
+        payload.Questions = templateData.questions?.map((q: any) => ({
+          Id: q.id,
+          Text: q.text,
+          Type: q.type,
+          Required: q.required,
+          Options: q.options,
+        }));
+      }
+      if (templateData.status !== undefined) {
+        payload.Status =
+          templateData.status === "active"
+            ? true
+            : templateData.status === "inactive"
+              ? false
+              : templateData.status;
+      }
+      await apiRequest("PUT", `/api/questionnaire-templates/${id}`, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["/api/questionnaire-templates"],
       });
       setEditingTemplate(null);
+      setIsCreateModalOpen(false);
+      resetForm();
       toast({
         title: "Success",
         description: "Questionnaire template updated successfully",
       });
     },
     onError: (error) => {
+      console.error("Error updating questionnaire template:", error);
       toast({
         title: "Error",
         description: "Failed to update questionnaire template",
@@ -444,7 +593,7 @@ export default function QuestionnaireTemplates() {
     mutationFn: async (templateId: string) => {
       return await apiRequest(
         "POST",
-        `/api/questionnaire-templates/${templateId}/copy`
+        `/api/questionnaire-templates/${templateId}/copy`,
       );
     },
     onSuccess: () => {
@@ -478,15 +627,42 @@ export default function QuestionnaireTemplates() {
     defaultValues: {
       name: "",
       description: "",
-      targetRole: "employee",
+      companyId: null,
       applicableLevelId: null,
       applicableGradeId: null,
       applicableLocationId: null,
-      sendOnMail: false,
       questions: [],
       status: "active",
     },
   });
+
+  // Watch the selected company ID for filtering dependent dropdowns
+  const selectedCompanyId = form.watch("companyId");
+
+  // Determine the effective company ID for filtering (use selected or current user's company)
+  const effectiveCompanyId = selectedCompanyId || (!isSuperAdmin && currentUserCompanyId ? String(currentUserCompanyId) : null);
+
+  // Filter locations, levels, and grades based on selected company or current user's company
+  const filteredLocations =
+    effectiveCompanyId
+      ? locations.filter(
+          (loc: any) => String(loc.companyId) === effectiveCompanyId && loc.status === true,
+        )
+      : locations.filter((loc: any) => loc.status === true);
+
+  const filteredLevels =
+    effectiveCompanyId
+      ? levels.filter(
+          (level: any) => String(level.companyId) === effectiveCompanyId && level.status === true,
+        )
+      : levels.filter((level: any) => level.status === true);
+
+  const filteredGrades =
+    effectiveCompanyId
+      ? grades.filter(
+          (grade: any) => String(grade.companyId) === effectiveCompanyId && grade.status === true,
+        )
+      : grades.filter((grade: any) => grade.status === true);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -496,7 +672,7 @@ export default function QuestionnaireTemplates() {
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -537,7 +713,7 @@ export default function QuestionnaireTemplates() {
 
   const updateQuestion = (id: string, field: keyof Question, value: any) => {
     const newQuestions = questions.map((q) =>
-      q.id === id ? { ...q, [field]: value } : q
+      q.id === id ? { ...q, [field]: value } : q,
     );
     setQuestions(newQuestions);
     // Sync form field with local state
@@ -545,29 +721,40 @@ export default function QuestionnaireTemplates() {
   };
 
   const onSubmit = (data: InsertQuestionnaireTemplate) => {
+    console.log("Form submitted", { data, questions, editingTemplate });
     const templateData = {
       ...data,
       questions: questions,
     };
 
     if (editingTemplate) {
+      console.log("Updating template", editingTemplate.id, templateData);
       updateTemplateMutation.mutate({ id: editingTemplate.id, templateData });
     } else {
+      console.log("Creating template", templateData);
       createTemplateMutation.mutate(templateData);
     }
   };
 
   const handleEdit = (template: QuestionnaireTemplate) => {
+    console.log("Editing template", template);
     setEditingTemplate(template);
+    setIsCreateModalOpen(true);
     const templateQuestions = (template.questions as Question[]) || [];
+    console.log("Template questions", templateQuestions);
     form.reset({
       name: template.name,
       description: template.description || "",
-      targetRole: template.targetRole,
-      applicableLevelId: template.applicableLevelId || null,
-      applicableGradeId: template.applicableGradeId || null,
-      applicableLocationId: template.applicableLocationId || null,
-      sendOnMail: template.sendOnMail || false,
+      companyId: template.companyId ? String(template.companyId) : null,
+      applicableLevelId: template.applicableLevelId
+        ? String(template.applicableLevelId)
+        : null,
+      applicableGradeId: template.applicableGradeId
+        ? String(template.applicableGradeId)
+        : null,
+      applicableLocationId: template.applicableLocationId
+        ? String(template.applicableLocationId)
+        : null,
       status: template.status || "active",
       questions: templateQuestions, // Include questions in form reset
     });
@@ -595,52 +782,158 @@ export default function QuestionnaireTemplates() {
     form.reset({
       name: "",
       description: "",
-      targetRole: "employee",
+      // For non-super admins, default to their company ID
+      companyId:
+        !isSuperAdmin && currentUserCompanyId
+          ? String(currentUserCompanyId)
+          : null,
       applicableLevelId: null,
       applicableGradeId: null,
       applicableLocationId: null,
-      sendOnMail: false,
       questions: [],
       status: "active",
     });
   };
 
+  // Tour action handlers
+  useEffect(() => {
+    if (!isTourMode || !currentAction) return;
+
+    if (currentAction === "openQuestionnaireForm") {
+      setEditingTemplate(null);
+      setIsCreateModalOpen(true);
+      setQuestions([]);
+      // Fill demo data after modal opens
+      setTimeout(() => {
+        form.setValue("name", "DEMO-ANNUAL-REVIEW");
+        form.setValue(
+          "description",
+          "Annual Performance Review - Demo data created during tour",
+        );
+        form.setValue("status", "active");
+        if (!isSuperAdmin && currentUserCompanyId) {
+          form.setValue("companyId", String(currentUserCompanyId));
+        }
+      }, 200);
+      clearAction();
+    } else if (currentAction === "addQuestionnaireQuestion") {
+      // Add a demo question
+      const demoQuestion: Question = {
+        id: "demo-q-" + Date.now().toString(),
+        text: "What are your key accomplishments this review period?",
+        type: "textarea",
+        required: true,
+      };
+      const newQuestions = [...questions, demoQuestion];
+      setQuestions(newQuestions);
+      form.setValue("questions", newQuestions);
+      // Add minimal delay to let the question render before clearing action
+      setTimeout(() => {
+        clearAction();
+      }, 100);
+    } else if (currentAction === "saveQuestionnaireAndClose") {
+      // Close modal and add demo questionnaire
+      setIsCreateModalOpen(false);
+      resetForm();
+      // Add demo questionnaire to display
+      setTourDemoQuestionnaire({
+        id: 9999,
+        name: "DEMO-ANNUAL-REVIEW",
+        description:
+          "Annual Performance Review - Demo data created during tour",
+        companyId:
+          !isSuperAdmin && currentUserCompanyId
+            ? String(currentUserCompanyId)
+            : null,
+        applicableLevelId: null,
+        applicableGradeId: null,
+        applicableLocationId: null,
+        questions: questions, // Include the questions that were added during tour
+        status: "active",
+        createdOn: new Date().toISOString(),
+        lastUpdatedOn: new Date().toISOString(),
+        createdBy: null,
+        lastUpdatedBy: null,
+      } as QuestionnaireTemplate);
+      clearAction();
+    }
+  }, [
+    currentAction,
+    isTourMode,
+    clearAction,
+    form,
+    isSuperAdmin,
+    currentUserCompanyId,
+    resetForm,
+    questions,
+  ]);
+
+  // Clean up tour demo data when tour ends
+  useEffect(() => {
+    const handleTourEnd = () => {
+      setTourDemoQuestionnaire(null);
+      setIsCreateModalOpen(false);
+      resetForm();
+    };
+
+    window.addEventListener("tourEnded", handleTourEnd);
+    return () => window.removeEventListener("tourEnded", handleTourEnd);
+  }, [resetForm]);
+
+  // Update form companyId when currentUser loads (for admins)
+  useEffect(() => {
+    if (!isSuperAdmin && currentUserCompanyId && !editingTemplate) {
+      form.setValue("companyId", String(currentUserCompanyId));
+    }
+  }, [isSuperAdmin, currentUserCompanyId, editingTemplate, form]);
+
   // Enrich templates with company information
   const enrichedTemplates = templates.map((template) => {
-    if (isSuperAdmin && template.createdById) {
-      const creator = users.find((u: any) => u.id === template.createdById);
-      const company = creator
-        ? companies.find((c: any) => c.id === creator.companyId)
-        : null;
+    if (template.companyId) {
+      const company = companies.find((c: any) => c.id === template.companyId);
       return {
         ...template,
         companyName: company?.name || null,
-        companyId: creator?.companyId || null,
       };
     }
     return template;
   });
 
-  const filteredTemplates = enrichedTemplates.filter((template) => {
+  // Include tour demo questionnaire if in tour mode
+  const allTemplates = tourDemoQuestionnaire
+    ? [tourDemoQuestionnaire, ...enrichedTemplates]
+    : enrichedTemplates;
+
+  const filteredTemplates = allTemplates.filter((template) => {
+    // For non-super admins, only show templates from their company
+    if (!isSuperAdmin && currentUserCompanyId) {
+      const matchesUserCompany =
+        template.companyId === String(currentUserCompanyId);
+      if (!matchesUserCompany) return false;
+    }
+
     const matchesSearch =
       searchQuery === "" ||
       template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       template.description?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesRole =
-      roleFilters.length === 0 ||
-      (template.targetRole && roleFilters.includes(template.targetRole));
+    const matchesStatus =
+      statusFilters.length === 0 ||
+      (template.status && statusFilters.includes(template.status));
 
     const matchesCompany =
       companyFilters.length === 0 ||
       (template.companyId && companyFilters.includes(template.companyId));
 
-    return matchesSearch && matchesRole && matchesCompany;
+    return matchesSearch && matchesStatus && matchesCompany;
   });
 
   return (
     <RoleGuard allowedRoles={["super_admin", "admin", "hr_manager"]}>
-      <div className="space-y-6" data-testid="questionnaire-templates">
+      <div
+        className="space-y-6 questionnaire-list"
+        data-testid="questionnaire-templates"
+      >
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Questionnaire Templates</h1>
@@ -651,6 +944,8 @@ export default function QuestionnaireTemplates() {
           <Dialog
             open={isCreateModalOpen || !!editingTemplate}
             onOpenChange={(open) => {
+              // Prevent closing during tour mode
+              if (isTourMode && !open) return;
               // Only close dialog if user explicitly wants to close it, not during form interactions
               if (
                 !open &&
@@ -665,13 +960,19 @@ export default function QuestionnaireTemplates() {
             <DialogTrigger asChild>
               <Button
                 onClick={() => setIsCreateModalOpen(true)}
-                data-testid="add-template-button"
+                data-testid="button-create-questionnaire"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Template
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent
+              className={cn(
+                "max-w-4xl max-h-[90vh] overflow-y-auto",
+                isTourMode && "z-[9997]",
+              )}
+              data-testid="dialog-create-questionnaire"
+            >
               <DialogHeader>
                 <DialogTitle>
                   {editingTemplate ? "Edit Template" : "Add New Template"}
@@ -684,52 +985,28 @@ export default function QuestionnaireTemplates() {
               </DialogHeader>
               <Form {...form}>
                 <form
-                  onSubmit={form.handleSubmit(onSubmit)}
+                  onSubmit={form.handleSubmit(onSubmit, (errors) => {
+                    console.error("Form validation errors:", errors);
+                  })}
                   className="space-y-4"
                 >
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Template Name</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="Q4 2023 Employee Review"
-                              data-testid="input-template-name"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="targetRole"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Target Role</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-target-role">
-                                <SelectValue placeholder="Select target role" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="employee">Employee</SelectItem>
-                              <SelectItem value="manager">Manager</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Template Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Q4 2023 Employee Review"
+                            data-testid="input-template-name"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}
@@ -783,6 +1060,37 @@ export default function QuestionnaireTemplates() {
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
+                        name="companyId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Company</FormLabel>
+                            <Select
+                              onValueChange={(v) => field.onChange(v || null)}
+                              value={field.value ?? ""}
+                              disabled={!isSuperAdmin}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-company">
+                                  <SelectValue placeholder="Select Company" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {companies.map((company: any) => (
+                                  <SelectItem
+                                    key={company.id}
+                                    value={String(company.id)}
+                                  >
+                                    {company.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
                         name="applicableLevelId"
                         render={({ field }) => (
                           <FormItem>
@@ -798,9 +1106,9 @@ export default function QuestionnaireTemplates() {
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="all">All Levels</SelectItem>
-                                {levels.map((level: any) => (
+                                {filteredLevels.map((level: any) => (
                                   <SelectItem key={level.id} value={level.id}>
-                                    {level.description} ({level.code})
+                                    {level.name}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -809,6 +1117,8 @@ export default function QuestionnaireTemplates() {
                           </FormItem>
                         )}
                       />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="applicableGradeId"
@@ -826,7 +1136,7 @@ export default function QuestionnaireTemplates() {
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="all">All Grades</SelectItem>
-                                {grades.map((grade: any) => (
+                                {filteredGrades.map((grade: any) => (
                                   <SelectItem key={grade.id} value={grade.id}>
                                     {grade.description} ({grade.code})
                                   </SelectItem>
@@ -837,8 +1147,6 @@ export default function QuestionnaireTemplates() {
                           </FormItem>
                         )}
                       />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="applicableLocationId"
@@ -858,7 +1166,7 @@ export default function QuestionnaireTemplates() {
                                 <SelectItem value="all">
                                   All Locations
                                 </SelectItem>
-                                {locations.map((location: any) => (
+                                {filteredLocations.map((location: any) => (
                                   <SelectItem
                                     key={location.id}
                                     value={location.id}
@@ -869,28 +1177,6 @@ export default function QuestionnaireTemplates() {
                               </SelectContent>
                             </Select>
                             <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="sendOnMail"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value || false}
-                                onCheckedChange={field.onChange}
-                                data-testid="checkbox-send-on-mail"
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Send on Mail</FormLabel>
-                              <p className="text-sm text-muted-foreground">
-                                Email this questionnaire to participants
-                                automatically
-                              </p>
-                            </div>
                           </FormItem>
                         )}
                       />
@@ -920,19 +1206,25 @@ export default function QuestionnaireTemplates() {
                         onDragEnd={handleDragEnd}
                       >
                         <SortableContext
-                          items={questions.map((q) => q.id)}
+                          items={[...questions].reverse().map((q) => q.id)}
                           strategy={verticalListSortingStrategy}
                         >
                           <div className="space-y-3">
-                            {questions.map((question, index) => (
-                              <SortableQuestion
-                                key={question.id}
-                                question={question}
-                                index={index}
-                                updateQuestion={updateQuestion}
-                                removeQuestion={removeQuestion}
-                              />
-                            ))}
+                            {[...questions].reverse().map((question) => {
+                              // Get the original index from the questions array for correct numbering
+                              const originalIndex = questions.findIndex(
+                                (q) => q.id === question.id,
+                              );
+                              return (
+                                <SortableQuestion
+                                  key={question.id}
+                                  question={question}
+                                  index={originalIndex}
+                                  updateQuestion={updateQuestion}
+                                  removeQuestion={removeQuestion}
+                                />
+                              );
+                            })}
                           </div>
                         </SortableContext>
                       </DndContext>
@@ -999,13 +1291,13 @@ export default function QuestionnaireTemplates() {
 
               <MultiSelect
                 options={[
-                  { value: "employee", label: "Employee" },
-                  { value: "manager", label: "Manager" },
+                  { value: "active", label: "Active" },
+                  { value: "inactive", label: "Inactive" },
                 ]}
-                selected={roleFilters}
-                onChange={setRoleFilters}
-                placeholder="All Roles"
-                label="roles"
+                selected={statusFilters}
+                onChange={setStatusFilters}
+                placeholder="All Status"
+                label="status"
               />
 
               {isSuperAdmin && (
@@ -1050,8 +1342,16 @@ export default function QuestionnaireTemplates() {
             filteredTemplates.map((template) => (
               <Card
                 key={template.id}
-                data-testid={`template-card-${template.id}`}
-                className="relative"
+                data-testid={
+                  template.id === 9999
+                    ? "tour-demo-questionnaire"
+                    : `template-card-${template.id}`
+                }
+                className={cn(
+                  "relative",
+                  template.id === 9999 &&
+                    "border-2 border-primary bg-primary/5",
+                )}
               >
                 <CardContent className="p-6 pt-12">
                   {/* Action buttons positioned at top-right corner */}
@@ -1086,10 +1386,10 @@ export default function QuestionnaireTemplates() {
                       size="sm"
                       onClick={() => handleDelete(template.id)}
                       data-testid={`delete-template-${template.id}`}
-                      title="Delete Template"
+                      title="Make Inactive"
                       className="h-8 w-8 p-0"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Ban className="h-4 w-4" />
                     </Button>
                   </div>
 
@@ -1099,21 +1399,23 @@ export default function QuestionnaireTemplates() {
                       <FileText className="h-6 w-6 text-primary-foreground" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center justify-between gap-2 mb-1">
                         <h3
                           className="font-semibold truncate"
                           data-testid={`template-name-${template.id}`}
                         >
                           {template.name}
                         </h3>
-                        {isSuperAdmin && (template as any).companyName && (
-                          <Badge variant="outline" className="text-xs">
+                        {(template as any).companyName && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs flex-shrink-0"
+                          >
                             {(template as any).companyName}
                           </Badge>
                         )}
                       </div>
                       <div className="flex gap-2 mt-1">
-                        <Badge variant="secondary">{template.targetRole}</Badge>
                         <Badge
                           variant={
                             template.status === "active"
@@ -1144,18 +1446,24 @@ export default function QuestionnaireTemplates() {
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteTemplateId} onOpenChange={(open) => !open && setDeleteTemplateId(null)}>
+      <AlertDialog
+        open={!!deleteTemplateId}
+        onOpenChange={(open) => !open && setDeleteTemplateId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Questionnaire Template</AlertDialogTitle>
+            <AlertDialogTitle>Make Questionnaire Template Inactive</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this questionnaire template? This action cannot be undone.
+              Are you sure you want to make this questionnaire template inactive?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Make Inactive
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

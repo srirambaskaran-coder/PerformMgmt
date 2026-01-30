@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,7 +24,7 @@ import {
   Search,
   Plus,
   Edit,
-  Trash2,
+  Ban,
   Calendar,
   Check,
   ChevronDown,
@@ -38,6 +38,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Form,
   FormControl,
@@ -55,6 +65,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useTour } from "@/contexts/TourContext";
 import { RoleGuard } from "@/components/RoleGuard";
 import { insertFrequencyCalendarSchema } from "@shared/schema";
 import type {
@@ -64,6 +76,7 @@ import type {
   ReviewFrequency,
 } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getClientIdFromSession } from "@/lib/ssoAuth";
 
 // Multi-select filter component
 interface MultiSelectProps {
@@ -154,11 +167,16 @@ function MultiSelect({
 
 export default function FrequencyCalendarManagement() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
+  const { isRunning: isTourMode, currentAction, clearAction } = useTour();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingCalendar, setEditingCalendar] =
     useState<FrequencyCalendar | null>(null);
+  const [tourDemoCalendar, setTourDemoCalendar] =
+    useState<FrequencyCalendar | null>(null);
+  const [deleteCalendarId, setDeleteCalendarId] = useState<string | null>(null);
 
   // Fetch frequency calendars
   const {
@@ -167,22 +185,73 @@ export default function FrequencyCalendarManagement() {
     error,
   } = useQuery<FrequencyCalendar[]>({
     queryKey: ["/api/frequency-calendars"],
+    select: (data: any[]) => {
+      return data.map((calendar: any) => ({
+        id: calendar.Id,
+        code: calendar.Code,
+        description: calendar.Description,
+        appraisalCycleId: calendar.AppraisalCycleId,
+        reviewFrequencyId: calendar.ReviewFrequencyId,
+        status: calendar.Status ? "active" : "inactive",
+        createdBy: calendar.CreatedBy,
+        createdOn: calendar.CreatedOn,
+        lastUpdatedBy: calendar.LastUpdatedBy,
+        lastUpdatedOn: calendar.LastUpdatedOn,
+      }));
+    },
   });
 
   // Fetch appraisal cycles for dropdown
   const { data: appraisalCycles = [] } = useQuery<AppraisalCycle[]>({
     queryKey: ["/api/appraisal-cycles"],
+    select: (data: any[]) => {
+      return data.map((cycle: any) => ({
+        id: cycle.Id,
+        code: cycle.Code,
+        description: cycle.Description,
+        fromDate: cycle.FromDate,
+        toDate: cycle.ToDate,
+        status: cycle.Status ? "active" : "inactive",
+        companyId: cycle.CompanyId,
+      }));
+    },
   });
 
   // Fetch review frequencies for dropdown
   const { data: reviewFrequencies = [] } = useQuery<ReviewFrequency[]>({
     queryKey: ["/api/review-frequencies"],
+    select: (data: any[]) => {
+      return data.map((freq: any) => ({
+        id: freq.Id,
+        code: freq.Code,
+        description: freq.Description,
+        status: freq.Status ? "active" : "inactive",
+      }));
+    },
   });
+
+  // Filter to show only active items in dropdowns
+  const activeAppraisalCycles = appraisalCycles.filter(cycle => cycle.status === "active");
+  const activeReviewFrequencies = reviewFrequencies.filter(freq => freq.status === "active");
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: InsertFrequencyCalendar) =>
-      apiRequest("POST", "/api/frequency-calendars", data),
+    mutationFn: (data: InsertFrequencyCalendar) => {
+      const payload = {
+        Code: data.code,
+        Description: data.description,
+        AppraisalCycleId: Number(data.appraisalCycleId),
+        ReviewFrequencyId: Number(data.reviewFrequencyId),
+        Status:
+          data.status === "active"
+            ? true
+            : data.status === "inactive"
+              ? false
+              : data.status,
+        ClientId: getClientIdFromSession(),
+      };
+      return apiRequest("POST", "/api/frequency-calendars", payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/frequency-calendars"] });
       toast({
@@ -203,8 +272,32 @@ export default function FrequencyCalendarManagement() {
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: InsertFrequencyCalendar }) =>
-      apiRequest("PUT", `/api/frequency-calendars/${id}`, data),
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: InsertFrequencyCalendar;
+    }) => {
+      const payload: any = {};
+      if (data.code !== undefined) payload.Code = data.code;
+      if (data.description !== undefined)
+        payload.Description = data.description;
+      if (data.appraisalCycleId !== undefined)
+        payload.AppraisalCycleId = Number(data.appraisalCycleId);
+      if (data.reviewFrequencyId !== undefined)
+        payload.ReviewFrequencyId = Number(data.reviewFrequencyId);
+      if (data.status !== undefined) {
+        payload.Status =
+          data.status === "active"
+            ? true
+            : data.status === "inactive"
+              ? false
+              : data.status;
+      }
+      payload.ClientId = getClientIdFromSession();
+      return apiRequest("PUT", `/api/frequency-calendars/${id}`, payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/frequency-calendars"] });
       toast({
@@ -265,6 +358,73 @@ export default function FrequencyCalendarManagement() {
     });
   };
 
+  // Tour action handlers
+  useEffect(() => {
+    if (!isTourMode || !currentAction) return;
+
+    if (currentAction === "openFrequencyCalendarForm") {
+      setEditingCalendar(null);
+      setIsCreateModalOpen(true);
+      // Fill demo data after modal opens - use first available cycle and frequency
+      setTimeout(() => {
+        form.setValue("code", "DEMO-Q1-2026");
+        form.setValue(
+          "description",
+          "Q1 2026 Review Calendar - Demo data created during tour",
+        );
+        form.setValue("status", "active");
+        // Try to set the first available cycle and frequency
+        if (appraisalCycles.length > 0) {
+          form.setValue("appraisalCycleId", appraisalCycles[0].id);
+        }
+        if (reviewFrequencies.length > 0) {
+          form.setValue("reviewFrequencyId", reviewFrequencies[0].id);
+        }
+      }, 200);
+      clearAction();
+    } else if (currentAction === "saveFrequencyCalendarAndClose") {
+      // Close modal and add demo calendar
+      setIsCreateModalOpen(false);
+      resetForm();
+      // Add demo calendar to display
+      setTourDemoCalendar({
+        id: 9999,
+        code: "DEMO-Q1-2026",
+        description: "Q1 2026 Review Calendar - Demo data created during tour",
+        appraisalCycleId:
+          appraisalCycles.length > 0 ? appraisalCycles[0].id : "demo-cycle",
+        reviewFrequencyId:
+          reviewFrequencies.length > 0 ? reviewFrequencies[0].id : "demo-freq",
+        status: "active",
+        createdBy: null,
+        createdOn: new Date().toISOString(),
+        lastUpdatedBy: null,
+        lastUpdatedOn: new Date().toISOString(),
+      } as FrequencyCalendar);
+      clearAction();
+    }
+  }, [
+    currentAction,
+    isTourMode,
+    clearAction,
+    form,
+    appraisalCycles,
+    reviewFrequencies,
+    resetForm,
+  ]);
+
+  // Clean up tour demo data when tour ends
+  useEffect(() => {
+    const handleTourEnd = () => {
+      setTourDemoCalendar(null);
+      setIsCreateModalOpen(false);
+      resetForm();
+    };
+
+    window.addEventListener("tourEnded", handleTourEnd);
+    return () => window.removeEventListener("tourEnded", handleTourEnd);
+  }, [resetForm]);
+
   const handleEdit = (calendar: FrequencyCalendar) => {
     setEditingCalendar(calendar);
     form.reset({
@@ -278,8 +438,13 @@ export default function FrequencyCalendarManagement() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this frequency calendar?")) {
-      deleteMutation.mutate(id);
+    setDeleteCalendarId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteCalendarId) {
+      deleteMutation.mutate(deleteCalendarId);
+      setDeleteCalendarId(null);
     }
   };
 
@@ -291,8 +456,11 @@ export default function FrequencyCalendarManagement() {
     }
   };
 
-  // Filtering logic
-  const filteredCalendars = calendars.filter((calendar) => {
+  // Filtering logic - include tour demo calendar if in tour mode
+  const allCalendars = tourDemoCalendar
+    ? [tourDemoCalendar, ...calendars]
+    : calendars;
+  const filteredCalendars = allCalendars.filter((calendar) => {
     const matchesSearch =
       calendar.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (calendar.description &&
@@ -326,7 +494,7 @@ export default function FrequencyCalendarManagement() {
 
   return (
     <RoleGuard allowedRoles={["admin"]}>
-      <div className="p-6 space-y-6">
+      <div className="space-y-6 calendar-list">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold" data-testid="text-page-title">
@@ -339,6 +507,7 @@ export default function FrequencyCalendarManagement() {
           <Dialog
             open={isCreateModalOpen}
             onOpenChange={(open) => {
+              if (isTourMode && !open) return;
               setIsCreateModalOpen(open);
               if (!open) {
                 setEditingCalendar(null);
@@ -347,12 +516,15 @@ export default function FrequencyCalendarManagement() {
             }}
           >
             <DialogTrigger asChild>
-              <Button className="gap-2" data-testid="button-create">
+              <Button className="gap-2" data-testid="button-create-calendar">
                 <Plus className="h-4 w-4" />
                 Create Frequency Calendar
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent
+              className={cn("sm:max-w-md", isTourMode && "z-[9997]")}
+              data-testid="dialog-create-calendar"
+            >
               <DialogHeader>
                 <DialogTitle>
                   {editingCalendar
@@ -425,7 +597,7 @@ export default function FrequencyCalendarManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {appraisalCycles.map((cycle) => (
+                              {activeAppraisalCycles.map((cycle) => (
                                 <SelectItem key={cycle.id} value={cycle.id}>
                                   {cycle.code}
                                 </SelectItem>
@@ -452,7 +624,7 @@ export default function FrequencyCalendarManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {reviewFrequencies.map((frequency) => (
+                              {activeReviewFrequencies.map((frequency) => (
                                 <SelectItem
                                   key={frequency.id}
                                   value={frequency.id}
@@ -496,8 +668,8 @@ export default function FrequencyCalendarManagement() {
                       {createMutation.isPending || updateMutation.isPending
                         ? "Saving..."
                         : editingCalendar
-                        ? "Update"
-                        : "Create"}
+                          ? "Update"
+                          : "Create"}
                     </Button>
                     <Button
                       type="button"
@@ -576,7 +748,16 @@ export default function FrequencyCalendarManagement() {
             {filteredCalendars.map((calendar) => (
               <Card
                 key={calendar.id}
-                className="hover:shadow-md transition-shadow"
+                data-testid={
+                  calendar.id === 9999
+                    ? "tour-demo-calendar"
+                    : `card-calendar-${calendar.id}`
+                }
+                className={cn(
+                  "hover:shadow-md transition-shadow",
+                  calendar.id === 9999 &&
+                    "border-2 border-primary bg-primary/5",
+                )}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
@@ -616,8 +797,9 @@ export default function FrequencyCalendarManagement() {
                         onClick={() => handleDelete(calendar.id)}
                         disabled={deleteMutation.isPending}
                         data-testid={`button-delete-${calendar.id}`}
+                        title="Mark Inactive"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Ban className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -645,6 +827,26 @@ export default function FrequencyCalendarManagement() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!deleteCalendarId} onOpenChange={(open) => !open && setDeleteCalendarId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Make Frequency Calendar Inactive</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to make this frequency calendar inactive?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Make Inactive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RoleGuard>
   );
 }

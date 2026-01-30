@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useTour } from "@/contexts/TourContext";
 import {
   Card,
   CardContent,
@@ -37,20 +38,9 @@ import {
   ChevronRight,
   Image,
   Upload,
+  Compass,
 } from "lucide-react";
 import type { Company } from "@shared/schema";
-
-// Schema for password change - current password optional for OIDC accounts
-const passwordChangeSchema = z
-  .object({
-    currentPassword: z.string().optional(),
-    newPassword: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string().min(6, "Password confirmation is required"),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-  });
 
 // Schema for email service configuration
 const emailServiceSchema = z.object({
@@ -63,35 +53,23 @@ const emailServiceSchema = z.object({
   fromName: z.string().min(1, "From name is required"),
 });
 
-type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
 type EmailServiceForm = z.infer<typeof emailServiceSchema>;
 
 export default function Settings() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const { startTour } = useTour();
   const [showEmailServiceForm, setShowEmailServiceForm] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
-  const isSuperAdmin = user?.role === "super_admin";
-  const isAdmin = user?.role === "admin";
-  const isHRManager = user?.role === "hr_manager";
-  const isEmployee = user?.role === "employee";
-  const isManager = user?.role === "manager";
-  const canChangePassword =
-    isSuperAdmin || isAdmin || isHRManager || isEmployee || isManager;
+  // Get role handling both uppercase and lowercase property names
+  const userRole = (user as any)?.role || (user as any)?.Role || "";
+  // Normalize role for comparison (handles both "hr_manager" and "hrmanager", "super_admin" and "superadmin")
+  const normalizedUserRole = userRole?.toLowerCase().replace(/_/g, "") || "";
+  const isSuperAdmin = normalizedUserRole === "superadmin";
+  const isAdmin = normalizedUserRole === "admin";
   const canConfigureEmail = isAdmin; // Only Administrators can configure email
   const canUploadLogo = isAdmin; // Only Administrators can upload company logo
-
-  // Password change form
-  const passwordForm = useForm<PasswordChangeForm>({
-    resolver: zodResolver(passwordChangeSchema),
-    defaultValues: {
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    },
-  });
 
   // Email service configuration form
   const emailForm = useForm<EmailServiceForm>({
@@ -119,31 +97,6 @@ export default function Settings() {
     enabled: !!user && canUploadLogo,
   });
 
-  // Password change mutation
-  const changePasswordMutation = useMutation({
-    mutationFn: async (data: PasswordChangeForm) => {
-      await apiRequest("POST", "/api/settings/change-password", {
-        currentPassword: data.currentPassword,
-        newPassword: data.newPassword,
-      });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Password changed successfully",
-      });
-      passwordForm.reset();
-      setShowPasswordForm(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to change password",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Email service configuration mutation
   const emailServiceMutation = useMutation({
     mutationFn: async (data: EmailServiceForm) => {
@@ -167,7 +120,7 @@ export default function Settings() {
 
   // Company logo upload handler
   const handleLogoUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file || !company) return;
@@ -199,7 +152,6 @@ export default function Settings() {
       // Get signed upload URL
       const urlResponse = await fetch(`${API_BASE_URL}/api/objects/upload`, {
         method: "POST",
-        credentials: "include",
       });
 
       if (!urlResponse.ok) {
@@ -243,7 +195,7 @@ export default function Settings() {
         `/api/companies/current/logo`,
         {
           logoUrl: objectPath,
-        }
+        },
       );
 
       console.log("PUT request successful");
@@ -269,12 +221,17 @@ export default function Settings() {
     }
   };
 
-  const onPasswordSubmit = (data: PasswordChangeForm) => {
-    changePasswordMutation.mutate(data);
-  };
-
   const onEmailSubmit = (data: EmailServiceForm) => {
     emailServiceMutation.mutate(data);
+  };
+
+  // Handle starting the tour
+  const handleStartTour = () => {
+    toast({
+      title: "Starting Application Tour",
+      description: "Let's walk through the key features of the application.",
+    });
+    startTour();
   };
 
   // Load email config into form when available
@@ -286,7 +243,7 @@ export default function Settings() {
   }, [emailConfig]);
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="container mx-auto py-6 space-y-6" data-testid="settings">
       {/* Page Header */}
       <div>
         <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -330,17 +287,18 @@ export default function Settings() {
                     className="flex items-center gap-1 w-fit"
                   >
                     <Shield className="h-3 w-3" />
-                    {user?.role === "super_admin"
-                      ? "Super Administrator"
-                      : user?.role === "admin"
-                      ? "Administrator"
-                      : user?.role === "hr_manager"
-                      ? "HR Manager"
-                      : user?.role === "manager"
-                      ? "Manager"
-                      : user?.role === "employee"
-                      ? "Employee"
-                      : user?.role}
+                    {(() => {
+                      // Normalize role for comparison (handles both "hr_manager" and "hrmanager")
+                      const normalizedRole =
+                        userRole?.toLowerCase().replace(/_/g, "") || "";
+                      if (normalizedRole === "superadmin")
+                        return "Super Administrator";
+                      if (normalizedRole === "admin") return "Administrator";
+                      if (normalizedRole === "hrmanager") return "HR Manager";
+                      if (normalizedRole === "manager") return "Manager";
+                      if (normalizedRole === "employee") return "Employee";
+                      return userRole;
+                    })()}
                   </Badge>
                 </div>
               </div>
@@ -348,126 +306,37 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Change Password Card */}
-        {canChangePassword && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Key className="h-5 w-5" />
-                Change Password
-              </CardTitle>
-              <CardDescription>
-                Update your account password for security
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!showPasswordForm ? (
-                <Button
-                  onClick={() => setShowPasswordForm(true)}
-                  className="flex items-center gap-2"
-                  data-testid="button-change-password"
-                >
-                  <Key className="h-4 w-4" />
-                  Change Password
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              ) : (
-                <Form {...passwordForm}>
-                  <form
-                    onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}
-                    className="space-y-4"
-                  >
-                    <FormField
-                      control={passwordForm.control}
-                      name="currentPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>
-                            Current Password{" "}
-                            <span className="text-muted-foreground">
-                              (optional if none set)
-                            </span>
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="password"
-                              placeholder="Enter current password (leave blank if none set)"
-                              data-testid="input-current-password"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                          <p className="text-sm text-muted-foreground">
-                            Leave current password blank if this is your first
-                            time setting a password
-                          </p>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={passwordForm.control}
-                      name="newPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>New Password</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="password"
-                              placeholder="Enter new password"
-                              data-testid="input-new-password"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={passwordForm.control}
-                      name="confirmPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Confirm New Password</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="password"
-                              placeholder="Confirm new password"
-                              data-testid="input-confirm-password"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        type="submit"
-                        disabled={changePasswordMutation.isPending}
-                        data-testid="button-submit-password"
-                      >
-                        {changePasswordMutation.isPending
-                          ? "Changing..."
-                          : "Change Password"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setShowPasswordForm(false);
-                          passwordForm.reset();
-                        }}
-                        data-testid="button-cancel-password"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        {/* Application Tour Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Compass className="h-5 w-5" />
+              Application Tour
+            </CardTitle>
+            <CardDescription>
+              Take a guided tour to learn how to use the Performance Management
+              System
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                New to the system? Start an interactive tour that will guide you
+                through all the key features and help you understand how to
+                manage performance reviews effectively.
+              </p>
+              <Button
+                onClick={handleStartTour}
+                className="flex items-center gap-2"
+                data-testid="button-start-tour"
+              >
+                <Compass className="h-4 w-4" />
+                Start Application Tour
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Email Service Configuration Card - Administrator Only */}
         {canConfigureEmail && (
@@ -559,7 +428,7 @@ export default function Settings() {
                                 {...field}
                                 onChange={(e) =>
                                   field.onChange(
-                                    parseInt(e.target.value) || 587
+                                    parseInt(e.target.value) || 587,
                                   )
                                 }
                               />
@@ -754,8 +623,8 @@ export default function Settings() {
                         {uploadingLogo
                           ? "Uploading..."
                           : company.logoUrl
-                          ? "Update Logo"
-                          : "Upload Logo"}
+                            ? "Update Logo"
+                            : "Upload Logo"}
                       </Button>
                     </div>
                   </Label>
@@ -769,22 +638,6 @@ export default function Settings() {
                     data-testid="input-logo-upload"
                   />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Access Restrictions Info */}
-        {!canChangePassword && !canConfigureEmail && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center py-8">
-                <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">Limited Access</h3>
-                <p className="text-muted-foreground">
-                  Settings are only available for Administrators and Super
-                  Administrators.
-                </p>
               </div>
             </CardContent>
           </Card>

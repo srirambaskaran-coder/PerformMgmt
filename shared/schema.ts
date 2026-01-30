@@ -4,12 +4,18 @@ import { z } from "zod";
 // ENUMS - Pure TypeScript enum types
 // ============================================
 
+// Role names - supporting both formats:
+// - With underscores (for display/internal use): super_admin, hr_manager
+// - Without underscores (for API payload): superadmin, hrmanager
 export const UserRoles = [
   "super_admin",
   "admin",
   "hr_manager",
   "employee",
   "manager",
+  // Also accept without underscores (API format)
+  "superadmin",
+  "hrmanager",
 ] as const;
 export type UserRole = (typeof UserRoles)[number];
 
@@ -662,7 +668,12 @@ export interface SubmitFeedback {
 // User schema
 export const insertUserSchema = z
   .object({
-    email: z.string().email().optional().nullable(),
+    email: z
+      .string()
+      .email("Please enter a valid email address")
+      .optional()
+      .nullable()
+      .or(z.literal("")),
     firstName: z.string().optional().nullable(),
     lastName: z.string().optional().nullable(),
     profileImageUrl: z.string().optional().nullable(),
@@ -671,9 +682,14 @@ export const insertUserSchema = z
     department: z.string().optional().nullable(),
     dateOfJoining: z.preprocess(
       (val) => (val ? new Date(val as string) : null),
-      z.date().nullable().optional()
+      z.date().nullable().optional(),
     ),
-    mobileNumber: z.string().optional().nullable(),
+    mobileNumber: z
+      .string()
+      .regex(/^[0-9]{10}$/, "Mobile number must be exactly 10 digits")
+      .optional()
+      .nullable()
+      .or(z.literal("")),
     reportingManagerId: z.string().optional().nullable(),
     locationId: z.string().optional().nullable(),
     companyId: z.string().optional().nullable(),
@@ -698,29 +714,52 @@ export const insertUserSchema = z
     {
       message: "Passwords do not match",
       path: ["confirmPassword"],
-    }
+    },
   );
 
 // Company schema
 export const insertCompanySchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1, "Company name is required"),
   address: z.string().optional().nullable(),
   clientContact: z.string().optional().nullable(),
-  email: z.string().email().optional().nullable(),
-  contactNumber: z.string().optional().nullable(),
+  email: z
+    .string()
+    .email("Invalid email address")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  contactNumber: z
+    .string()
+    .regex(/^[0-9]{10}$/, "Contact number must be exactly 10 digits")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
   gstNumber: z.string().optional().nullable(),
   logoUrl: z.string().optional().nullable(),
-  url: z.string().optional().nullable(),
+  url: z
+    .string()
+    .url("Invalid URL format")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
   companyUrl: z.string().optional().nullable(),
   status: z.enum(StatusValues).optional().nullable(),
 });
 
 // Location schema
 export const insertLocationSchema = z.object({
-  code: z.string().min(1),
-  name: z.string().min(1),
-  state: z.string().optional().nullable(),
+  code: z.string().min(1, "Location code is required"),
+  name: z.string().min(1, "Location name is required"),
+  locationType: z.number().optional().nullable(),
+  gstNumber: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
   country: z.string().optional().nullable(),
+  state: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
+  pincode: z.string().optional().nullable(),
+  isBillingAddress: z.boolean().optional().nullable(),
+  isShippingAddress: z.boolean().optional().nullable(),
+  isPrimaryLocation: z.boolean().optional().nullable(),
   companyId: z.string().optional().nullable(),
   status: z.enum(StatusValues).optional().nullable(),
   createdById: z.string().optional().nullable(),
@@ -730,7 +769,7 @@ export const insertLocationSchema = z.object({
 export const insertQuestionnaireTemplateSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional().nullable(),
-  targetRole: z.enum(UserRoles),
+  targetRole: z.enum(UserRoles).optional().nullable(),
   applicableCategory: z.enum(CategoryValues).optional().nullable(),
   applicableLevelId: z.string().optional().nullable(),
   applicableGradeId: z.string().optional().nullable(),
@@ -762,28 +801,28 @@ export const insertEvaluationSchema = z.object({
   selfEvaluationData: z.any().optional().nullable(),
   selfEvaluationSubmittedAt: z.preprocess(
     (val) => (val ? new Date(val as string) : null),
-    z.date().nullable().optional()
+    z.date().nullable().optional(),
   ),
   managerEvaluationData: z.any().optional().nullable(),
   managerEvaluationSubmittedAt: z.preprocess(
     (val) => (val ? new Date(val as string) : null),
-    z.date().nullable().optional()
+    z.date().nullable().optional(),
   ),
   overallRating: z.number().optional().nullable(),
   status: z.string().optional().default("not_started"),
   meetingScheduledAt: z.preprocess(
     (val) => (val ? new Date(val as string) : null),
-    z.date().nullable().optional()
+    z.date().nullable().optional(),
   ),
   meetingNotes: z.string().optional().nullable(),
   showNotesToEmployee: z.boolean().optional().default(false),
   meetingCompletedAt: z.preprocess(
     (val) => (val ? new Date(val as string) : null),
-    z.date().nullable().optional()
+    z.date().nullable().optional(),
   ),
   finalizedAt: z.preprocess(
     (val) => (val ? new Date(val as string) : null),
-    z.date().nullable().optional()
+    z.date().nullable().optional(),
   ),
 });
 
@@ -825,7 +864,7 @@ export const insertAccessTokenSchema = z.object({
   expiresAt: z.preprocess((val) => new Date(val as string), z.date()),
   usedAt: z.preprocess(
     (val) => (val ? new Date(val as string) : null),
-    z.date().nullable().optional()
+    z.date().nullable().optional(),
   ),
   isActive: z.boolean().optional().default(true),
 });
@@ -840,7 +879,7 @@ export const insertCalendarCredentialSchema = z.object({
   refreshToken: z.string().min(1),
   expiresAt: z.preprocess(
     (val) => (val ? new Date(val as string) : null),
-    z.date().nullable().optional()
+    z.date().nullable().optional(),
   ),
   scope: z.string().optional().nullable(),
   isActive: z.boolean().optional().default(true),
@@ -970,7 +1009,7 @@ export const insertScheduledAppraisalTaskSchema = z.object({
   status: z.string().default("pending"),
   executedAt: z.preprocess(
     (val) => (val ? new Date(val as string) : null),
-    z.date().nullable().optional()
+    z.date().nullable().optional(),
   ),
   error: z.string().optional().nullable(),
 });
@@ -1038,7 +1077,7 @@ export const updateDevelopmentGoalSchema = z
     plannedOutcome: z.string().min(1).optional(),
     targetDate: z.preprocess(
       (val) => (val ? new Date(val as string) : undefined),
-      z.date().optional()
+      z.date().optional(),
     ),
     progress: z.number().min(0).max(100).optional(),
   })
@@ -1056,7 +1095,7 @@ export const updateUserSchema = z
     department: z.string().optional().nullable(),
     dateOfJoining: z.preprocess(
       (val) => (val ? new Date(val as string) : null),
-      z.date().nullable().optional()
+      z.date().nullable().optional(),
     ),
     mobileNumber: z.string().optional().nullable(),
     reportingManagerId: z.string().optional().nullable(),

@@ -6,6 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,7 +24,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Plus, Search, Edit, Trash2, Send, Calendar, Clock, FileText } from "lucide-react";
+import { Plus, Search, Edit, Ban, Send, Calendar, Clock, FileText } from "lucide-react";
 
 export default function PublishQuestionnaires() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -22,6 +32,7 @@ export default function PublishQuestionnaires() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingQuestionnaire, setEditingQuestionnaire] = useState<PublishQuestionnaire | null>(null);
+  const [deleteQuestionnaireId, setDeleteQuestionnaireId] = useState<string | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -155,8 +166,13 @@ export default function PublishQuestionnaires() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this publish questionnaire?")) {
-      deleteQuestionnaireMutation.mutate(id);
+    setDeleteQuestionnaireId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteQuestionnaireId) {
+      deleteQuestionnaireMutation.mutate(deleteQuestionnaireId);
+      setDeleteQuestionnaireId(null);
     }
   };
 
@@ -644,8 +660,9 @@ export default function PublishQuestionnaires() {
                         onClick={() => handleDelete(questionnaire.id)}
                         disabled={deleteQuestionnaireMutation.isPending}
                         data-testid={`button-delete-${questionnaire.id}`}
+                        title="Mark Inactive"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Ban className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -673,6 +690,26 @@ export default function PublishQuestionnaires() {
           )}
         </div>
       </div>
+
+      <AlertDialog open={!!deleteQuestionnaireId} onOpenChange={(open) => !open && setDeleteQuestionnaireId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Make Published Questionnaire Inactive</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to make this published questionnaire inactive?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Make Inactive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RoleGuard>
   );
 }

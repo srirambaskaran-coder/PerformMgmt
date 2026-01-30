@@ -1,5 +1,6 @@
 ﻿import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { useTour } from "@/contexts/TourContext";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/SidebarContext";
 import { useQuery } from "@tanstack/react-query";
@@ -26,6 +27,16 @@ import {
   BarChart3,
   MessageSquare,
 } from "lucide-react";
+
+// Normalize company object from API (convert uppercase keys to lowercase)
+function normalizeCompany(apiCompany: any) {
+  if (!apiCompany) return null;
+  return {
+    id: apiCompany.Id || apiCompany.id,
+    name: apiCompany.Name || apiCompany.name,
+    logoUrl: apiCompany.LogoURL || apiCompany.logoUrl,
+  };
+}
 
 interface NavItem {
   href: string;
@@ -163,12 +174,12 @@ const navItems: NavItem[] = [
     icon: Target,
     roles: ["employee"],
   },
-  {
-    href: "/feedback-requests",
-    label: "Feedback Requests",
-    icon: MessageSquare,
-    roles: ["employee"],
-  },
+  // {
+  //   href: "/feedback-requests",
+  //   label: "Feedback Requests",
+  //   icon: MessageSquare,
+  //   roles: ["employee"],
+  // },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -176,28 +187,48 @@ export function Sidebar() {
   const { collapsed } = useSidebar();
   const [location] = useLocation();
   const { user } = useAuth();
+  const { isTourMode, tourSteps, currentStep } = useTour();
+
+  // Get current tour step's target selector to highlight the corresponding menu item
+  const currentTourTargetSelector =
+    isTourMode && tourSteps[currentStep]?.targetSelector;
 
   // Fetch company data if user has a companyId
   const companyId = (user as any)?.companyId;
   const { data: company } = useQuery({
     queryKey: ["/api/companies", companyId],
     enabled: !!companyId,
+    select: (data: any) => normalizeCompany(data),
   });
 
   // Use active role from session for role switching support
+  // Handle both uppercase (from API) and lowercase (from schema) property names
+  const userAny = user as any;
   const activeRole =
-    (user as any)?.activeRole || (user as any)?.role || "employee";
+    userAny?.activeRole ||
+    userAny?.ActiveRole ||
+    userAny?.role ||
+    userAny?.Role ||
+    "employee";
+
+  // Normalize role for comparison (handles both "hr_manager" and "hrmanager")
+  const normalizedActiveRole =
+    activeRole?.toLowerCase().replace(/_/g, "") || "employee";
 
   const filteredNavItems = navItems.filter((item) => {
     if (!item.roles) return true;
-    return item.roles.includes(activeRole);
+    // Normalize both the user's role and the allowed roles for comparison
+    const normalizedAllowedRoles = item.roles.map((r) =>
+      r.toLowerCase().replace(/_/g, ""),
+    );
+    return normalizedAllowedRoles.includes(normalizedActiveRole);
   });
 
   return (
     <div
       className={cn(
         "bg-card border-r border-border flex flex-col h-full transition-all duration-300 shrink-0",
-        collapsed ? "w-16" : "w-64"
+        collapsed ? "w-16" : "w-64",
       )}
       data-testid="sidebar"
     >
@@ -205,20 +236,20 @@ export function Sidebar() {
       <div
         className={cn(
           "border-b border-border shrink-0 flex items-center",
-          collapsed ? "h-16 justify-center" : "p-4"
+          collapsed ? "h-16 justify-center" : "p-4",
         )}
       >
         <div
           className={cn(
             "flex items-center",
-            collapsed ? "justify-center" : "gap-3"
+            collapsed ? "justify-center" : "gap-3",
           )}
         >
-          {(company as any)?.logoUrl ? (
+          {company?.logoUrl ? (
             <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-background border border-border">
               <img
-                src={(company as any).logoUrl}
-                alt={(company as any)?.name || "Company Logo"}
+                src={company.logoUrl}
+                alt={company?.name || "Company Logo"}
                 className="w-full h-full object-contain"
                 onError={(e) => {
                   // Fallback to default icon if image fails to load
@@ -239,7 +270,7 @@ export function Sidebar() {
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <h2 className="font-semibold text-foreground text-sm truncate">
-                {(company as any)?.name || "Performance Hub"}
+                {company?.name || "Performance Hub"}
               </h2>
               <p className="text-xs text-muted-foreground truncate">
                 Employee Management
@@ -255,11 +286,15 @@ export function Sidebar() {
           "flex-1 overflow-y-auto overflow-x-hidden space-y-1",
           collapsed
             ? "sidebar-scroll-collapsed px-1.5 py-2"
-            : "sidebar-scroll px-2 py-2"
+            : "sidebar-scroll px-2 py-2",
         )}
       >
         {filteredNavItems.map((item) => {
           const isActive = location === item.href;
+          // Check if this menu item is being highlighted in the current tour step
+          const navTestId = `nav-${item.href.replace("/", "") || "dashboard"}`;
+          const isTourHighlighted =
+            currentTourTargetSelector === `[data-testid='${navTestId}']`;
           const Icon = item.icon;
 
           return (
@@ -271,11 +306,11 @@ export function Sidebar() {
                 collapsed
                   ? "justify-center w-10 h-10 mx-auto"
                   : "gap-3 px-3 py-2",
-                isActive
+                isActive || isTourHighlighted
                   ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
               )}
-              data-testid={`nav-${item.href.replace("/", "") || "dashboard"}`}
+              data-testid={navTestId}
               title={collapsed ? item.label : undefined}
             >
               <Icon className="h-5 w-5 shrink-0" />

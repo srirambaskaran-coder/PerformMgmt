@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,7 +24,7 @@ import {
   Search,
   Plus,
   Edit,
-  Trash2,
+  Ban,
   Clock,
   Check,
   ChevronDown,
@@ -38,6 +38,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Form,
   FormControl,
@@ -55,10 +65,13 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useTour } from "@/contexts/TourContext";
 import { RoleGuard } from "@/components/RoleGuard";
 import { insertReviewFrequencySchema } from "@shared/schema";
 import type { ReviewFrequency, InsertReviewFrequency } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getClientIdFromSession } from "@/lib/ssoAuth";
 
 // Multi-select filter component
 interface MultiSelectProps {
@@ -149,11 +162,16 @@ function MultiSelect({
 
 export default function ReviewFrequencyManagement() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
+  const { isRunning: isTourMode, currentAction, clearAction } = useTour();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingFrequency, setEditingFrequency] =
     useState<ReviewFrequency | null>(null);
+  const [tourDemoFrequency, setTourDemoFrequency] =
+    useState<ReviewFrequency | null>(null);
+  const [deleteFrequencyId, setDeleteFrequencyId] = useState<string | null>(null);
 
   // Fetch review frequencies
   const {
@@ -162,12 +180,36 @@ export default function ReviewFrequencyManagement() {
     error,
   } = useQuery<ReviewFrequency[]>({
     queryKey: ["/api/review-frequencies"],
+    select: (data: any[]) => {
+      return data.map((freq: any) => ({
+        id: freq.Id,
+        code: freq.Code,
+        description: freq.Description,
+        status: freq.Status ? "active" : "inactive",
+        createdBy: freq.CreatedBy,
+        createdOn: freq.CreatedOn,
+        lastUpdatedBy: freq.LastUpdatedBy,
+        lastUpdatedOn: freq.LastUpdatedOn,
+      }));
+    },
   });
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: InsertReviewFrequency) =>
-      apiRequest("POST", "/api/review-frequencies", data),
+    mutationFn: (data: InsertReviewFrequency) => {
+      const payload = {
+        Code: data.code,
+        Description: data.description,
+        Status:
+          data.status === "active"
+            ? true
+            : data.status === "inactive"
+              ? false
+              : data.status,
+        ClientId: getClientIdFromSession(),
+      };
+      return apiRequest("POST", "/api/review-frequencies", payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/review-frequencies"] });
       toast({
@@ -188,8 +230,22 @@ export default function ReviewFrequencyManagement() {
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: InsertReviewFrequency }) =>
-      apiRequest("PUT", `/api/review-frequencies/${id}`, data),
+    mutationFn: ({ id, data }: { id: string; data: InsertReviewFrequency }) => {
+      const payload: any = {};
+      if (data.code !== undefined) payload.Code = data.code;
+      if (data.description !== undefined)
+        payload.Description = data.description;
+      if (data.status !== undefined) {
+        payload.Status =
+          data.status === "active"
+            ? true
+            : data.status === "inactive"
+              ? false
+              : data.status;
+      }
+      payload.ClientId = getClientIdFromSession();
+      return apiRequest("PUT", `/api/review-frequencies/${id}`, payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/review-frequencies"] });
       toast({
@@ -246,6 +302,54 @@ export default function ReviewFrequencyManagement() {
     });
   };
 
+  // Tour action handlers
+  useEffect(() => {
+    if (!isTourMode || !currentAction) return;
+
+    if (currentAction === "openReviewFrequencyForm") {
+      setEditingFrequency(null);
+      setIsCreateModalOpen(true);
+      // Fill demo data after modal opens
+      setTimeout(() => {
+        form.setValue("code", "DEMO-QUARTERLY");
+        form.setValue(
+          "description",
+          "Quarterly Review - Demo data created during tour",
+        );
+        form.setValue("status", "active");
+      }, 200);
+      clearAction();
+    } else if (currentAction === "saveReviewFrequencyAndClose") {
+      // Close modal and add demo frequency
+      setIsCreateModalOpen(false);
+      resetForm();
+      // Add demo frequency to display
+      setTourDemoFrequency({
+        id: 9999,
+        code: "DEMO-QUARTERLY",
+        description: "Quarterly Review - Demo data created during tour",
+        status: "active",
+        createdBy: null,
+        createdOn: new Date().toISOString(),
+        lastUpdatedBy: null,
+        lastUpdatedOn: new Date().toISOString(),
+      } as ReviewFrequency);
+      clearAction();
+    }
+  }, [currentAction, isTourMode, clearAction, form, resetForm]);
+
+  // Clean up tour demo data when tour ends
+  useEffect(() => {
+    const handleTourEnd = () => {
+      setTourDemoFrequency(null);
+      setIsCreateModalOpen(false);
+      resetForm();
+    };
+
+    window.addEventListener("tourEnded", handleTourEnd);
+    return () => window.removeEventListener("tourEnded", handleTourEnd);
+  }, [resetForm]);
+
   const handleEdit = (frequency: ReviewFrequency) => {
     setEditingFrequency(frequency);
     form.reset({
@@ -257,8 +361,13 @@ export default function ReviewFrequencyManagement() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this review frequency?")) {
-      deleteMutation.mutate(id);
+    setDeleteFrequencyId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteFrequencyId) {
+      deleteMutation.mutate(deleteFrequencyId);
+      setDeleteFrequencyId(null);
     }
   };
 
@@ -270,8 +379,11 @@ export default function ReviewFrequencyManagement() {
     }
   };
 
-  // Filtering logic
-  const filteredFrequencies = frequencies.filter((frequency) => {
+  // Filtering logic - include tour demo frequency if in tour mode
+  const allFrequencies = tourDemoFrequency
+    ? [tourDemoFrequency, ...frequencies]
+    : frequencies;
+  const filteredFrequencies = allFrequencies.filter((frequency) => {
     const matchesSearch =
       frequency.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (frequency.description &&
@@ -296,7 +408,7 @@ export default function ReviewFrequencyManagement() {
 
   return (
     <RoleGuard allowedRoles={["admin"]}>
-      <div className="p-6 space-y-6">
+      <div className="space-y-6 frequency-list">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold" data-testid="text-page-title">
@@ -309,6 +421,7 @@ export default function ReviewFrequencyManagement() {
           <Dialog
             open={isCreateModalOpen}
             onOpenChange={(open) => {
+              if (isTourMode && !open) return;
               setIsCreateModalOpen(open);
               if (!open) {
                 setEditingFrequency(null);
@@ -317,12 +430,15 @@ export default function ReviewFrequencyManagement() {
             }}
           >
             <DialogTrigger asChild>
-              <Button className="gap-2" data-testid="button-create">
+              <Button className="gap-2" data-testid="button-create-frequency">
                 <Plus className="h-4 w-4" />
                 Create Review Frequency
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent
+              className={cn("sm:max-w-md", isTourMode && "z-[9997]")}
+              data-testid="dialog-create-frequency"
+            >
               <DialogHeader>
                 <DialogTitle>
                   {editingFrequency
@@ -407,8 +523,8 @@ export default function ReviewFrequencyManagement() {
                       {createMutation.isPending || updateMutation.isPending
                         ? "Saving..."
                         : editingFrequency
-                        ? "Update"
-                        : "Create"}
+                          ? "Update"
+                          : "Create"}
                     </Button>
                     <Button
                       type="button"
@@ -487,7 +603,16 @@ export default function ReviewFrequencyManagement() {
             {filteredFrequencies.map((frequency) => (
               <Card
                 key={frequency.id}
-                className="hover:shadow-md transition-shadow"
+                data-testid={
+                  frequency.id === 9999
+                    ? "tour-demo-frequency"
+                    : `card-frequency-${frequency.id}`
+                }
+                className={cn(
+                  "hover:shadow-md transition-shadow",
+                  frequency.id === 9999 &&
+                    "border-2 border-primary bg-primary/5",
+                )}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
@@ -527,8 +652,9 @@ export default function ReviewFrequencyManagement() {
                         onClick={() => handleDelete(frequency.id)}
                         disabled={deleteMutation.isPending}
                         data-testid={`button-delete-${frequency.id}`}
+                        title="Mark Inactive"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Ban className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -546,6 +672,26 @@ export default function ReviewFrequencyManagement() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!deleteFrequencyId} onOpenChange={(open) => !open && setDeleteFrequencyId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Make Review Frequency Inactive</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to make this review frequency inactive?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Make Inactive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RoleGuard>
   );
 }

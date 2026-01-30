@@ -38,7 +38,6 @@ export const apiClient = {
     const response = await fetch(url, {
       ...options,
       method: "GET",
-      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...authHeaders,
@@ -64,7 +63,6 @@ export const apiClient = {
     const response = await fetch(url, {
       ...options,
       method: "POST",
-      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...authHeaders,
@@ -91,7 +89,6 @@ export const apiClient = {
     const response = await fetch(url, {
       ...options,
       method: "PUT",
-      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...authHeaders,
@@ -118,7 +115,6 @@ export const apiClient = {
     const response = await fetch(url, {
       ...options,
       method: "DELETE",
-      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...authHeaders,

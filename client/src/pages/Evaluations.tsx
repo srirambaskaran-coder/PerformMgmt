@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
@@ -42,9 +42,11 @@ import {
 } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/hooks/useAuth";
+import { useTour } from "@/contexts/TourContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/config/api.config";
+import { getAccessToken } from "@/hooks/useAuth";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import {
@@ -113,7 +115,7 @@ export default function Evaluations() {
     useState<EvaluationWithDetails | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [responses, setResponses] = useState<Record<string, QuestionResponse>>(
-    {}
+    {},
   );
   const [averageRating, setAverageRating] = useState<number>(0);
   const [showMeetingScheduler, setShowMeetingScheduler] = useState(false);
@@ -129,6 +131,129 @@ export default function Evaluations() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isTourMode, currentAction, clearAction } = useTour();
+  const [showDemoData, setShowDemoData] = useState(false);
+
+  // Demo evaluation data for tour
+  const demoEvaluations: EvaluationWithDetails[] = [
+    {
+      id: "demo-eval-1",
+      employeeId: user?.id || "employee-1",
+      managerId: "manager-1",
+      reviewCycleId: "cycle-2024",
+      initiatedAppraisalId: "appraisal-1",
+      selfEvaluationData: null,
+      selfEvaluationSubmittedAt: null,
+      managerEvaluationData: null,
+      managerEvaluationSubmittedAt: null,
+      overallRating: null,
+      meetingScheduledAt: null,
+      meetingNotes: null,
+      meetingCompletedAt: null,
+      finalizedAt: null,
+      showNotesToEmployee: false,
+      calibratedRating: null,
+      calibrationRemarks: null,
+      calibratedBy: null,
+      calibratedAt: null,
+      status: "pending_self_evaluation",
+      createdOn: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      lastUpdatedOn: new Date(
+        Date.now() - 7 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      employee: {
+        id: user?.id || "employee-1",
+        email: user?.email || "employee@company.com",
+        firstName: user?.firstName || "John",
+        lastName: user?.lastName || "Doe",
+        code: "EMP001",
+        designation: "Software Engineer",
+        department: "Engineering",
+        locationId: "loc-1",
+        companyId: "company-1",
+        role: "employee",
+        levelId: "level-3",
+        gradeId: "grade-b",
+        reportingManagerId: "manager-1",
+      },
+      manager: {
+        id: "manager-1",
+        email: "manager@company.com",
+        firstName: "Sarah",
+        lastName: "Manager",
+        code: "MGR001",
+        designation: "Engineering Manager",
+      },
+      questionnaires: [
+        {
+          id: "questionnaire-1",
+          name: "Self Assessment - Technical Skills",
+          description: "Evaluate your technical competencies and achievements",
+          targetRole: "employee",
+          questions: [
+            {
+              id: "q1",
+              text: "How would you rate your technical skills and knowledge in your current role?",
+              type: "rating",
+              required: true,
+              category: "Technical Competency",
+              weight: 30,
+            },
+            {
+              id: "q2",
+              text: "Describe your key technical achievements this review period. Include specific projects, technologies used, and impact.",
+              type: "textarea",
+              required: true,
+              category: "Achievements",
+              weight: 25,
+            },
+            {
+              id: "q3",
+              text: "Rate your ability to collaborate with team members and communicate technical concepts.",
+              type: "rating",
+              required: true,
+              category: "Collaboration",
+              weight: 20,
+            },
+            {
+              id: "q4",
+              text: "What challenges did you face and how did you overcome them?",
+              type: "textarea",
+              required: true,
+              category: "Problem Solving",
+              weight: 15,
+            },
+            {
+              id: "q5",
+              text: "What are your development goals for the next review period?",
+              type: "textarea",
+              required: true,
+              category: "Development",
+              weight: 10,
+            },
+          ],
+        },
+      ],
+      appraisalCycle: {
+        id: "cycle-2024",
+        code: "Q4-2024",
+        description: "Q4 2024 Performance Review",
+        fromDate: "2024-10-01",
+        toDate: "2024-12-31",
+      },
+      frequencyCalendar: {
+        id: "freq-1",
+        code: "QUARTERLY",
+        description: "Quarterly Review",
+        appraisalCycleId: "cycle-2024",
+      },
+      frequencyCalendarDetail: {
+        displayName: "October - December 2024",
+        startDate: "2024-10-01",
+        endDate: "2024-12-31",
+      },
+    },
+  ];
 
   const { data: evaluations = [], isLoading } = useQuery<
     EvaluationWithDetails[]
@@ -142,23 +267,175 @@ export default function Evaluations() {
         employeeId: user?.id || "",
         includeQuestionnaires: "true",
       });
-      const response = await fetch(
-        `${API_BASE_URL}/api/evaluations?${params}`,
-        {
-          credentials: "include",
-        }
-      );
-      if (!response.ok) throw new Error("Failed to fetch evaluations");
+      const response = await apiRequest("GET", `/api/evaluations?${params}`);
       return response.json();
     },
+    select: (data: any[]) => {
+      return data.map((evaluation: any) => ({
+        id: evaluation.Id,
+        employeeId: evaluation.EmployeeId,
+        managerId: evaluation.ManagerId,
+        reviewCycleId: evaluation.ReviewCycleId,
+        initiatedAppraisalId: evaluation.InitiatedAppraisalId,
+        selfEvaluationData:
+          typeof evaluation.SelfEvaluationData === "string"
+            ? (() => {
+                try {
+                  return JSON.parse(evaluation.SelfEvaluationData);
+                } catch {
+                  return null;
+                }
+              })()
+            : evaluation.SelfEvaluationData,
+        selfEvaluationSubmittedAt: evaluation.SelfEvaluationSubmittedAt,
+        managerEvaluationData:
+          typeof evaluation.ManagerEvaluationData === "string"
+            ? (() => {
+                try {
+                  return JSON.parse(evaluation.ManagerEvaluationData);
+                } catch {
+                  return null;
+                }
+              })()
+            : evaluation.ManagerEvaluationData,
+        managerEvaluationSubmittedAt: evaluation.ManagerEvaluationSubmittedAt,
+        overallRating: evaluation.OverallRating,
+        meetingScheduledAt: evaluation.MeetingScheduledAt,
+        meetingNotes: evaluation.MeetingNotes,
+        meetingCompletedAt: evaluation.MeetingCompletedAt,
+        finalizedAt: evaluation.FinalizedAt,
+        showNotesToEmployee: evaluation.ShowNotesToEmployee,
+        calibratedRating: evaluation.CalibratedRating,
+        calibrationRemarks: evaluation.CalibrationRemarks,
+        calibratedBy: evaluation.CalibratedBy,
+        calibratedAt: evaluation.CalibratedAt,
+        status: evaluation.Status,
+        createdOn: evaluation.CreatedOn,
+        lastUpdatedOn: evaluation.LastUpdatedOn,
+        employee: evaluation.employee
+          ? {
+              id: evaluation.employee.Id,
+              email: evaluation.employee.Email,
+              firstName: evaluation.employee.FirstName,
+              lastName: evaluation.employee.LastName,
+              code: evaluation.employee.Code,
+              designation: evaluation.employee.Designation,
+              department: evaluation.employee.Department,
+              locationId: evaluation.employee.LocationId,
+              companyId: evaluation.employee.CompanyId,
+              role: evaluation.employee.Role,
+              levelId: evaluation.employee.LevelId,
+              gradeId: evaluation.employee.GradeId,
+              reportingManagerId: evaluation.employee.ReportingManagerId,
+            }
+          : null,
+        manager: evaluation.manager
+          ? {
+              id: evaluation.manager.Id,
+              email: evaluation.manager.Email,
+              firstName: evaluation.manager.FirstName,
+              lastName: evaluation.manager.LastName,
+              code: evaluation.manager.Code,
+              designation: evaluation.manager.Designation,
+            }
+          : null,
+        questionnaires: (evaluation.questionnaires || []).map((q: any) => ({
+          id: q.Id,
+          name: q.Name,
+          description: q.Description,
+          targetRole: q.TargetRole,
+          questions:
+            typeof q.Questions === "string"
+              ? JSON.parse(q.Questions)
+              : q.Questions,
+        })),
+        appraisalCycle: evaluation.appraisalCycle
+          ? {
+              id: evaluation.appraisalCycle.Id,
+              code: evaluation.appraisalCycle.Code,
+              description: evaluation.appraisalCycle.Description,
+              fromDate: evaluation.appraisalCycle.FromDate,
+              toDate: evaluation.appraisalCycle.ToDate,
+            }
+          : null,
+        frequencyCalendar: evaluation.frequencyCalendar
+          ? {
+              id: evaluation.frequencyCalendar.Id,
+              code: evaluation.frequencyCalendar.Code,
+              description: evaluation.frequencyCalendar.Description,
+              appraisalCycleId: evaluation.frequencyCalendar.AppraisalCycleId,
+            }
+          : null,
+        frequencyCalendarDetail: evaluation.frequencyCalendarDetail,
+      }));
+    },
   });
+
+  // Merge demo data with real data when in tour mode
+  // Show demo data immediately during tour without waiting for API
+  const displayEvaluations = isTourMode
+    ? [...evaluations, ...demoEvaluations]
+    : evaluations;
+
+  // Handle tour actions
+  useEffect(() => {
+    if (!isTourMode) {
+      setShowDemoData(false);
+      setIsViewModalOpen(false);
+      return;
+    }
+
+    if (!currentAction) return;
+
+    if (currentAction === "showDemoEvaluations") {
+      setShowDemoData(true);
+      clearAction();
+    }
+
+    if (currentAction === "openDemoEvaluation") {
+      const demoEval = displayEvaluations.find((e) => e.id === "demo-eval-1");
+      if (demoEval) {
+        handleViewEvaluation(demoEval);
+      }
+      clearAction();
+    }
+
+    if (currentAction === "fillDemoData") {
+      // Fill in demo data for both rating and text questions
+      setResponses((prev) => ({
+        ...prev,
+        q1: {
+          questionId: "q1",
+          response: "",
+          rating: 4,
+        },
+        q2: {
+          questionId: "q2",
+          response:
+            "During this review period, I successfully led the migration of our authentication system to a modern OAuth2 implementation, which improved security and reduced login times by 40%. I also mentored two junior developers and contributed to improving our code review process with automated testing pipelines.",
+        },
+      }));
+      clearAction();
+    }
+
+    if (currentAction === "closeDemoEvaluation") {
+      setIsViewModalOpen(false);
+      clearAction();
+    }
+  }, [
+    isTourMode,
+    currentAction,
+    clearAction,
+    showDemoData,
+    displayEvaluations,
+  ]);
 
   const submitEvaluationMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       await apiRequest("PUT", `/api/evaluations/${id}`, {
-        selfEvaluationData: data,
-        selfEvaluationSubmittedAt: new Date(),
-        status: "in_progress",
+        SelfEvaluationData: data,
+        SelfEvaluationSubmittedAt: new Date(),
+        Status: "in_progress",
       });
     },
     onSuccess: () => {
@@ -181,9 +458,9 @@ export default function Evaluations() {
   const saveDraftMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       await apiRequest("PUT", `/api/evaluations/${id}`, {
-        selfEvaluationData: data,
-        status: "in_progress",
-        // Don't set selfEvaluationSubmittedAt - this keeps it as a draft
+        SelfEvaluationData: data,
+        Status: "in_progress",
+        // Don't set SelfEvaluationSubmittedAt - this keeps it as a draft
       });
     },
     onSuccess: () => {
@@ -215,7 +492,7 @@ export default function Evaluations() {
       const response = await apiRequest(
         "POST",
         `/api/evaluations/${evaluationId}/schedule-meeting-employee`,
-        meetingDetails
+        meetingDetails,
       );
       return response;
     },
@@ -259,7 +536,16 @@ export default function Evaluations() {
 
     // Load existing responses if available
     if (evaluation.selfEvaluationData) {
-      const savedData = evaluation.selfEvaluationData as any;
+      // Parse JSON string if needed
+      let savedData = evaluation.selfEvaluationData as any;
+      if (typeof savedData === "string") {
+        try {
+          savedData = JSON.parse(savedData);
+        } catch (e) {
+          console.error("Failed to parse selfEvaluationData:", e);
+          savedData = {};
+        }
+      }
 
       // Handle both old format (direct responses) and new format (with responses key)
       const savedResponses = savedData.responses || savedData;
@@ -310,7 +596,7 @@ export default function Evaluations() {
   // Export functionality - now using server-side data for security
   const handleExport = async (
     evaluation: EvaluationWithDetails,
-    format: "pdf" | "docx"
+    format: "pdf" | "docx",
   ) => {
     if (!evaluation) return;
 
@@ -321,10 +607,13 @@ export default function Evaluations() {
         format,
       };
 
+      const accessToken = getAccessToken();
       const response = await fetch(`${API_BASE_URL}/api/evaluations/export`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify(exportData),
       });
 
@@ -398,7 +687,7 @@ export default function Evaluations() {
 
   // Calculate average rating from responses
   const calculateAverageRating = (
-    responseData: Record<string, QuestionResponse>
+    responseData: Record<string, QuestionResponse>,
   ) => {
     const ratings = Object.values(responseData)
       .filter((response) => response.rating !== undefined)
@@ -414,7 +703,7 @@ export default function Evaluations() {
 
   // Get all questions from questionnaires
   const getAllQuestions = (
-    questionnaires: QuestionnaireTemplate[]
+    questionnaires: QuestionnaireTemplate[],
   ): EnhancedQuestion[] => {
     if (!questionnaires || !Array.isArray(questionnaires)) {
       return [];
@@ -503,7 +792,12 @@ export default function Evaluations() {
         );
       case "rating":
         return (
-          <Card key={question.id} className="p-4">
+          <Card
+            key={question.id}
+            className="p-4 relative"
+            data-testid={`rating-card-${question.id}`}
+            style={{ zIndex: isTourMode ? 9996 : undefined }}
+          >
             <div className="space-y-4">
               <div>
                 <FormLabel className="text-base font-semibold">
@@ -584,6 +878,8 @@ export default function Evaluations() {
                   placeholder="Enter your response..."
                   className="mt-1"
                   data-testid={`question-response-${question.id}`}
+                  disabled={!!selectedEvaluation?.selfEvaluationSubmittedAt}
+                  readOnly={!!selectedEvaluation?.selfEvaluationSubmittedAt}
                 />
               </div>
             </div>
@@ -614,7 +910,7 @@ export default function Evaluations() {
                 </CardContent>
               </Card>
             ))
-          ) : evaluations.length === 0 ? (
+          ) : displayEvaluations.length === 0 ? (
             <Card>
               <CardContent className="text-center py-12">
                 <ClipboardList className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -627,7 +923,7 @@ export default function Evaluations() {
               </CardContent>
             </Card>
           ) : (
-            evaluations.map((evaluation) => (
+            displayEvaluations.map((evaluation) => (
               <Card
                 key={evaluation.id}
                 data-testid={`evaluation-card-${evaluation.id}`}
@@ -659,13 +955,13 @@ export default function Evaluations() {
                             {evaluation.createdAt
                               ? new Date(
                                   new Date(evaluation.createdAt).getTime() +
-                                    7 * 24 * 60 * 60 * 1000
+                                    7 * 24 * 60 * 60 * 1000,
                                 ).toLocaleDateString()
                               : evaluation.frequencyCalendarDetail?.endDate
-                              ? new Date(
-                                  evaluation.frequencyCalendarDetail.endDate
-                                ).toLocaleDateString()
-                              : "TBD"}
+                                ? new Date(
+                                    evaluation.frequencyCalendarDetail.endDate,
+                                  ).toLocaleDateString()
+                                : "TBD"}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -752,7 +1048,7 @@ export default function Evaluations() {
                                 {evaluation.managerEvaluationSubmittedAt && (
                                   <span className="text-xs text-blue-600">
                                     {new Date(
-                                      evaluation.managerEvaluationSubmittedAt
+                                      evaluation.managerEvaluationSubmittedAt,
                                     ).toLocaleDateString()}
                                   </span>
                                 )}
@@ -777,7 +1073,7 @@ export default function Evaluations() {
                                 {evaluation.meetingCompletedAt && (
                                   <span className="text-xs text-green-600">
                                     {new Date(
-                                      evaluation.meetingCompletedAt
+                                      evaluation.meetingCompletedAt,
                                     ).toLocaleDateString()}
                                   </span>
                                 )}
@@ -796,7 +1092,7 @@ export default function Evaluations() {
                                 <span className="text-sm font-medium text-accent">
                                   Evaluation Completed on{" "}
                                   {new Date(
-                                    evaluation.finalizedAt
+                                    evaluation.finalizedAt,
                                   ).toLocaleDateString()}
                                 </span>
                               </div>
@@ -884,8 +1180,20 @@ export default function Evaluations() {
         </div>
 
         {/* Evaluation Modal */}
-        <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <Dialog
+          open={isViewModalOpen}
+          onOpenChange={(open) => {
+            // Prevent closing dialog during tour mode unless explicitly requested
+            if (!isTourMode) {
+              setIsViewModalOpen(open);
+            }
+          }}
+        >
+          <DialogContent
+            className="max-w-4xl max-h-[90vh] overflow-y-auto"
+            data-testid="evaluation-dialog"
+            style={{ zIndex: isTourMode ? 9991 : undefined }}
+          >
             <DialogHeader>
               <DialogTitle data-testid="evaluation-dialog-title">
                 Performance Evaluation
@@ -903,7 +1211,8 @@ export default function Evaluations() {
                           }{" "}
                           -{" "}
                           {new Date(
-                            selectedEvaluation.frequencyCalendarDetail.startDate
+                            selectedEvaluation.frequencyCalendarDetail
+                              .startDate,
                           )
                             .toLocaleDateString("en-GB", {
                               day: "2-digit",
@@ -914,7 +1223,7 @@ export default function Evaluations() {
                             .replace(/\//g, "-")}{" "}
                           to{" "}
                           {new Date(
-                            selectedEvaluation.frequencyCalendarDetail.endDate
+                            selectedEvaluation.frequencyCalendarDetail.endDate,
                           )
                             .toLocaleDateString("en-GB", {
                               day: "2-digit",
@@ -1002,11 +1311,11 @@ export default function Evaluations() {
                               </CardHeader>
                               <CardContent className="space-y-4">
                                 {getAllQuestions([questionnaire]).map(
-                                  renderQuestion
+                                  renderQuestion,
                                 )}
                               </CardContent>
                             </Card>
-                          )
+                          ),
                         )}
                       </div>
                     ) : (
@@ -1047,7 +1356,10 @@ export default function Evaluations() {
                         variant="outline"
                         onClick={handleSaveDraft}
                         className="flex-1"
-                        disabled={saveDraftMutation.isPending}
+                        disabled={
+                          saveDraftMutation.isPending ||
+                          !!selectedEvaluation.selfEvaluationSubmittedAt
+                        }
                         data-testid="save-draft-btn"
                       >
                         {saveDraftMutation.isPending
@@ -1249,7 +1561,7 @@ export default function Evaluations() {
 
                       // Validate that the selected date is not in the past
                       const meetingDateTime = new Date(
-                        `${meetingData.date}T${meetingData.time}`
+                        `${meetingData.date}T${meetingData.time}`,
                       );
                       const now = new Date();
                       if (meetingDateTime <= now) {

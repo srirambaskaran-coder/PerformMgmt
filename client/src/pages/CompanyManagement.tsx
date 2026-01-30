@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { API_BASE_URL } from "@/config/api.config";
 import {
   Card,
   CardContent,
@@ -58,6 +57,25 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { FileDropzone } from "@/components/FileDropzone";
 import { Plus, Edit, Trash2, Building } from "lucide-react";
 
+// Normalize company object from API (convert uppercase keys to lowercase)
+function normalizeCompany(apiCompany: any): Company {
+  return {
+    id: apiCompany.Id || apiCompany.id,
+    name: apiCompany.Name || apiCompany.name,
+    address: apiCompany.Address || apiCompany.address,
+    clientContact: apiCompany.ClientContact || apiCompany.clientContact,
+    email: apiCompany.Email || apiCompany.email,
+    contactNumber: apiCompany.ContactNumber || apiCompany.contactNumber,
+    gstNumber: apiCompany.GSTNumber || apiCompany.gstNumber,
+    logoUrl: apiCompany.LogoURL || apiCompany.logoUrl,
+    status: apiCompany.Status ? "active" : "inactive",
+    url: apiCompany.URL || apiCompany.url,
+    companyUrl: apiCompany.CompanyURL || apiCompany.companyUrl,
+    createdAt: apiCompany.CreatedOn || apiCompany.createdAt,
+    updatedAt: apiCompany.LastUpdatedOn || apiCompany.updatedAt,
+  };
+}
+
 export default function CompanyManagement() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
@@ -66,13 +84,28 @@ export default function CompanyManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: companies = [], isLoading } = useQuery<Company[]>({
+  const { data: companiesRaw = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/companies"],
   });
 
+  // Normalize companies to handle API response with uppercase keys
+  const companies: Company[] = companiesRaw.map((company: any) =>
+    normalizeCompany(company)
+  );
+
   const createCompanyMutation = useMutation({
     mutationFn: async (companyData: InsertCompany) => {
-      await apiRequest("POST", "/api/companies", companyData);
+      // Convert status to boolean for API
+      const payload = {
+        ...companyData,
+        status:
+          companyData.status === "active"
+            ? true
+            : companyData.status === "inactive"
+            ? false
+            : companyData.status,
+      };
+      await apiRequest("POST", "/api/companies", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
@@ -99,7 +132,17 @@ export default function CompanyManagement() {
       id: string;
       companyData: Partial<InsertCompany>;
     }) => {
-      await apiRequest("PUT", `/api/companies/${id}`, companyData);
+      // Convert status to boolean for API
+      const payload = {
+        ...companyData,
+        status:
+          companyData.status === "active"
+            ? true
+            : companyData.status === "inactive"
+            ? false
+            : companyData.status,
+      };
+      await apiRequest("PUT", `/api/companies/${id}`, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
@@ -210,31 +253,26 @@ export default function CompanyManagement() {
 
   const handleFileUpload = async (file: File) => {
     try {
-      // Create FormData for multipart upload
-      const formData = new FormData();
-      formData.append("logo", file);
-
-      // Upload file to backend
-      const response = await fetch(
-        `${API_BASE_URL}/api/companies/upload-logo`,
-        {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("pms_access_token")}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Upload failed");
-      }
-
+      // Get presigned URL
+      const response = await apiRequest("POST", "/api/objects/upload");
       const data = await response.json();
+      const uploadURL = data.uploadURL;
 
-      // Set the logo URL returned by backend
-      form.setValue("logoUrl", data.logoUrl);
+      // Upload file directly to S3
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": file.type,
+        },
+      });
+
+      // Update the logo URL in the backend
+      const logoResponse = await apiRequest("PUT", "/api/company-logos", {
+        logoURL: uploadURL,
+      });
+      const logoData = await logoResponse.json();
+      form.setValue("logoUrl", logoData.objectPath);
 
       toast({
         title: "Success",
@@ -418,6 +456,7 @@ export default function CompanyManagement() {
                             <Input
                               {...field}
                               value={field.value ?? ""}
+                              maxLength={10}
                               data-testid="input-contact-number"
                             />
                           </FormControl>
@@ -454,7 +493,7 @@ export default function CompanyManagement() {
                           <div className="border rounded-lg p-4 space-y-4">
                             {/* Option 1: Upload File */}
                             <FileDropzone
-                              maxFileSize={2097152}
+                              maxFileSize={5242880}
                               acceptedFileTypes={[
                                 "image/png",
                                 "image/jpeg",
@@ -465,10 +504,6 @@ export default function CompanyManagement() {
                               onFileSelect={() => {}}
                               onUpload={handleFileUpload}
                             />
-                            <p className="text-xs text-muted-foreground">
-                              Maximum file size: 2MB. Recommended: Square image
-                              (200x200px or larger)
-                            </p>
 
                             {/* OR Divider */}
                             <div className="relative">

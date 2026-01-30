@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Building, Shield, UserCheck, User } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { API_BASE_URL } from "@/config/api.config";
-import { setStoredUser, setTokens } from "@/hooks/useAuth";
+import { setStoredUser, setTokens, normalizeUser } from "@/hooks/useAuth";
 
 interface TestUser {
   id: string;
@@ -50,7 +50,6 @@ export default function DevLogin() {
     mutationFn: () =>
       fetch(`${API_BASE_URL}/api/dev/seed-users`, {
         method: "POST",
-        credentials: "include",
       }).then((res) => res.json()),
   });
 
@@ -60,7 +59,6 @@ export default function DevLogin() {
       fetch(`${API_BASE_URL}/api/dev/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ userId }),
       }).then((res) => res.json()),
     onSuccess: (result) => {
@@ -68,9 +66,10 @@ export default function DevLogin() {
       if (result.accessToken) {
         setTokens(result.accessToken, result.refreshToken, result.expiresIn);
       }
-      // Store user data
+      // Store user data (normalize to lowercase keys)
       if (result.user) {
-        setStoredUser(result.user);
+        const normalizedUser = normalizeUser(result.user);
+        setStoredUser(normalizedUser);
       }
       window.location.reload();
     },

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
@@ -26,6 +26,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Popover,
   PopoverContent,
@@ -57,14 +67,17 @@ import {
   type InsertAppraisalCycle,
 } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { getClientIdFromSession } from "@/lib/ssoAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useTour } from "@/contexts/TourContext";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import {
   Plus,
   Search,
   Edit,
-  Trash2,
+  Ban,
   Repeat,
   Tag,
   Clock,
@@ -167,19 +180,56 @@ export default function AppraisalCycleManagement() {
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingCycle, setEditingCycle] = useState<AppraisalCycle | null>(null);
+  const [tourDemoCycle, setTourDemoCycle] = useState<AppraisalCycle | null>(
+    null,
+  );
+  const [deleteCycleId, setDeleteCycleId] = useState<string | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const { isRunning: isTourMode, currentAction, clearAction } = useTour();
 
   // Data queries
   const { data: cycles = [], isLoading } = useQuery<AppraisalCycle[]>({
     queryKey: ["/api/appraisal-cycles"],
+    select: (data: any[]) => {
+      return data.map((cycle: any) => ({
+        id: cycle.Id,
+        code: cycle.Code,
+        description: cycle.Description,
+        fromDate: cycle.FromDate,
+        toDate: cycle.ToDate,
+        status: cycle.Status ? "active" : "inactive",
+        companyId: cycle.CompanyId,
+        createdBy: cycle.CreatedBy,
+        createdOn: cycle.CreatedOn,
+        lastUpdatedBy: cycle.LastUpdatedBy,
+        lastUpdatedOn: cycle.LastUpdatedOn,
+        createdAt: cycle.CreatedOn,
+        updatedAt: cycle.LastUpdatedOn,
+        createdById: cycle.CreatedBy || "",
+      }));
+    },
   });
 
   // Mutations
   const createCycleMutation = useMutation({
     mutationFn: async (cycleData: InsertAppraisalCycle) => {
-      await apiRequest("POST", "/api/appraisal-cycles", cycleData);
+      const payload = {
+        Code: cycleData.code,
+        Description: cycleData.description,
+        FromDate: cycleData.fromDate,
+        ToDate: cycleData.toDate,
+        Status:
+          cycleData.status === "active"
+            ? true
+            : cycleData.status === "inactive"
+              ? false
+              : cycleData.status,
+        ClientId: getClientIdFromSession(),
+      };
+      await apiRequest("POST", "/api/appraisal-cycles", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appraisal-cycles"] });
@@ -210,7 +260,23 @@ export default function AppraisalCycleManagement() {
       id: string;
       cycleData: Partial<InsertAppraisalCycle>;
     }) => {
-      await apiRequest("PUT", `/api/appraisal-cycles/${id}`, cycleData);
+      const payload: any = {};
+      if (cycleData.code !== undefined) payload.Code = cycleData.code;
+      if (cycleData.description !== undefined)
+        payload.Description = cycleData.description;
+      if (cycleData.fromDate !== undefined)
+        payload.FromDate = cycleData.fromDate;
+      if (cycleData.toDate !== undefined) payload.ToDate = cycleData.toDate;
+      if (cycleData.status !== undefined) {
+        payload.Status =
+          cycleData.status === "active"
+            ? true
+            : cycleData.status === "inactive"
+              ? false
+              : cycleData.status;
+      }
+      payload.ClientId = getClientIdFromSession();
+      await apiRequest("PUT", `/api/appraisal-cycles/${id}`, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appraisal-cycles"] });
@@ -262,7 +328,7 @@ export default function AppraisalCycleManagement() {
     {
       path: ["toDate"],
       message: "To date must be on or after from date",
-    }
+    },
   );
 
   // Form handling
@@ -287,6 +353,73 @@ export default function AppraisalCycleManagement() {
     });
   };
 
+  // Tour action handlers
+  useEffect(() => {
+    if (!isTourMode || !currentAction) return;
+
+    if (currentAction === "openAppraisalCycleForm") {
+      setEditingCycle(null);
+      setIsCreateModalOpen(true);
+      // Fill demo data after modal opens
+      setTimeout(() => {
+        const fromDate = new Date(2026, 0, 1); // Jan 1, 2026
+        const toDate = new Date(2026, 11, 31); // Dec 31, 2026
+        form.setValue("code", "DEMO-2026");
+        form.setValue("fromDate", fromDate);
+        form.setValue("toDate", toDate);
+        form.setValue(
+          "description",
+          "Annual Review 2026 - Demo data created during tour",
+        );
+        form.setValue("status", "active");
+      }, 200);
+      clearAction();
+    } else if (currentAction === "saveAppraisalCycleAndClose") {
+      // Close modal and add demo cycle
+      setIsCreateModalOpen(false);
+      resetForm();
+      // Add demo cycle to display
+      setTourDemoCycle({
+        id: 9999,
+        code: "DEMO-2026",
+        description: "Annual Review 2026 - Demo data created during tour",
+        fromDate: new Date(2026, 0, 1),
+        toDate: new Date(2026, 11, 31),
+        status: "active",
+        companyId: currentUser?.companyId
+          ? Number(currentUser.companyId)
+          : null,
+        createdBy: null,
+        createdOn: new Date().toISOString(),
+        lastUpdatedBy: null,
+        lastUpdatedOn: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdById: "Tour Demo",
+      } as AppraisalCycle);
+      clearAction();
+    }
+  }, [
+    currentAction,
+    isTourMode,
+    clearAction,
+    form,
+    currentUser?.companyId,
+    resetForm,
+  ]);
+
+  // Clean up tour demo data when tour ends
+  useEffect(() => {
+    const handleTourEnd = () => {
+      setTourDemoCycle(null);
+      setIsCreateModalOpen(false);
+      resetForm();
+    };
+
+    window.addEventListener("tourEnded", handleTourEnd);
+    return () => window.removeEventListener("tourEnded", handleTourEnd);
+  }, [resetForm]);
+
   const handleEdit = (cycle: AppraisalCycle) => {
     setEditingCycle(cycle);
     form.reset({
@@ -310,15 +443,22 @@ export default function AppraisalCycleManagement() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this appraisal cycle?")) {
-      deleteCycleMutation.mutate(id);
+    setDeleteCycleId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteCycleId) {
+      deleteCycleMutation.mutate(deleteCycleId);
+      setDeleteCycleId(null);
     }
   };
 
-  // Filtering logic
-  const filteredCycles = cycles.filter((cycle) => {
+  // Filtering logic - include tour demo cycle if in tour mode
+  const allCycles = tourDemoCycle ? [tourDemoCycle, ...cycles] : cycles;
+  const filteredCycles = (allCycles || []).filter((cycle: AppraisalCycle) => {
     const matchesSearch =
-      cycle.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (cycle.code &&
+        cycle.code.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (cycle.description &&
         cycle.description.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesStatus =
@@ -347,7 +487,7 @@ export default function AppraisalCycleManagement() {
 
   return (
     <RoleGuard allowedRoles={["admin"]}>
-      <div className="container mx-auto py-6">
+      <div className="container mx-auto py-6 appraisal-cycle-list">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold">Appraisal Cycle Management</h1>
@@ -356,7 +496,13 @@ export default function AppraisalCycleManagement() {
               dates for systematic reviews
             </p>
           </div>
-          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+          <Dialog
+            open={isCreateModalOpen}
+            onOpenChange={(open) => {
+              if (isTourMode && !open) return;
+              setIsCreateModalOpen(open);
+            }}
+          >
             <DialogTrigger asChild>
               <Button
                 data-testid="button-create-cycle"
@@ -366,7 +512,10 @@ export default function AppraisalCycleManagement() {
                 Create Appraisal Cycle
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent
+              className={cn("max-w-2xl", isTourMode && "z-[9997]")}
+              data-testid="dialog-create-cycle"
+            >
               <DialogHeader>
                 <DialogTitle>
                   {editingCycle
@@ -525,8 +674,8 @@ export default function AppraisalCycleManagement() {
                       updateCycleMutation.isPending
                         ? "Saving..."
                         : editingCycle
-                        ? "Update"
-                        : "Create"}
+                          ? "Update"
+                          : "Create"}
                     </Button>
                   </div>
                 </form>
@@ -576,8 +725,20 @@ export default function AppraisalCycleManagement() {
               </p>
             </div>
           ) : (
-            filteredCycles.map((cycle) => (
-              <Card key={cycle.id} data-testid={`card-cycle-${cycle.id}`}>
+            filteredCycles.map((cycle: AppraisalCycle) => (
+              <Card
+                key={cycle.id}
+                data-testid={
+                  cycle.id === 9999
+                    ? "tour-demo-cycle"
+                    : `card-cycle-${cycle.id}`
+                }
+                className={
+                  cycle.id === 9999
+                    ? "border-2 border-primary bg-primary/5"
+                    : ""
+                }
+              >
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -597,13 +758,6 @@ export default function AppraisalCycleManagement() {
                           {cycle.status}
                         </Badge>
                       </div>
-                      {cycle.description && (
-                        <CardDescription
-                          data-testid={`text-description-${cycle.id}`}
-                        >
-                          {cycle.description}
-                        </CardDescription>
-                      )}
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -620,8 +774,9 @@ export default function AppraisalCycleManagement() {
                         onClick={() => handleDelete(cycle.id)}
                         disabled={deleteCycleMutation.isPending}
                         data-testid={`button-delete-${cycle.id}`}
+                        title="Mark Inactive"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Ban className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -636,10 +791,13 @@ export default function AppraisalCycleManagement() {
                       </span>
                     </div>
                     {cycle.description && (
-                      <div className="flex items-center gap-2">
-                        <Tag className="w-4 h-4" />
-                        <span>Description</span>
-                      </div>
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Tag className="w-4 h-4" />
+                          <span>Description</span>
+                        </div>
+                        <p className="pl-6">{cycle.description}</p>
+                      </>
                     )}
                     <div className="flex items-center gap-2 pt-2">
                       <Clock className="w-4 h-4" />
@@ -808,6 +966,26 @@ export default function AppraisalCycleManagement() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <AlertDialog open={!!deleteCycleId} onOpenChange={(open) => !open && setDeleteCycleId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Make Appraisal Cycle Inactive</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to make this appraisal cycle inactive?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Make Inactive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RoleGuard>
   );
 }

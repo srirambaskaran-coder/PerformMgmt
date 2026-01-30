@@ -1,17 +1,15 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
-import { queryClient, setSystemErrorHandler } from "./lib/queryClient";
+import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { TourProvider } from "@/contexts/TourContext";
+import { TourModal } from "@/components/TourModal";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffect, useState } from "react";
+import { checkAndPerformSSOLogin } from "@/lib/ssoAuth";
 import { Layout } from "@/components/Layout";
-import {
-  SystemErrorProvider,
-  useSystemError,
-} from "@/contexts/SystemErrorContext";
-import { SystemErrorModal } from "@/components/SystemErrorModal";
-import { useEffect } from "react";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import DevLogin from "@/pages/DevLogin";
@@ -122,33 +120,59 @@ function Router() {
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
-  const { hasSystemError, errorMessage, setSystemError, clearSystemError } =
-    useSystemError();
+  const [ssoChecking, setSsoChecking] = useState(true);
 
-  // Register system error handler
+  // Check for HRsuite SSO session on app load
   useEffect(() => {
-    setSystemErrorHandler(setSystemError);
-  }, [setSystemError]);
+    const checkSSO = async () => {
+      try {
+        // Only check SSO if not already authenticated
+        if (!isLoading && !isAuthenticated) {
+          console.log("[App] Checking for HRsuite SSO session...");
+          await checkAndPerformSSOLogin();
+        }
+      } catch (error) {
+        console.error("[App] SSO check failed:", error);
+      } finally {
+        setSsoChecking(false);
+      }
+    };
 
-  const handleRetry = () => {
-    clearSystemError();
-    window.location.reload();
-  };
+    // Small delay to ensure storage is ready
+    const timer = setTimeout(checkSSO, 100);
+    return () => clearTimeout(timer);
+  }, [isLoading, isAuthenticated]);
+
+  // Show loading while checking SSO
+  const showLoading = isLoading || (ssoChecking && !isAuthenticated);
 
   return (
     <>
       <Toaster />
-      <SystemErrorModal
-        isOpen={hasSystemError}
-        errorMessage={errorMessage}
-        onRetry={handleRetry}
-      />
-      {isLoading || !isAuthenticated ? (
+      {showLoading ? (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted/20">
+          <div className="flex flex-col items-center space-y-6">
+            {/* Loading Spinner */}
+            <div className="relative">
+              <div className="w-12 h-12 border-4 border-muted rounded-full"></div>
+              <div className="absolute top-0 left-0 w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+
+            {/* Loading Message */}
+            <p className="text-muted-foreground text-sm">
+              Setting up application, please wait...
+            </p>
+          </div>
+        </div>
+      ) : !isAuthenticated ? (
         <Router />
       ) : (
-        <Layout>
-          <Router />
-        </Layout>
+        <TourProvider>
+          <Layout>
+            <Router />
+          </Layout>
+          <TourModal />
+        </TourProvider>
       )}
     </>
   );
@@ -157,13 +181,11 @@ function AppContent() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <SystemErrorProvider>
-        <TooltipProvider>
-          <WouterRouter hook={useHashLocation}>
-            <AppContent />
-          </WouterRouter>
-        </TooltipProvider>
-      </SystemErrorProvider>
+      <TooltipProvider>
+        <WouterRouter hook={useHashLocation}>
+          <AppContent />
+        </WouterRouter>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

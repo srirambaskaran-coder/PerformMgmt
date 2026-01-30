@@ -290,8 +290,8 @@ export default function EmployeeDashboard() {
                         evaluation.status === "completed"
                           ? "bg-green-100"
                           : evaluation.status === "overdue"
-                          ? "bg-red-100"
-                          : "bg-yellow-100"
+                            ? "bg-red-100"
+                            : "bg-yellow-100"
                       }`}
                     >
                       {evaluation.status === "completed" ? (
@@ -317,15 +317,15 @@ export default function EmployeeDashboard() {
                         evaluation.status === "completed"
                           ? "secondary"
                           : evaluation.status === "overdue"
-                          ? "destructive"
-                          : "default"
+                            ? "destructive"
+                            : "default"
                       }
                     >
                       {evaluation.status === "completed"
                         ? "Completed"
                         : evaluation.status === "overdue"
-                        ? "Overdue"
-                        : "Pending"}
+                          ? "Overdue"
+                          : "Pending"}
                     </Badge>
                     {evaluation.rating && (
                       <div className="flex items-center gap-1 mt-1">
@@ -376,8 +376,8 @@ export default function EmployeeDashboard() {
                         task.priority === "high"
                           ? "bg-red-500"
                           : task.priority === "medium"
-                          ? "bg-yellow-500"
-                          : "bg-green-500"
+                            ? "bg-yellow-500"
+                            : "bg-green-500"
                       }`}
                     ></div>
                     <div>
@@ -443,8 +443,8 @@ export default function EmployeeDashboard() {
                         goal.status === "on_track"
                           ? "default"
                           : goal.status === "at_risk"
-                          ? "secondary"
-                          : "destructive"
+                            ? "secondary"
+                            : "destructive"
                       }
                       className="text-xs"
                     >

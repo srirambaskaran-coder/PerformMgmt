@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
@@ -41,6 +41,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
+import { useTour } from "@/contexts/TourContext";
 import {
   Calendar,
   Clock,
@@ -78,12 +79,435 @@ export default function Meetings() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isTourMode, currentAction, clearAction } = useTour();
+  const [showDemoData, setShowDemoData] = useState(false);
 
   // Get active role for role switching support
   const activeRole =
-    (user as any)?.activeRole || (user as any)?.role || "employee";
+    (user as any)?.activeRole ||
+    (user as any)?.ActiveRole ||
+    (user as any)?.role ||
+    (user as any)?.Role ||
+    "employee";
+
+  // Demo meetings for tour - different data based on role
+  const demoMeetingsForManager: EvaluationWithDetails[] = [
+    {
+      id: "demo-meeting-1",
+      employeeId: "demo-emp-1",
+      managerId: user?.id || "manager-1",
+      reviewCycleId: "cycle-2024",
+      initiatedAppraisalId: "appraisal-1",
+      selfEvaluationData: null,
+      selfEvaluationSubmittedAt: new Date(
+        Date.now() - 10 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      managerEvaluationData: null,
+      managerEvaluationSubmittedAt: new Date(
+        Date.now() - 5 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      overallRating: 4,
+      meetingScheduledAt: new Date(
+        Date.now() + 2 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      meetingNotes: null,
+      meetingCompletedAt: null,
+      finalizedAt: null,
+      showNotesToEmployee: false,
+      calibratedRating: null,
+      calibrationRemarks: null,
+      createdOn: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      createdBy: "system",
+      lastUpdatedOn: new Date(
+        Date.now() - 5 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      lastUpdatedBy: user?.id || "manager-1",
+      employee: {
+        id: "demo-emp-1",
+        code: "EMP001",
+        email: "john.doe@company.com",
+        password: "",
+        firstName: "John",
+        lastName: "Doe",
+        designation: "Software Engineer",
+        department: "Engineering",
+        role: "employee",
+        managerId: user?.id || "manager-1",
+        companyId: "company-1",
+        locationId: "loc-1",
+        levelId: "level-3",
+        gradeId: "grade-b",
+        isActive: true,
+        createdOn: new Date(
+          Date.now() - 365 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+        createdBy: "hr",
+        lastUpdatedOn: null,
+        lastUpdatedBy: null,
+      },
+      manager: {
+        id: user?.id || "manager-1",
+        code: "MGR001",
+        email: user?.email || "manager@company.com",
+        password: "",
+        firstName: user?.firstName || "Manager",
+        lastName: user?.lastName || "User",
+        designation: "Engineering Manager",
+        department: "Engineering",
+        role: "manager",
+        managerId: null,
+        companyId: "company-1",
+        locationId: "loc-1",
+        levelId: "level-5",
+        gradeId: "grade-a",
+        isActive: true,
+        createdOn: new Date(
+          Date.now() - 730 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+        createdBy: "hr",
+        lastUpdatedOn: null,
+        lastUpdatedBy: null,
+      },
+    },
+    {
+      id: "demo-meeting-2",
+      employeeId: "demo-emp-2",
+      managerId: user?.id || "manager-1",
+      reviewCycleId: "cycle-2024",
+      initiatedAppraisalId: "appraisal-2",
+      selfEvaluationData: null,
+      selfEvaluationSubmittedAt: new Date(
+        Date.now() - 8 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      managerEvaluationData: null,
+      managerEvaluationSubmittedAt: new Date(
+        Date.now() - 3 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      overallRating: 5,
+      meetingScheduledAt: new Date(
+        Date.now() + 5 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      meetingNotes: null,
+      meetingCompletedAt: null,
+      finalizedAt: null,
+      showNotesToEmployee: false,
+      calibratedRating: null,
+      calibrationRemarks: null,
+      createdOn: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      createdBy: "system",
+      lastUpdatedOn: new Date(
+        Date.now() - 3 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      lastUpdatedBy: user?.id || "manager-1",
+      employee: {
+        id: "demo-emp-2",
+        code: "EMP002",
+        email: "jane.smith@company.com",
+        password: "",
+        firstName: "Jane",
+        lastName: "Smith",
+        designation: "Senior Developer",
+        department: "Engineering",
+        role: "employee",
+        managerId: user?.id || "manager-1",
+        companyId: "company-1",
+        locationId: "loc-1",
+        levelId: "level-4",
+        gradeId: "grade-a",
+        isActive: true,
+        createdOn: new Date(
+          Date.now() - 500 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+        createdBy: "hr",
+        lastUpdatedOn: null,
+        lastUpdatedBy: null,
+      },
+      manager: {
+        id: user?.id || "manager-1",
+        code: "MGR001",
+        email: user?.email || "manager@company.com",
+        password: "",
+        firstName: user?.firstName || "Manager",
+        lastName: user?.lastName || "User",
+        designation: "Engineering Manager",
+        department: "Engineering",
+        role: "manager",
+        managerId: null,
+        companyId: "company-1",
+        locationId: "loc-1",
+        levelId: "level-5",
+        gradeId: "grade-a",
+        isActive: true,
+        createdOn: new Date(
+          Date.now() - 730 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+        createdBy: "hr",
+        lastUpdatedOn: null,
+        lastUpdatedBy: null,
+      },
+    },
+  ];
+
+  // Demo meetings for employee tour - shows meetings from employee perspective
+  const demoMeetingsForEmployee: EvaluationWithDetails[] = [
+    {
+      id: "demo-employee-meeting-1",
+      employeeId: user?.id || "employee-1",
+      managerId: "manager-demo-1",
+      reviewCycleId: "cycle-2024",
+      initiatedAppraisalId: "appraisal-1",
+      selfEvaluationData: { responses: {}, averageRating: 4 },
+      selfEvaluationSubmittedAt: new Date(
+        Date.now() - 14 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      managerEvaluationData: {
+        managerRemarks: "Great performance this quarter!",
+      },
+      managerEvaluationSubmittedAt: new Date(
+        Date.now() - 7 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      overallRating: 4,
+      meetingScheduledAt: new Date(
+        Date.now() + 3 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      meetingNotes: null,
+      meetingCompletedAt: null,
+      finalizedAt: null,
+      showNotesToEmployee: false,
+      calibratedRating: null,
+      calibrationRemarks: null,
+      createdOn: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      createdBy: "system",
+      lastUpdatedOn: new Date(
+        Date.now() - 7 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      lastUpdatedBy: "manager-demo-1",
+      employee: {
+        id: user?.id || "employee-1",
+        code: user?.code || "EMP001",
+        email: user?.email || "employee@company.com",
+        password: "",
+        firstName: user?.firstName || "John",
+        lastName: user?.lastName || "Doe",
+        designation: user?.designation || "Software Engineer",
+        department: "Engineering",
+        role: "employee",
+        managerId: "manager-demo-1",
+        companyId: "company-1",
+        locationId: "loc-1",
+        levelId: "level-3",
+        gradeId: "grade-b",
+        isActive: true,
+        createdOn: new Date(
+          Date.now() - 365 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+        createdBy: "hr",
+        lastUpdatedOn: null,
+        lastUpdatedBy: null,
+      },
+      manager: {
+        id: "manager-demo-1",
+        code: "MGR001",
+        email: "sarah.manager@company.com",
+        password: "",
+        firstName: "Sarah",
+        lastName: "Johnson",
+        designation: "Engineering Manager",
+        department: "Engineering",
+        role: "manager",
+        managerId: null,
+        companyId: "company-1",
+        locationId: "loc-1",
+        levelId: "level-5",
+        gradeId: "grade-a",
+        isActive: true,
+        createdOn: new Date(
+          Date.now() - 730 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+        createdBy: "hr",
+        lastUpdatedOn: null,
+        lastUpdatedBy: null,
+      },
+    },
+    {
+      id: "demo-employee-meeting-2",
+      employeeId: user?.id || "employee-1",
+      managerId: "manager-demo-1",
+      reviewCycleId: "cycle-2023-q3",
+      initiatedAppraisalId: "appraisal-prev",
+      selfEvaluationData: { responses: {}, averageRating: 4.5 },
+      selfEvaluationSubmittedAt: new Date(
+        Date.now() - 90 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      managerEvaluationData: {
+        managerRemarks:
+          "Excellent work on the Q3 projects. Continue the momentum!",
+      },
+      managerEvaluationSubmittedAt: new Date(
+        Date.now() - 85 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      overallRating: 4.5,
+      meetingScheduledAt: new Date(
+        Date.now() - 80 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      meetingNotes:
+        "Discussed Q3 achievements including the successful API migration. Set goals for improving documentation and mentoring junior developers. Employee shows strong technical skills and leadership potential.",
+      meetingCompletedAt: new Date(
+        Date.now() - 80 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      finalizedAt: new Date(
+        Date.now() - 79 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      showNotesToEmployee: true,
+      calibratedRating: 4.5,
+      calibrationRemarks: null,
+      createdOn: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(),
+      createdBy: "system",
+      lastUpdatedOn: new Date(
+        Date.now() - 79 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      lastUpdatedBy: "manager-demo-1",
+      employee: {
+        id: user?.id || "employee-1",
+        code: user?.code || "EMP001",
+        email: user?.email || "employee@company.com",
+        password: "",
+        firstName: user?.firstName || "John",
+        lastName: user?.lastName || "Doe",
+        designation: user?.designation || "Software Engineer",
+        department: "Engineering",
+        role: "employee",
+        managerId: "manager-demo-1",
+        companyId: "company-1",
+        locationId: "loc-1",
+        levelId: "level-3",
+        gradeId: "grade-b",
+        isActive: true,
+        createdOn: new Date(
+          Date.now() - 365 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+        createdBy: "hr",
+        lastUpdatedOn: null,
+        lastUpdatedBy: null,
+      },
+      manager: {
+        id: "manager-demo-1",
+        code: "MGR001",
+        email: "sarah.manager@company.com",
+        password: "",
+        firstName: "Sarah",
+        lastName: "Johnson",
+        designation: "Engineering Manager",
+        department: "Engineering",
+        role: "manager",
+        managerId: null,
+        companyId: "company-1",
+        locationId: "loc-1",
+        levelId: "level-5",
+        gradeId: "grade-a",
+        isActive: true,
+        createdOn: new Date(
+          Date.now() - 730 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+        createdBy: "hr",
+        lastUpdatedOn: null,
+        lastUpdatedBy: null,
+      },
+    },
+  ];
+
+  // Select appropriate demo data based on role
+  const demoMeetings =
+    activeRole === "manager" ? demoMeetingsForManager : demoMeetingsForEmployee;
+
+  // Handle tour actions
+  useEffect(() => {
+    // Reset demo data when tour ends
+    if (!isTourMode) {
+      setShowDemoData(false);
+      return;
+    }
+
+    if (!currentAction) return;
+
+    if (currentAction === "showDemoMeetings") {
+      setShowDemoData(true);
+      clearAction();
+    }
+  }, [isTourMode, currentAction, clearAction]);
 
   console.log("[Meetings] User:", user?.id, "Active Role:", activeRole);
+
+  // Normalize evaluation data from PascalCase API response to camelCase
+  const normalizeEvaluation = (evaluation: any): EvaluationWithDetails => ({
+    id: evaluation.Id || evaluation.id,
+    employeeId: evaluation.EmployeeId || evaluation.employeeId,
+    managerId: evaluation.ManagerId || evaluation.managerId,
+    reviewCycleId: evaluation.ReviewCycleId || evaluation.reviewCycleId,
+    initiatedAppraisalId:
+      evaluation.InitiatedAppraisalId || evaluation.initiatedAppraisalId,
+    selfEvaluationData: evaluation.SelfEvaluationData
+      ? typeof evaluation.SelfEvaluationData === "string"
+        ? JSON.parse(evaluation.SelfEvaluationData)
+        : evaluation.SelfEvaluationData
+      : evaluation.selfEvaluationData || null,
+    selfEvaluationSubmittedAt:
+      evaluation.SelfEvaluationSubmittedAt ||
+      evaluation.selfEvaluationSubmittedAt,
+    managerEvaluationData: evaluation.ManagerEvaluationData
+      ? typeof evaluation.ManagerEvaluationData === "string"
+        ? JSON.parse(evaluation.ManagerEvaluationData)
+        : evaluation.ManagerEvaluationData
+      : evaluation.managerEvaluationData || null,
+    managerEvaluationSubmittedAt:
+      evaluation.ManagerEvaluationSubmittedAt ||
+      evaluation.managerEvaluationSubmittedAt,
+    overallRating: evaluation.OverallRating || evaluation.overallRating,
+    meetingScheduledAt:
+      evaluation.MeetingScheduledAt || evaluation.meetingScheduledAt,
+    meetingNotes: evaluation.MeetingNotes || evaluation.meetingNotes,
+    meetingCompletedAt:
+      evaluation.MeetingCompletedAt || evaluation.meetingCompletedAt,
+    finalizedAt: evaluation.FinalizedAt || evaluation.finalizedAt,
+    showNotesToEmployee:
+      evaluation.ShowNotesToEmployee ?? evaluation.showNotesToEmployee ?? false,
+    calibratedRating:
+      evaluation.CalibratedRating || evaluation.calibratedRating,
+    calibrationRemarks:
+      evaluation.CalibrationRemarks || evaluation.calibrationRemarks,
+    calibratedBy: evaluation.CalibratedBy || evaluation.calibratedBy,
+    calibratedAt: evaluation.CalibratedAt || evaluation.calibratedAt,
+    status: evaluation.Status || evaluation.status,
+    createdOn: evaluation.CreatedOn || evaluation.createdOn,
+    lastUpdatedOn: evaluation.LastUpdatedOn || evaluation.lastUpdatedOn,
+    employee: evaluation.employee
+      ? {
+          id: evaluation.employee.Id || evaluation.employee.id,
+          firstName:
+            evaluation.employee.FirstName || evaluation.employee.firstName,
+          lastName:
+            evaluation.employee.LastName || evaluation.employee.lastName,
+          email: evaluation.employee.Email || evaluation.employee.email,
+          department:
+            evaluation.employee.Department || evaluation.employee.department,
+          designation:
+            evaluation.employee.Designation || evaluation.employee.designation,
+        }
+      : undefined,
+    manager: evaluation.manager
+      ? {
+          id: evaluation.manager.Id || evaluation.manager.id,
+          firstName:
+            evaluation.manager.FirstName || evaluation.manager.firstName,
+          lastName: evaluation.manager.LastName || evaluation.manager.lastName,
+          email: evaluation.manager.Email || evaluation.manager.email,
+          department:
+            evaluation.manager.Department || evaluation.manager.department,
+          designation:
+            evaluation.manager.Designation || evaluation.manager.designation,
+        }
+      : undefined,
+  });
 
   // Fetch evaluations filtered by active role:
   // - As Employee: show evaluations where user is the employee
@@ -95,46 +519,59 @@ export default function Meetings() {
     queryFn: async () => {
       const response = await apiRequest(
         "GET",
-        "/api/evaluations?includeQuestionnaires=true"
+        "/api/evaluations?includeQuestionnaires=true",
       );
       const data = await response.json();
       console.log("[Meetings] API Response data:", data);
       return data as EvaluationWithDetails[];
     },
-    select: (data: EvaluationWithDetails[]) => {
-      console.log("[Meetings] All evaluations before filter:", data.length);
-      const filtered = data.filter((evaluation: EvaluationWithDetails) => {
-        console.log(
-          "[Meetings] Checking evaluation:",
-          evaluation.id,
-          "Employee:",
-          evaluation.employeeId,
-          "Manager:",
-          evaluation.managerId
-        );
-        if (activeRole === "manager") {
-          // As Manager: show meetings with reporting members (where user is the manager)
-          const match = evaluation.managerId === user?.id;
-          console.log("[Meetings] Manager match:", match);
-          return match;
-        } else {
-          // As Employee: show meetings where user is the employee
-          const match = evaluation.employeeId === user?.id;
+    select: (data: any[]) => {
+      // Normalize data from PascalCase to camelCase
+      const normalizedData = data.map(normalizeEvaluation);
+      console.log(
+        "[Meetings] All evaluations before filter:",
+        normalizedData.length,
+      );
+      const filtered = normalizedData.filter(
+        (evaluation: EvaluationWithDetails) => {
           console.log(
-            "[Meetings] Employee match:",
-            match,
-            "comparing",
+            "[Meetings] Checking evaluation:",
+            evaluation.id,
+            "Employee:",
             evaluation.employeeId,
-            "===",
-            user?.id
+            "Manager:",
+            evaluation.managerId,
           );
-          return match;
-        }
-      });
+          if (activeRole === "manager") {
+            // As Manager: show meetings with reporting members (where user is the manager)
+            const match = evaluation.managerId === user?.id;
+            console.log("[Meetings] Manager match:", match);
+            return match;
+          } else {
+            // As Employee: show meetings where user is the employee
+            const match = evaluation.employeeId === user?.id;
+            console.log(
+              "[Meetings] Employee match:",
+              match,
+              "comparing",
+              evaluation.employeeId,
+              "===",
+              user?.id,
+            );
+            return match;
+          }
+        },
+      );
       console.log("[Meetings] Filtered evaluations:", filtered.length);
       return filtered;
     },
   });
+
+  // Merge demo data with real data when in tour mode
+  // Show demo data immediately in tour mode without waiting for action
+  const baseMeetings = isTourMode
+    ? [...evaluations, ...demoMeetings]
+    : evaluations;
 
   const scheduleMeetingMutation = useMutation({
     mutationFn: async ({
@@ -174,7 +611,7 @@ export default function Meetings() {
       const response = await apiRequest(
         "PUT",
         `/api/evaluations/${data.evaluationId}/meeting-notes`,
-        data.notesData
+        data.notesData,
       );
       return response.json();
     },
@@ -221,7 +658,7 @@ export default function Meetings() {
   const onSubmitSchedule = (data: any) => {
     if (selectedEvaluation) {
       const meetingDateTime = new Date(
-        `${data.meetingDate}T${data.meetingTime}`
+        `${data.meetingDate}T${data.meetingTime}`,
       );
       scheduleMeetingMutation.mutate({
         id: selectedEvaluation.id,
@@ -286,19 +723,19 @@ export default function Meetings() {
   };
 
   // Show all evaluations that are ready for meetings (both evaluations submitted)
-  const eligibleEvaluations = (evaluations || []).filter(
+  const eligibleEvaluations = (baseMeetings || []).filter(
     (evaluation: EvaluationWithDetails) =>
       evaluation.selfEvaluationSubmittedAt &&
-      evaluation.managerEvaluationSubmittedAt
+      evaluation.managerEvaluationSubmittedAt,
   );
 
   console.log(
     "[Meetings] Total evaluations after role filter:",
-    (evaluations || []).length
+    (baseMeetings || []).length,
   );
   console.log(
     "[Meetings] Eligible evaluations (both submitted):",
-    eligibleEvaluations.length
+    eligibleEvaluations.length,
   );
   console.log("[Meetings] Eligible evaluations details:", eligibleEvaluations);
 
@@ -335,7 +772,7 @@ export default function Meetings() {
                     {
                       (evaluations || []).filter(
                         (e: EvaluationWithDetails) =>
-                          e.meetingScheduledAt || e.meetingCompletedAt
+                          e.meetingScheduledAt || e.meetingCompletedAt,
                       ).length
                     }
                   </p>
@@ -361,7 +798,7 @@ export default function Meetings() {
                     {
                       (evaluations || []).filter(
                         (e: EvaluationWithDetails) =>
-                          e.meetingScheduledAt && !e.meetingCompletedAt
+                          e.meetingScheduledAt && !e.meetingCompletedAt,
                       ).length
                     }
                   </p>
@@ -386,7 +823,7 @@ export default function Meetings() {
                   >
                     {
                       (evaluations || []).filter(
-                        (e: EvaluationWithDetails) => e.meetingCompletedAt
+                        (e: EvaluationWithDetails) => e.meetingCompletedAt,
                       ).length
                     }
                   </p>
@@ -471,11 +908,11 @@ export default function Meetings() {
                               <Calendar className="h-4 w-4" />
                               <span>
                                 {new Date(
-                                  evaluation.meetingScheduledAt
+                                  evaluation.meetingScheduledAt,
                                 ).toLocaleDateString()}{" "}
                                 at{" "}
                                 {new Date(
-                                  evaluation.meetingScheduledAt
+                                  evaluation.meetingScheduledAt,
                                 ).toLocaleTimeString([], {
                                   hour: "2-digit",
                                   minute: "2-digit",
@@ -553,7 +990,7 @@ export default function Meetings() {
                         )}
                       </div>
                     </div>
-                  )
+                  ),
                 )}
               </div>
             )}

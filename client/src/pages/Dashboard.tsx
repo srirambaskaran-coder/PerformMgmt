@@ -23,14 +23,24 @@ export default function Dashboard() {
   const currentRole =
     userAny.activeRole || userAny.ActiveRole || userAny.role || userAny.Role;
 
-  console.log("[Dashboard] User:", user, "Current role:", currentRole);
+  // Normalize role for comparison (handles both "hr_manager" and "hrmanager")
+  const normalizedRole = currentRole?.toLowerCase().replace(/_/g, "") || "";
 
-  switch (currentRole) {
-    case "super_admin":
+  console.log(
+    "[Dashboard] User:",
+    user,
+    "Current role:",
+    currentRole,
+    "Normalized:",
+    normalizedRole,
+  );
+
+  switch (normalizedRole) {
+    case "superadmin":
       return <SuperAdminDashboard />;
     case "admin":
       return <AdminDashboard />;
-    case "hr_manager":
+    case "hrmanager":
       return <HRManagerDashboard />;
     case "manager":
       return <ManagerDashboard />;

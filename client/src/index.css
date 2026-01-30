@@ -3,53 +3,80 @@
 @tailwind utilities;
 
 :root {
-  --background: hsl(210, 20%, 98%);
-  --foreground: hsl(210, 40%, 8%);
+  /* Background & Foreground - using white and gray from color scheme */
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(240, 2%, 13%);
   --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(210, 40%, 8%);
+  --card-foreground: hsl(240, 2%, 13%);
   --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(210, 40%, 8%);
-  --primary: hsl(214, 84%, 56%);
-  --primary-foreground: hsl(0, 0%, 98%);
-  --secondary: hsl(214, 32%, 91%);
-  --secondary-foreground: hsl(214, 50%, 15%);
-  --muted: hsl(214, 32%, 91%);
-  --muted-foreground: hsl(214, 25%, 40%);
-  --accent: hsl(154, 61%, 43%);
-  --accent-foreground: hsl(0, 0%, 98%);
-  --destructive: hsl(0, 84%, 60%);
-  --destructive-foreground: hsl(0, 0%, 98%);
-  --border: hsl(214, 32%, 91%);
-  --input: hsl(214, 32%, 91%);
-  --ring: hsl(214, 84%, 56%);
-  --chart-1: hsl(214, 84%, 56%);
-  --chart-2: hsl(154, 61%, 43%);
-  --chart-3: hsl(42, 93%, 47%);
-  --chart-4: hsl(147, 78%, 42%);
-  --chart-5: hsl(341, 75%, 51%);
+  --popover-foreground: hsl(240, 2%, 13%);
+
+  /* Primary - #2F2F73 */
+  --primary: hsl(240, 42%, 32%);
+  --primary-foreground: hsl(0, 0%, 100%);
+
+  /* Secondary - #6c757d */
+  --secondary: hsl(208, 7%, 46%);
+  --secondary-foreground: hsl(0, 0%, 100%);
+
+  /* Muted - using lightgray #A8A8AD */
+  --muted: hsl(240, 3%, 95%);
+  --muted-foreground: hsl(240, 9%, 39%);
+
+  /* Accent/Success - #25B480 */
+  --accent: hsl(157, 65%, 42%);
+  --accent-foreground: hsl(0, 0%, 100%);
+
+  /* Destructive/Danger - #FE6C6C */
+  --destructive: hsl(0, 99%, 71%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+
+  /* Borders - using strokegray #DADADA */
+  --border: hsl(0, 0%, 85%);
+  --input: hsl(0, 0%, 85%);
+  --ring: hsl(240, 42%, 32%);
+
+  /* Charts */
+  --chart-1: hsl(240, 42%, 32%);
+  --chart-2: hsl(157, 65%, 42%);
+  --chart-3: hsl(36, 100%, 65%);
+  --chart-4: hsl(208, 7%, 46%);
+  --chart-5: hsl(0, 99%, 71%);
+
+  /* Sidebar */
   --sidebar: hsl(0, 0%, 100%);
-  --sidebar-foreground: hsl(210, 40%, 8%);
-  --sidebar-primary: hsl(214, 84%, 56%);
-  --sidebar-primary-foreground: hsl(0, 0%, 98%);
-  --sidebar-accent: hsl(214, 32%, 91%);
-  --sidebar-accent-foreground: hsl(214, 84%, 56%);
-  --sidebar-border: hsl(214, 32%, 91%);
-  --sidebar-ring: hsl(214, 84%, 56%);
-  --font-sans: "Inter", system-ui, sans-serif;
+  --sidebar-foreground: hsl(240, 22%, 25%);
+  --sidebar-primary: hsl(240, 42%, 32%);
+  --sidebar-primary-foreground: hsl(0, 0%, 100%);
+  --sidebar-accent: hsl(240, 42%, 32%, 0.1);
+  --sidebar-accent-foreground: hsl(240, 42%, 32%);
+  --sidebar-border: hsl(0, 0%, 85%);
+  --sidebar-ring: hsl(240, 42%, 32%);
+
+  /* Fonts */
+  --font-sans:
+    "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
   --radius: 6px;
   --shadow-2xs: 0px 2px 0px 0px hsl(214, 84%, 56% / 0);
   --shadow-xs: 0px 2px 0px 0px hsl(214, 84%, 56% / 0);
-  --shadow-sm: 0px 2px 0px 0px hsl(214, 84%, 56% / 0),
+  --shadow-sm:
+    0px 2px 0px 0px hsl(214, 84%, 56% / 0),
     0px 1px 2px -1px hsl(214, 84%, 56% / 0);
-  --shadow: 0px 2px 0px 0px hsl(214, 84%, 56% / 0),
+  --shadow:
+    0px 2px 0px 0px hsl(214, 84%, 56% / 0),
     0px 1px 2px -1px hsl(214, 84%, 56% / 0);
-  --shadow-md: 0px 2px 0px 0px hsl(214, 84%, 56% / 0),
+  --shadow-md:
+    0px 2px 0px 0px hsl(214, 84%, 56% / 0),
     0px 2px 4px -1px hsl(214, 84%, 56% / 0);
-  --shadow-lg: 0px 2px 0px 0px hsl(214, 84%, 56% / 0),
+  --shadow-lg:
+    0px 2px 0px 0px hsl(214, 84%, 56% / 0),
     0px 4px 6px -1px hsl(214, 84%, 56% / 0);
-  --shadow-xl: 0px 2px 0px 0px hsl(214, 84%, 56% / 0),
+  --shadow-xl:
+    0px 2px 0px 0px hsl(214, 84%, 56% / 0),
     0px 8px 10px -1px hsl(214, 84%, 56% / 0);
   --shadow-2xl: 0px 2px 0px 0px hsl(214, 84%, 56% / 0);
   --tracking-normal: 0em;
@@ -57,53 +84,80 @@
 }
 
 .dark {
-  --background: hsl(0, 0%, 0%);
-  --foreground: hsl(200, 7%, 91%);
-  --card: hsl(228, 10%, 10%);
-  --card-foreground: hsl(0, 0%, 85%);
-  --popover: hsl(0, 0%, 0%);
-  --popover-foreground: hsl(200, 7%, 91%);
-  --primary: hsl(214, 88%, 53%);
+  /* Background & Foreground - dk-bg #0E0E21, dk-text #C6C6EA */
+  --background: hsl(240, 42%, 9%);
+  --foreground: hsl(240, 49%, 85%);
+  --card: hsl(240, 42%, 13%);
+  --card-foreground: hsl(240, 49%, 85%);
+  --popover: hsl(240, 42%, 13%);
+  --popover-foreground: hsl(240, 49%, 85%);
+
+  /* Primary - dk-primary #49499A */
+  --primary: hsl(240, 36%, 45%);
   --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(195, 15%, 95%);
-  --secondary-foreground: hsl(210, 25%, 8%);
-  --muted: hsl(0, 0%, 9%);
-  --muted-foreground: hsl(210, 4%, 46%);
-  --accent: hsl(206, 70%, 8%);
-  --accent-foreground: hsl(214, 88%, 53%);
-  --destructive: hsl(0, 91%, 54%);
+
+  /* Secondary */
+  --secondary: hsl(208, 7%, 46%);
+  --secondary-foreground: hsl(0, 0%, 100%);
+
+  /* Muted */
+  --muted: hsl(240, 35%, 15%);
+  --muted-foreground: hsl(240, 49%, 75%);
+
+  /* Accent/Success */
+  --accent: hsl(157, 65%, 42%);
+  --accent-foreground: hsl(0, 0%, 100%);
+
+  /* Destructive/Danger */
+  --destructive: hsl(0, 99%, 71%);
   --destructive-foreground: hsl(0, 0%, 100%);
-  --border: hsl(210, 5%, 15%);
-  --input: hsl(208, 28%, 18%);
-  --ring: hsl(214, 84%, 56%);
-  --chart-1: hsl(214, 84%, 56%);
-  --chart-2: hsl(154, 61%, 43%);
-  --chart-3: hsl(42, 93%, 47%);
-  --chart-4: hsl(147, 78%, 42%);
-  --chart-5: hsl(341, 75%, 51%);
-  --sidebar: hsl(228, 10%, 10%);
-  --sidebar-foreground: hsl(0, 0%, 85%);
-  --sidebar-primary: hsl(214, 84%, 56%);
+
+  /* Borders - dk-stroke #26264C */
+  --border: hsl(240, 35%, 22%);
+  --input: hsl(240, 35%, 22%);
+  --ring: hsl(240, 36%, 45%);
+
+  /* Charts */
+  --chart-1: hsl(240, 36%, 45%);
+  --chart-2: hsl(157, 65%, 42%);
+  --chart-3: hsl(36, 100%, 65%);
+  --chart-4: hsl(208, 7%, 46%);
+  --chart-5: hsl(0, 99%, 71%);
+
+  /* Sidebar - dk-surface #13132E */
+  --sidebar: hsl(240, 42%, 13%);
+  --sidebar-foreground: hsl(240, 49%, 85%);
+  --sidebar-primary: hsl(240, 36%, 45%);
   --sidebar-primary-foreground: hsl(0, 0%, 100%);
-  --sidebar-accent: hsl(206, 70%, 8%);
-  --sidebar-accent-foreground: hsl(214, 88%, 53%);
-  --sidebar-border: hsl(206, 16%, 26%);
-  --sidebar-ring: hsl(214, 84%, 56%);
-  --font-sans: "Inter", system-ui, sans-serif;
+  --sidebar-accent: hsl(240, 36%, 45%, 0.2);
+  --sidebar-accent-foreground: hsl(240, 49%, 85%);
+  --sidebar-border: hsl(240, 35%, 22%);
+  --sidebar-ring: hsl(240, 36%, 45%);
+
+  /* Fonts */
+  --font-sans:
+    "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
   --radius: 6px;
   --shadow-2xs: 0px 2px 0px 0px hsl(214, 84%, 56% / 0);
   --shadow-xs: 0px 2px 0px 0px hsl(214, 84%, 56% / 0);
-  --shadow-sm: 0px 2px 0px 0px hsl(214, 84%, 56% / 0),
+  --shadow-sm:
+    0px 2px 0px 0px hsl(214, 84%, 56% / 0),
     0px 1px 2px -1px hsl(214, 84%, 56% / 0);
-  --shadow: 0px 2px 0px 0px hsl(214, 84%, 56% / 0),
+  --shadow:
+    0px 2px 0px 0px hsl(214, 84%, 56% / 0),
     0px 1px 2px -1px hsl(214, 84%, 56% / 0);
-  --shadow-md: 0px 2px 0px 0px hsl(214, 84%, 56% / 0),
+  --shadow-md:
+    0px 2px 0px 0px hsl(214, 84%, 56% / 0),
     0px 2px 4px -1px hsl(214, 84%, 56% / 0);
-  --shadow-lg: 0px 2px 0px 0px hsl(214, 84%, 56% / 0),
+  --shadow-lg:
+    0px 2px 0px 0px hsl(214, 84%, 56% / 0),
     0px 4px 6px -1px hsl(214, 84%, 56% / 0);
-  --shadow-xl: 0px 2px 0px 0px hsl(214, 84%, 56% / 0),
+  --shadow-xl:
+    0px 2px 0px 0px hsl(214, 84%, 56% / 0),
     0px 8px 10px -1px hsl(214, 84%, 56% / 0);
   --shadow-2xl: 0px 2px 0px 0px hsl(214, 84%, 56% / 0);
 }
@@ -115,7 +169,11 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family:
+      "DM Sans",
+      -apple-system,
+      BlinkMacSystemFont,
+      sans-serif;
   }
 }
 
@@ -138,7 +196,9 @@
   background-color: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-radius: calc(var(--radius) + 2px);
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  box-shadow:
+    0 1px 3px 0 rgb(0 0 0 / 0.1),
+    0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
 
 .status-badge {
@@ -212,7 +272,9 @@
   right: 1rem;
   padding: 1rem;
   border-radius: var(--radius);
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  box-shadow:
+    0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 4px 6px -4px rgb(0 0 0 / 0.1);
   z-index: 1001;
 }
 
@@ -294,4 +356,100 @@
 
 .sidebar-scroll-collapsed::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* Password match animations */
+@keyframes scaleIn {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-3px);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  75% {
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes ping {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  75%,
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@keyframes spotlight-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px hsl(var(--primary)),
+      0 0 0 6px hsl(var(--primary) / 0.3),
+      0 0 30px 8px hsl(var(--primary) / 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px hsl(var(--primary)),
+      0 0 0 8px hsl(var(--primary) / 0.4),
+      0 0 40px 12px hsl(var(--primary) / 0.5);
+  }
+}
+
+/* Tour mode - lower dialog z-index so spotlight appears above */
+body.tour-active [data-radix-dialog-overlay] {
+  z-index: 50 !important;
+}
+
+body.tour-active [data-radix-dialog-content] {
+  z-index: 51 !important;
+}
+/* Also target any element with z-50 class inside portals during tour */
+body.tour-active [data-radix-portal] > div {
+  z-index: 50 !important;
+}
+
+body.tour-active [role="dialog"] {
+  z-index: 51 !important;
 }

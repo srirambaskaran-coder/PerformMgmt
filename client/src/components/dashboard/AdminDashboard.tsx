@@ -58,13 +58,15 @@ interface DepartmentStats {
 }
 
 interface CompanyUser {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: string;
-  department?: string;
-  profileImageUrl?: string;
+  Id: string;
+  FirstName: string | null;
+  LastName: string | null;
+  Email: string;
+  Role: string;
+  Department?: string | null;
+  ProfileImageUrl?: string | null;
+  Designation?: string | null;
+  Code?: string | null;
 }
 
 // Route mapping for setup items
@@ -80,16 +82,33 @@ export default function AdminDashboard() {
     queryKey: ["/api/dashboard/admin/metrics"],
   });
 
-  const { data: setupItems = [], isLoading: setupLoading } = useQuery<
-    SetupItem[]
-  >({
-    queryKey: ["/api/dashboard/admin/setup-items"],
-  });
-
   const { data: departments = [], isLoading: departmentsLoading } = useQuery<
     DepartmentStats[]
   >({
     queryKey: ["/api/dashboard/admin/departments"],
+    select: (data: any[]) => {
+      // Normalize API response to match DepartmentStats interface
+      return data.map((dept: any) => {
+        // Handle completionRate - it might be an array (from API) or a number
+        let completionRateValue = 0;
+        const rawCompletionRate = dept.completionRate || dept.CompletionRate;
+        if (typeof rawCompletionRate === "number") {
+          completionRateValue = rawCompletionRate;
+        } else if (Array.isArray(rawCompletionRate)) {
+          // If it's an array, we can't use it directly - set to 0 or calculate if needed
+          completionRateValue = 0;
+        }
+
+        return {
+          id: String(dept.id || dept.Id || dept.departmentId),
+          name: dept.name || dept.Name || dept.departmentName || "Unknown",
+          employeeCount:
+            dept.employeeCount || dept.EmployeeCount || dept.totalUsers || 0,
+          managersCount: dept.managersCount || dept.ManagersCount || 0,
+          completionRate: completionRateValue,
+        };
+      });
+    },
   });
 
   const { data: companyUsers = [], isLoading: usersLoading } = useQuery<
@@ -97,11 +116,6 @@ export default function AdminDashboard() {
   >({
     queryKey: ["/api/users"],
   });
-
-  // Check if all setup tasks are completed
-  const allSetupComplete =
-    setupItems.length > 0 &&
-    setupItems.every((item) => item.status === "completed");
 
   if (metricsLoading) {
     return (
@@ -120,7 +134,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="space-y-6" data-testid="admin-dashboard">
+    <div className="space-y-6 dashboard-content" data-testid="admin-dashboard">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Administration Dashboard</h1>
@@ -129,12 +143,12 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button asChild>
+          {/* <Button asChild>
             <Link href="/users">
               <Plus className="h-4 w-4 mr-2" />
               Add User
             </Link>
-          </Button>
+          </Button> */}
           <Button variant="outline" asChild>
             <Link href="/settings">
               <Settings className="h-4 w-4 mr-2" />
@@ -222,7 +236,7 @@ export default function AdminDashboard() {
                   Appraisal Cycles
                 </p>
                 <p className="text-2xl font-bold">
-                  {metrics?.appraisalCycles || 0}
+                  {metrics?.totalAppraisalCycles || 0}
                 </p>
               </div>
               <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
@@ -240,158 +254,70 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Setup Tasks / User Overview and Department Overview */}
+      {/* User Overview and Department Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {allSetupComplete ? (
-          /* User Overview - shown when all setup tasks are complete */
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>User Overview</CardTitle>
-                <CardDescription>
-                  Company employees and team members
-                </CardDescription>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>User Overview</CardTitle>
+              <CardDescription>
+                Company employees and team members
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/users">View All</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {usersLoading ? (
+              <div className="animate-pulse space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-14 bg-muted rounded-lg"></div>
+                ))}
               </div>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/users">View All</Link>
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {usersLoading ? (
-                <div className="animate-pulse space-y-3">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="h-14 bg-muted rounded-lg"></div>
-                  ))}
-                </div>
-              ) : companyUsers.length > 0 ? (
-                companyUsers.slice(0, 6).map((user) => (
-                  <Link key={user.id} href={`/users/${user.id}`}>
-                    <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9">
-                          <AvatarImage
-                            src={user.profileImageUrl}
-                            alt={`${user.firstName} ${user.lastName}`}
-                          />
-                          <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                            {user.firstName?.charAt(0)}
-                            {user.lastName?.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium text-sm">
-                            {user.firstName} {user.lastName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {user.email}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {user.role?.replace("_", " ")}
-                        </Badge>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </div>
+            ) : companyUsers.length > 0 ? (
+              companyUsers.slice(0, 6).map((user) => (
+                <div
+                  key={user.Id}
+                  className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage
+                        src={user.ProfileImageUrl || undefined}
+                        alt={`${user.FirstName || ""} ${user.LastName || ""}`}
+                      />
+                      <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                        {user.FirstName?.charAt(0) ||
+                          (user.Email || "?").charAt(0).toUpperCase()}
+                        {user.LastName?.charAt(0) || ""}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium text-sm">
+                        {user.FirstName && user.LastName
+                          ? `${user.FirstName} ${user.LastName}`
+                          : user.FirstName ||
+                            user.LastName ||
+                            (user.Email || "Unknown").split("@")[0]}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {user.Email || "No email"}
+                      </p>
                     </div>
-                  </Link>
-                ))
-              ) : (
-                <p className="text-center text-muted-foreground py-4">
-                  No users found
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          /* Setup Tasks - shown when setup is incomplete */
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Setup Tasks</CardTitle>
-                <CardDescription>Complete system configuration</CardDescription>
-              </div>
-              <Badge variant="outline">
-                {setupItems.filter((item) => item.status === "pending").length}{" "}
-                pending
-              </Badge>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {setupLoading ? (
-                <div className="animate-pulse space-y-3">
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-12 bg-muted rounded-lg"></div>
-                  ))}
+                  </div>
+                  <Badge variant="outline" className="text-xs capitalize">
+                    {user.Role?.replace("_", " ")}
+                  </Badge>
                 </div>
-              ) : setupItems.length > 0 ? (
-                setupItems.slice(0, 6).map((item) => {
-                  const route = setupItemRoutes[item.id];
-                  const ItemWrapper = route ? Link : "div";
-                  const itemProps = route ? { href: route } : {};
-
-                  return (
-                    <ItemWrapper key={item.id} {...(itemProps as any)}>
-                      <div
-                        className={`flex items-center justify-between p-3 bg-muted/30 rounded-lg ${
-                          route
-                            ? "hover:bg-muted/50 transition-colors cursor-pointer"
-                            : ""
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                              item.status === "completed"
-                                ? "bg-green-100"
-                                : item.status === "in_progress"
-                                ? "bg-yellow-100"
-                                : "bg-gray-100"
-                            }`}
-                          >
-                            {item.status === "completed" ? (
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            ) : item.status === "in_progress" ? (
-                              <Clock className="h-4 w-4 text-yellow-600" />
-                            ) : (
-                              <AlertCircle className="h-4 w-4 text-gray-600" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm">{item.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {item.description}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant={
-                              item.priority === "high"
-                                ? "destructive"
-                                : item.priority === "medium"
-                                ? "default"
-                                : "secondary"
-                            }
-                            className="text-xs"
-                          >
-                            {item.priority}
-                          </Badge>
-                          {route && (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </div>
-                      </div>
-                    </ItemWrapper>
-                  );
-                })
-              ) : (
-                <p className="text-center text-muted-foreground py-4">
-                  All setup tasks completed
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
+              ))
+            ) : (
+              <p className="text-center text-muted-foreground py-4">
+                No users found
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -420,7 +346,7 @@ export default function AdminDashboard() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground">
-                      {dept.name.charAt(0).toUpperCase()}
+                      {(dept.name || "?").charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <p className="font-medium">{dept.name}</p>
@@ -431,11 +357,11 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">{dept.completionRate}%</p>
+                    {/* <p className="font-medium">{dept.completionRate}%</p>
                     <Progress
                       value={dept.completionRate}
                       className="w-20 h-2 mt-1"
-                    />
+                    /> */}
                   </div>
                 </div>
               ))
@@ -485,7 +411,13 @@ export default function AdminDashboard() {
             <Button variant="outline" asChild>
               <Link href="/levels">
                 <Layers className="h-4 w-4 mr-2" />
-                Levels & Grades
+                Levels
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/grades">
+                <Award className="h-4 w-4 mr-2" />
+                Grades
               </Link>
             </Button>
             <Button variant="outline" asChild>

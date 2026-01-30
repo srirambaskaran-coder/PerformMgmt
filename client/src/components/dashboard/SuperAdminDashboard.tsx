@@ -24,6 +24,7 @@ import {
   UserCog,
 } from "lucide-react";
 import { Link } from "wouter";
+import { apiClient } from "@/lib/api";
 
 interface SuperAdminMetrics {
   totalCompanies: number;
@@ -58,10 +59,54 @@ export default function SuperAdminDashboard() {
       queryKey: ["/api/dashboard/super-admin/metrics"],
     });
 
-  const { data: companies = [], isLoading: companiesLoading } = useQuery<
-    CompanyOverview[]
+  const { data: allUsers = [], isLoading: usersLoading } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      const role = undefined;
+      const department = undefined;
+      let status = undefined;
+      const companyId = undefined;
+
+      // If status is 'active' or 'inactive', convert to boolean string
+      if (status === "active") {
+        status = "true";
+      } else if (status === "inactive") {
+        status = "false";
+      }
+
+      if (role) params.append("role", role);
+      if (department) params.append("department", department);
+      if (status) params.append("status", status);
+      if (companyId) params.append("companyId", companyId);
+
+      const queryString = params.toString();
+      const endpoint = `/api/users${queryString ? `?${queryString}` : ""}`;
+      return apiClient.get(endpoint);
+    },
+  });
+
+  const { data: rawCompanies = [], isLoading: companiesLoading } = useQuery<
+    any[]
   >({
     queryKey: ["/api/dashboard/super-admin/companies"],
+  });
+
+  // Map companies with user count from users API
+  const companies: CompanyOverview[] = rawCompanies.map((company: any) => {
+    const userCount = allUsers.filter((user: any) => {
+      const userCompanyId = user.companyId || user.CompanyId;
+      return String(userCompanyId) === String(company.Id);
+    }).length;
+
+    return {
+      id: company.Id,
+      name: company.Name,
+      domain: company.CompanyURL,
+      userCount: userCount,
+      status: company.Status ? "active" : "inactive",
+      planType: company.planType || "Standard",
+    };
   });
 
   const { data: alerts = [], isLoading: alertsLoading } = useQuery<
@@ -74,15 +119,17 @@ export default function SuperAdminDashboard() {
     queryKey: ["/api/questionnaire-templates"],
   });
 
-  // Fetch all users and filter admins
-  const { data: allUsers = [], isLoading: usersLoading } = useQuery<any[]>({
-    queryKey: ["/api/users"],
-  });
-
   // Filter users who are admins (admin role)
-  const adminUsers = allUsers.filter(
-    (user: any) => user.role === "admin" || user.roles?.includes("admin")
-  );
+  // Handle both uppercase and lowercase property names, and Roles as JSON string
+  const adminUsers = allUsers.filter((user: any) => {
+    const role = user.role || user.Role || "";
+    const rolesRaw = user.roles || user.Roles;
+    const roles =
+      typeof rolesRaw === "string"
+        ? JSON.parse(rolesRaw || "[]")
+        : rolesRaw || [];
+    return role === "admin" || roles.includes("admin");
+  });
 
   if (metricsLoading) {
     return (
@@ -230,12 +277,12 @@ export default function SuperAdminDashboard() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground">
-                      {company.name.charAt(0).toUpperCase()}
+                      {company.name?.charAt(0).toUpperCase() || "?"}
                     </div>
                     <div>
                       <p className="font-medium">{company.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {company.userCount} users • {company.planType}
+                        {company.userCount} users
                       </p>
                     </div>
                   </div>
@@ -282,20 +329,23 @@ export default function SuperAdminDashboard() {
             ) : adminUsers.length > 0 ? (
               adminUsers.slice(0, 5).map((admin: any) => (
                 <div
-                  key={admin.id}
+                  key={admin.id || admin.Id}
                   className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-xs font-medium text-white">
-                      {admin.firstName?.[0]?.toUpperCase() || ""}
-                      {admin.lastName?.[0]?.toUpperCase() || ""}
+                      {(admin.firstName ||
+                        admin.FirstName)?.[0]?.toUpperCase() || ""}
+                      {(admin.lastName || admin.LastName)?.[0]?.toUpperCase() ||
+                        ""}
                     </div>
                     <div>
                       <p className="font-medium">
-                        {admin.firstName} {admin.lastName}
+                        {admin.firstName || admin.FirstName}{" "}
+                        {admin.lastName || admin.LastName}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {admin.email}
+                        {admin.email || admin.Email}
                       </p>
                     </div>
                   </div>
@@ -349,14 +399,14 @@ export default function SuperAdminDashboard() {
                 System Settings
               </Link>
             </Button>
-            <Button variant="outline">
+            {/* <Button variant="outline">
               <Database className="h-4 w-4 mr-2" />
               Database Backup
             </Button>
             <Button variant="outline">
               <Shield className="h-4 w-4 mr-2" />
               Security Audit
-            </Button>
+            </Button> */}
           </div>
         </CardContent>
       </Card>

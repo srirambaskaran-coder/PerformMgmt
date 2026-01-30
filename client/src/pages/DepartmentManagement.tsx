@@ -62,7 +62,9 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { getClientIdFromSession } from "@/lib/ssoAuth";
 import { RoleGuard } from "@/components/RoleGuard";
+import { useAuth } from "@/hooks/useAuth";
 import {
   type Department,
   type InsertDepartment,
@@ -70,6 +72,15 @@ import {
 } from "@shared/schema";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { cn } from "@/lib/utils";
+import { ViewModeToggle } from "@/components/ViewModeToggle";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // Multi-select filter component
 interface MultiSelectProps {
@@ -161,23 +172,54 @@ function MultiSelect({
 export default function DepartmentManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<"card" | "table">("card");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(
-    null
+    null,
   );
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
 
   // Data queries
   const { data: departments = [], isLoading } = useQuery<Department[]>({
     queryKey: ["/api/departments"],
+    select: (data: any) => {
+      // API returns {departments: [...]} - unwrap it
+      const deptArray = data?.departments || data;
+      if (!Array.isArray(deptArray)) return [];
+      return deptArray.map((dept: any) => ({
+        id: String(dept.Id),
+        code: dept.Code || "",
+        description: dept.Name || "", // API uses Name for description
+        status: dept.Status === true ? "active" : "inactive",
+        companyId: dept.ClientId ? String(dept.ClientId) : null,
+        headOfDepartment: dept.HeadOfTheDepartment || null,
+        createdOn: dept.CreatedOn,
+        lastUpdatedOn: dept.LastUpdatedOn,
+        createdBy: dept.CreatedBy,
+        lastUpdatedBy: dept.LastUpdatedBy,
+      }));
+    },
   });
 
   // Mutations
   const createDepartmentMutation = useMutation({
     mutationFn: async (departmentData: InsertDepartment) => {
-      await apiRequest("POST", "/api/departments", departmentData);
+      // Transform to PascalCase and convert status to boolean
+      const payload = {
+        Code: departmentData.code,
+        Name: departmentData.description, // API uses Name, not Description
+        Status:
+          departmentData.status === "active"
+            ? true
+            : departmentData.status === "inactive"
+              ? false
+              : departmentData.status,
+        ClientId: getClientIdFromSession(),
+      };
+      await apiRequest("POST", "/api/departments", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/departments"] });
@@ -208,7 +250,23 @@ export default function DepartmentManagement() {
       id: string;
       departmentData: Partial<InsertDepartment>;
     }) => {
-      await apiRequest("PUT", `/api/departments/${id}`, departmentData);
+      // Transform to PascalCase and convert status to boolean
+      const payload: any = {};
+      if (departmentData.code !== undefined) payload.Code = departmentData.code;
+      if (departmentData.description !== undefined)
+        payload.Name = departmentData.description; // API uses Name, not Description
+      if (departmentData.status !== undefined) {
+        payload.Status =
+          departmentData.status === "active"
+            ? true
+            : departmentData.status === "inactive"
+              ? false
+              : departmentData.status;
+      }
+      if (departmentData.companyId !== undefined) {
+        payload.ClientId = getClientIdFromSession();
+      }
+      await apiRequest("PUT", `/api/departments/${id}`, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/departments"] });
@@ -314,260 +372,285 @@ export default function DepartmentManagement() {
 
   return (
     <RoleGuard allowedRoles={["admin"]}>
-      <div className="p-6 max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
+      <div
+        className="space-y-6 department-list"
+        data-testid="department-management"
+      >
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Building2 className="h-8 w-8" />
-              Department Management
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Manage company departments for organizational structure
+            <h1 className="text-2xl font-semibold">Department Management</h1>
+            <p className="text-muted-foreground">
+              Manage organizational departments
             </p>
           </div>
-          <Dialog
-            open={isCreateModalOpen || editingDepartment !== null}
-            onOpenChange={(open) => !open && handleCloseModal()}
-          >
-            <DialogTrigger asChild>
-              <Button
-                onClick={() => setIsCreateModalOpen(true)}
-                data-testid="button-add-department"
-                className="flex items-center gap-2"
+          <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+        </div>
+        <Dialog
+          open={isCreateModalOpen || editingDepartment !== null}
+          onOpenChange={(open) => !open && handleCloseModal()}
+        >
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>
+                {editingDepartment ? "Edit Department" : "Add New Department"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingDepartment
+                  ? "Update the department information below."
+                  : "Enter the details for the new department."}
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-4"
               >
-                <Plus className="h-4 w-4" />
-                Add Department
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingDepartment ? "Edit Department" : "Add New Department"}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingDepartment
-                    ? "Update the department information below."
-                    : "Enter the details for the new department."}
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit(onSubmit)}
-                  className="space-y-4"
-                >
-                  <FormField
-                    control={form.control}
-                    name="code"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Department Code</FormLabel>
+                <FormField
+                  control={form.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Department Code</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., HR, IT, FIN"
+                          {...field}
+                          data-testid="input-department-code"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., Human Resources Department"
+                          {...field}
+                          data-testid="input-department-description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value ?? "active"}
+                      >
                         <FormControl>
-                          <Input
-                            placeholder="e.g., HR, IT, FIN"
-                            {...field}
-                            data-testid="input-department-code"
-                          />
+                          <SelectTrigger data-testid="select-department-status">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., Human Resources Department"
-                            {...field}
-                            data-testid="input-department-description"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value ?? "active"}
-                        >
-                          <FormControl>
-                            <SelectTrigger data-testid="select-department-status">
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="inactive">Inactive</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleCloseModal}
-                      data-testid="button-cancel-department"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={
-                        createDepartmentMutation.isPending ||
-                        updateDepartmentMutation.isPending
-                      }
-                      data-testid="button-save-department"
-                    >
-                      {createDepartmentMutation.isPending ||
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCloseModal}
+                    data-testid="button-cancel-department"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={
+                      createDepartmentMutation.isPending ||
                       updateDepartmentMutation.isPending
-                        ? "Saving..."
-                        : editingDepartment
+                    }
+                    data-testid="button-save-department"
+                  >
+                    {createDepartmentMutation.isPending ||
+                    updateDepartmentMutation.isPending
+                      ? "Saving..."
+                      : editingDepartment
                         ? "Update"
                         : "Create"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
 
-        {/* Search and Filter Controls */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search departments..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-departments"
-            />
-          </div>
-          <MultiSelect
-            options={[
-              { value: "active", label: "Active" },
-              { value: "inactive", label: "Inactive" },
-            ]}
-            selected={statusFilters}
-            onChange={setStatusFilters}
-            placeholder="All Status"
-            label="status"
-          />
-        </div>
+        {/* Filters */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Filters</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search departments..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search-departments"
+                />
+              </div>
+              <MultiSelect
+                options={[
+                  { value: "active", label: "Active" },
+                  { value: "inactive", label: "Inactive" },
+                ]}
+                selected={statusFilters}
+                onChange={setStatusFilters}
+                placeholder="All Status"
+                label="status"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Department List */}
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <Card key={index} className="animate-pulse">
-                <CardHeader className="pb-3">
-                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-3 bg-gray-200 rounded w-full mb-2"></div>
-                  <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : filteredDepartments.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">
-                No departments found
-              </h3>
-              <p className="text-muted-foreground text-center mb-4">
-                {searchQuery || statusFilters.length > 0
-                  ? "No departments match your current filters."
-                  : "Start by creating your first department."}
-              </p>
-              {searchQuery === "" && statusFilters.length === 0 && (
-                <Button
-                  onClick={() => setIsCreateModalOpen(true)}
-                  data-testid="button-create-first-department"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Department
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredDepartments.map((department) => (
-              <Card
-                key={department.id}
-                className="hover:shadow-md transition-shadow"
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle
-                        className="text-lg"
+        <Card>
+          <CardHeader>
+            <CardTitle>Departments</CardTitle>
+            <CardDescription>
+              {filteredDepartments.length} department
+              {filteredDepartments.length !== 1 ? "s" : ""} found
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center space-x-4 animate-pulse"
+                  >
+                    <div className="w-10 h-10 bg-muted rounded-full"></div>
+                    <div className="flex-1">
+                      <div className="h-4 bg-muted rounded w-1/4 mb-2"></div>
+                      <div className="h-3 bg-muted rounded w-1/3"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredDepartments.length === 0 ? (
+              <div className="text-center py-8">
+                <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No departments found</p>
+              </div>
+            ) : viewMode === "card" ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredDepartments.map((department) => (
+                  <Card
+                    key={department.id}
+                    className="hover:shadow-md transition-shadow"
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Building2 className="h-6 w-6 text-primary-foreground" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3
+                              className="font-semibold truncate"
+                              data-testid={`text-department-description-${department.id}`}
+                            >
+                              {department.description}
+                            </h3>
+                            <p
+                              className="text-sm text-muted-foreground truncate"
+                              data-testid={`text-department-code-${department.id}`}
+                            >
+                              {department.code}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge
+                          variant={
+                            department.status === "active"
+                              ? "default"
+                              : "secondary"
+                          }
+                          data-testid={`badge-department-status-${department.id}`}
+                        >
+                          {department.status}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Department Name</TableHead>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredDepartments.map((department) => (
+                    <TableRow
+                      key={department.id}
+                      data-testid={`department-table-row-${department.id}`}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                            <Building2 className="h-5 w-5 text-primary-foreground" />
+                          </div>
+                          <div>
+                            <p
+                              className="font-medium"
+                              data-testid={`text-department-description-${department.id}`}
+                            >
+                              {department.description}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell
                         data-testid={`text-department-code-${department.id}`}
                       >
                         {department.code}
-                      </CardTitle>
-                      <CardDescription
-                        className="mt-1"
-                        data-testid={`text-department-description-${department.id}`}
-                      >
-                        {department.description}
-                      </CardDescription>
-                    </div>
-                    <Badge
-                      variant={
-                        department.status === "active" ? "default" : "secondary"
-                      }
-                      data-testid={`badge-department-status-${department.id}`}
-                    >
-                      {department.status}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Separator className="my-3" />
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(department)}
-                      data-testid={`button-edit-department-${department.id}`}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        deleteDepartmentMutation.mutate(department.id)
-                      }
-                      disabled={deleteDepartmentMutation.isPending}
-                      data-testid={`button-delete-department-${department.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            department.status === "active"
+                              ? "default"
+                              : "secondary"
+                          }
+                          data-testid={`badge-department-status-${department.id}`}
+                        >
+                          {department.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </RoleGuard>
   );

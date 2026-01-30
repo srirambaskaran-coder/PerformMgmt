@@ -30,7 +30,7 @@ export function getRefreshToken(): string | null {
 export function setTokens(
   accessToken: string,
   refreshToken: string,
-  expiresIn?: number
+  expiresIn?: number,
 ): void {
   try {
     localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
@@ -78,7 +78,7 @@ export async function refreshAccessToken(): Promise<boolean> {
         setTokens(
           data.accessToken,
           data.refreshToken || refreshToken,
-          data.expiresIn
+          data.expiresIn,
         );
         console.log("[useAuth] Token refreshed successfully");
         return true;
@@ -112,6 +112,111 @@ export function setStoredUser(user: SafeUser): void {
   } catch (error) {
     console.error("[useAuth] Failed to store user:", error);
   }
+}
+
+// Normalize user object from API (convert uppercase keys to lowercase)
+export function normalizeUser(apiUser: any): SafeUser {
+  return {
+    id: apiUser.Id || apiUser.id,
+    email: apiUser.Email || apiUser.email,
+    firstName: apiUser.FirstName || apiUser.firstName,
+    lastName: apiUser.LastName || apiUser.lastName,
+    profileImageUrl: apiUser.ProfileImageUrl || apiUser.profileImageUrl,
+    code: apiUser.Code || apiUser.code,
+    designation: apiUser.Designation || apiUser.designation,
+    department: apiUser.Department || apiUser.department,
+    dateOfJoining: apiUser.DateOfJoining || apiUser.dateOfJoining,
+    mobileNumber: apiUser.MobileNumber || apiUser.mobileNumber,
+    reportingManagerId:
+      apiUser.ReportingManagerId || apiUser.reportingManagerId,
+    locationId: apiUser.LocationId || apiUser.locationId,
+    companyId: apiUser.CompanyId || apiUser.companyId,
+    levelId: apiUser.LevelId || apiUser.levelId,
+    gradeId: apiUser.GradeId || apiUser.gradeId,
+    role: apiUser.Role || apiUser.role,
+    roles: (() => {
+      const rawRoles = apiUser.Roles || apiUser.roles;
+      if (!rawRoles) return [];
+      if (Array.isArray(rawRoles)) return rawRoles;
+      if (typeof rawRoles === "string") {
+        let parsed: any = rawRoles;
+        // Handle potentially double/triple-encoded JSON strings
+        try {
+          // Keep parsing until we get an array or can't parse anymore
+          let attempts = 0;
+          while (typeof parsed === "string" && attempts < 5) {
+            attempts++;
+            try {
+              parsed = JSON.parse(parsed);
+            } catch {
+              break;
+            }
+          }
+          if (Array.isArray(parsed)) return parsed;
+          // If still a string after parsing, try splitting by comma
+          if (typeof parsed === "string") {
+            return parsed
+              .split(",")
+              .map((r: string) => r.trim())
+              .filter(Boolean);
+          }
+          return [];
+        } catch {
+          // If not JSON, split by comma
+          return rawRoles
+            .split(",")
+            .map((r: string) => r.trim())
+            .filter(Boolean);
+        }
+      }
+      return [];
+    })(),
+    status:
+      apiUser.Status !== undefined && apiUser.Status !== null
+        ? apiUser.Status
+          ? "active"
+          : "inactive"
+        : apiUser.status || "active",
+    createdAt: apiUser.CreatedOn || apiUser.createdAt,
+    updatedAt: apiUser.LastUpdatedOn || apiUser.updatedAt,
+    createdById: apiUser.CreatedBy || apiUser.createdById,
+    // Set activeRole and availableRoles for role switching
+    activeRole:
+      apiUser.ActiveRole || apiUser.activeRole || apiUser.Role || apiUser.role,
+    availableRoles: (() => {
+      const rawRoles = apiUser.Roles || apiUser.roles;
+      if (!rawRoles) return [];
+      if (Array.isArray(rawRoles)) return rawRoles;
+      if (typeof rawRoles === "string") {
+        let parsed: any = rawRoles;
+        try {
+          let attempts = 0;
+          while (typeof parsed === "string" && attempts < 5) {
+            attempts++;
+            try {
+              parsed = JSON.parse(parsed);
+            } catch {
+              break;
+            }
+          }
+          if (Array.isArray(parsed)) return parsed;
+          if (typeof parsed === "string") {
+            return parsed
+              .split(",")
+              .map((r: string) => r.trim())
+              .filter(Boolean);
+          }
+          return [];
+        } catch {
+          return rawRoles
+            .split(",")
+            .map((r: string) => r.trim())
+            .filter(Boolean);
+        }
+      }
+      return [];
+    })(),
+  };
 }
 
 // Clear all auth data from localStorage

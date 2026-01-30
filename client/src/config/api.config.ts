@@ -13,11 +13,12 @@ export function getEnvType(): Environment {
   const origin = window.location.origin;
   const hostname = window.location.hostname;
 
-  // Development: localhost, 127.0.0.1, or smeqc (dev server)
+  // Development: localhost, 127.0.0.1, smeqc, or smedev (dev server)
   if (
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
-    hostname.includes("smeqc")
+    hostname.includes("smeqc") ||
+    hostname.includes("smedev")
   ) {
     return "development";
   }
@@ -52,8 +53,8 @@ function getBaseUrl(env: Environment): string {
 
   // Default URLs for each environment
   const defaultUrls: Record<Environment, string> = {
-    // development: "https://dev.hfactor.app:8443/PerformanceMgt",
-    development: "http://localhost:3000",
+    development: "https://dev.hfactor.app:8443/PerformanceMgt",
+    // development: "http://localhost:3000",
     qc: import.meta.env.VITE_QC_API_URL || "http://your-qc-backend-url.com",
     production:
       import.meta.env.VITE_PROD_API_URL || "https://your-prod-backend-url.com",
@@ -98,6 +99,6 @@ export function getApiUrl(endpoint: string): string {
 // Debug logging (only in development)
 if (import.meta.env.DEV) {
   console.log(
-    `[API Config] Environment: ${CURRENT_ENV}, Base URL: ${API_BASE_URL}`
+    `[API Config] Environment: ${CURRENT_ENV}, Base URL: ${API_BASE_URL}`,
   );
 }

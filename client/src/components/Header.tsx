@@ -8,7 +8,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth, clearAuthData } from "@/hooks/useAuth";
+import {
+  useAuth,
+  clearAuthData,
+  getStoredUser,
+  setStoredUser,
+} from "@/hooks/useAuth";
+import { clearHRsuiteSession } from "@/lib/hrsuiteSession";
+import { clearSSOAttempted, getLoginSource } from "@/lib/ssoAuth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -23,18 +30,32 @@ export function Header() {
 
   const switchRoleMutation = useMutation({
     mutationFn: async (role: string) => {
+      // Normalize role for API payload (remove underscores)
+      const normalizedRole = role.toLowerCase().replace(/_/g, "");
       const response = await apiRequest("POST", "/api/auth/switch-role", {
-        role,
+        role: normalizedRole,
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, role) => {
+      // Update stored user with new active role
+      const storedUser = getStoredUser();
+      if (storedUser) {
+        const updatedUser = {
+          ...storedUser,
+          role: role,
+          activeRole: role,
+        };
+        setStoredUser(updatedUser);
+      }
       // Invalidate and refetch user data
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
         title: "Role switched successfully",
         description: "Your active role has been updated.",
       });
+      // Reload the page to apply the new role throughout the app
+      window.location.reload();
     },
     onError: (error: any) => {
       toast({
@@ -53,30 +74,60 @@ export function Header() {
     try {
       await fetch(`${API_BASE_URL}/api/auth/logout`, {
         method: "POST",
-        credentials: "include",
       });
     } catch (error) {
       console.error("Logout error:", error);
     }
+
+    // Check if user logged in via HRsuite
+    const loginSource = getLoginSource();
+
     // Clear localStorage auth data
     clearAuthData();
+    // Clear SSO attempted flag so next login can try SSO again
+    clearSSOAttempted();
+    // Clear HRsuite session data if it exists
+    clearHRsuiteSession();
     // Clear query cache
     queryClient.clear();
+
+    // If logged in via HRsuite, redirect back to HRsuite (if applicable)
+    // Otherwise, redirect to PMS login page
+    if (loginSource === "hrsuite") {
+      // You can customize this URL to redirect back to HRsuite
+      console.log("[Header] User logged in via HRsuite, logging out...");
+    }
+
     // Force redirect to login page with page reload
     window.location.href = `${import.meta.env.BASE_URL || "/"}#/login`;
     window.location.reload();
   };
 
   // Get active role and available roles from user object
-  const activeRole = (user as any)?.activeRole || (user as any)?.role;
-  const availableRoles = (user as any)?.availableRoles || [];
-  const hasMultipleRoles = availableRoles.length > 1;
+  // Handle both uppercase and lowercase property names
+  const activeRole =
+    (user as any)?.activeRole ||
+    (user as any)?.ActiveRole ||
+    (user as any)?.role ||
+    (user as any)?.Role;
 
-  // Helper function to format role names properly
+  // Use 'roles' as the source of truth for available roles
+  const availableRoles = (user as any)?.roles || (user as any)?.Roles || [];
+
+  const hasMultipleRoles =
+    Array.isArray(availableRoles) && availableRoles.length > 1;
+
+  // Helper function to format role names properly for display
   const formatRoleName = (role: string) => {
-    if (role === "hr_manager") return "HR Manager";
+    if (!role) return "Unknown";
+    // Handle both formats: "hr_manager" and "hrmanager"
+    const normalizedRole = role.toLowerCase().replace(/_/g, "");
+    if (normalizedRole === "hrmanager") return "HR Manager";
+    if (normalizedRole === "superadmin") return "Super Admin";
+    // For other roles, capitalize first letter
     return role
       .split("_")
+      .filter((word) => word && word.length > 0)
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
   };
@@ -168,30 +219,32 @@ export function Header() {
                   <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
                     Switch Role
                   </DropdownMenuLabel>
-                  {availableRoles.map((role: string) => (
-                    <DropdownMenuItem
-                      key={role}
-                      onClick={() => handleSwitchRole(role)}
-                      disabled={
-                        role === activeRole || switchRoleMutation.isPending
-                      }
-                      data-testid={`switch-role-${role}`}
-                    >
-                      <RefreshCw
-                        className={`mr-2 h-4 w-4 ${
-                          switchRoleMutation.isPending ? "animate-spin" : ""
-                        }`}
-                      />
-                      <span
-                        className={role === activeRole ? "font-medium" : ""}
+                  {availableRoles
+                    .filter((role: string) => role)
+                    .map((role: string) => (
+                      <DropdownMenuItem
+                        key={role}
+                        onClick={() => handleSwitchRole(role)}
+                        disabled={
+                          role === activeRole || switchRoleMutation.isPending
+                        }
+                        data-testid={`switch-role-${role}`}
                       >
-                        {formatRoleName(role)}
-                        {role === activeRole && (
-                          <span className="ml-2 text-primary">✓</span>
-                        )}
-                      </span>
-                    </DropdownMenuItem>
-                  ))}
+                        <RefreshCw
+                          className={`mr-2 h-4 w-4 ${
+                            switchRoleMutation.isPending ? "animate-spin" : ""
+                          }`}
+                        />
+                        <span
+                          className={role === activeRole ? "font-medium" : ""}
+                        >
+                          {formatRoleName(role)}
+                          {role === activeRole && (
+                            <span className="ml-2 text-primary">✓</span>
+                          )}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
                   <DropdownMenuSeparator />
                 </>
               )}

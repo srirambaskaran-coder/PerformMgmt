@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
@@ -26,6 +26,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Popover,
   PopoverContent,
@@ -56,14 +66,17 @@ import {
   type InsertGrade,
 } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { getClientIdFromSession } from "@/lib/ssoAuth";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { useAuth } from "@/hooks/useAuth";
+import { useTour } from "@/contexts/TourContext";
 import {
   Plus,
   Search,
   Edit,
-  Trash2,
+  Ban,
   Award,
   Tag,
   Clock,
@@ -165,19 +178,49 @@ export default function GradeManagement() {
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingGrade, setEditingGrade] = useState<Grade | null>(null);
+  const [tourDemoGrade, setTourDemoGrade] = useState<Grade | null>(null);
+  const [deleteGradeId, setDeleteGradeId] = useState<string | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const { isRunning: isTourMode, currentAction, clearAction } = useTour();
 
   // Data queries
   const { data: grades = [], isLoading } = useQuery<Grade[]>({
     queryKey: ["/api/grades"],
+    select: (data: any[]) => {
+      return data.map((grade: any) => ({
+        id: grade.Id,
+        code: grade.Code,
+        description: grade.Description,
+        status: grade.Status ? "active" : "inactive",
+        companyId: grade.CompanyId,
+        createdOn: grade.CreatedOn,
+        lastUpdatedOn: grade.LastUpdatedOn,
+        createdBy: grade.CreatedBy,
+        createdByName: grade.CreatedByName,
+        lastUpdatedBy: grade.LastUpdatedBy,
+      }));
+    },
   });
 
   // Mutations
   const createGradeMutation = useMutation({
     mutationFn: async (gradeData: InsertGrade) => {
-      await apiRequest("POST", "/api/grades", gradeData);
+      // Transform to PascalCase and convert status to boolean
+      const payload = {
+        Code: gradeData.code,
+        Description: gradeData.description,
+        Status:
+          gradeData.status === "active"
+            ? true
+            : gradeData.status === "inactive"
+              ? false
+              : gradeData.status,
+        ClientId: getClientIdFromSession(),
+      };
+      await apiRequest("POST", "/api/grades", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
@@ -208,7 +251,23 @@ export default function GradeManagement() {
       id: string;
       gradeData: Partial<InsertGrade>;
     }) => {
-      await apiRequest("PUT", `/api/grades/${id}`, gradeData);
+      // Transform to PascalCase and convert status to boolean
+      const payload: any = {};
+      if (gradeData.code !== undefined) payload.Code = gradeData.code;
+      if (gradeData.description !== undefined)
+        payload.Description = gradeData.description;
+      if (gradeData.status !== undefined) {
+        payload.Status =
+          gradeData.status === "active"
+            ? true
+            : gradeData.status === "inactive"
+              ? false
+              : gradeData.status;
+      }
+      if (gradeData.companyId !== undefined) {
+        payload.ClientId = getClientIdFromSession();
+      }
+      await apiRequest("PUT", `/api/grades/${id}`, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
@@ -272,6 +331,62 @@ export default function GradeManagement() {
     });
   };
 
+  // Tour action handlers
+  useEffect(() => {
+    if (!isTourMode || !currentAction) return;
+
+    if (currentAction === "openGradeForm") {
+      setEditingGrade(null);
+      setIsCreateModalOpen(true);
+      // Fill demo data after modal opens
+      setTimeout(() => {
+        form.setValue("code", "DEMO-G1");
+        form.setValue("description", "Grade 1 - Demo data created during tour");
+        form.setValue("status", "active");
+      }, 200);
+      clearAction();
+    } else if (currentAction === "saveGradeAndClose") {
+      // Close modal and add demo grade
+      setIsCreateModalOpen(false);
+      resetForm();
+      // Add demo grade to display
+      setTourDemoGrade({
+        id: 9999,
+        code: "DEMO-G1",
+        description: "Grade 1 - Demo data created during tour",
+        status: "active",
+        companyId: currentUser?.companyId
+          ? Number(currentUser.companyId)
+          : null,
+        createdOn: new Date().toISOString(),
+        lastUpdatedOn: new Date().toISOString(),
+        createdBy: null,
+        createdByName: "Tour Demo",
+        lastUpdatedBy: null,
+      } as Grade);
+      clearAction();
+    }
+  }, [
+    currentAction,
+    isTourMode,
+    clearAction,
+    form,
+    currentUser?.companyId,
+    resetForm,
+  ]);
+
+  // Clean up tour demo data when tour ends
+  useEffect(() => {
+    const handleTourEnd = () => {
+      setTourDemoGrade(null);
+      setIsCreateModalOpen(false);
+      resetForm();
+    };
+
+    window.addEventListener("tourEnded", handleTourEnd);
+    return () => window.removeEventListener("tourEnded", handleTourEnd);
+  }, [resetForm]);
+
   const handleEdit = (grade: Grade) => {
     setEditingGrade(grade);
     form.reset({
@@ -293,13 +408,19 @@ export default function GradeManagement() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this grade?")) {
-      deleteGradeMutation.mutate(id);
+    setDeleteGradeId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteGradeId) {
+      deleteGradeMutation.mutate(deleteGradeId);
+      setDeleteGradeId(null);
     }
   };
 
-  // Filtering logic
-  const filteredGrades = grades.filter((grade) => {
+  // Filtering logic - include tour demo grade if in tour mode
+  const allGrades = tourDemoGrade ? [tourDemoGrade, ...grades] : grades;
+  const filteredGrades = allGrades.filter((grade) => {
     const matchesSearch =
       grade.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (grade.description &&
@@ -312,7 +433,7 @@ export default function GradeManagement() {
 
   return (
     <RoleGuard allowedRoles={["admin"]}>
-      <div className="container mx-auto py-6">
+      <div className="container mx-auto py-6 grade-list">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold">Grade Management</h1>
@@ -321,7 +442,13 @@ export default function GradeManagement() {
               compensation structure
             </p>
           </div>
-          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+          <Dialog
+            open={isCreateModalOpen}
+            onOpenChange={(open) => {
+              if (isTourMode && !open) return;
+              setIsCreateModalOpen(open);
+            }}
+          >
             <DialogTrigger asChild>
               <Button
                 data-testid="button-create-grade"
@@ -331,7 +458,10 @@ export default function GradeManagement() {
                 Create Grade
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent
+              className={cn("max-w-2xl", isTourMode && "z-[9997]")}
+              data-testid="dialog-create-grade"
+            >
               <DialogHeader>
                 <DialogTitle>
                   {editingGrade ? "Edit Grade" : "Create New Grade"}
@@ -435,8 +565,8 @@ export default function GradeManagement() {
                       updateGradeMutation.isPending
                         ? "Saving..."
                         : editingGrade
-                        ? "Update"
-                        : "Create"}
+                          ? "Update"
+                          : "Create"}
                     </Button>
                   </div>
                 </form>
@@ -487,7 +617,19 @@ export default function GradeManagement() {
             </div>
           ) : (
             filteredGrades.map((grade) => (
-              <Card key={grade.id} data-testid={`card-grade-${grade.id}`}>
+              <Card
+                key={grade.id}
+                data-testid={
+                  grade.id === 9999
+                    ? "tour-demo-grade"
+                    : `card-grade-${grade.id}`
+                }
+                className={
+                  grade.id === 9999
+                    ? "border-2 border-primary bg-primary/5"
+                    : ""
+                }
+              >
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -530,8 +672,9 @@ export default function GradeManagement() {
                         onClick={() => handleDelete(grade.id)}
                         disabled={deleteGradeMutation.isPending}
                         data-testid={`button-delete-${grade.id}`}
+                        title="Mark Inactive"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Ban className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -548,9 +691,10 @@ export default function GradeManagement() {
                         <Clock className="w-4 h-4" />
                         <span>
                           Created:{" "}
-                          {grade.createdAt
-                            ? new Date(grade.createdAt).toLocaleDateString()
+                          {grade.createdOn
+                            ? new Date(grade.createdOn).toLocaleDateString()
                             : "Unknown"}
+                          {grade.createdByName && ` by ${grade.createdByName}`}
                         </span>
                       </div>
                     </div>
@@ -663,6 +807,30 @@ export default function GradeManagement() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!deleteGradeId}
+        onOpenChange={(open) => !open && setDeleteGradeId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Make Grade Inactive</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to make this grade inactive?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Make Inactive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RoleGuard>
   );
 }
