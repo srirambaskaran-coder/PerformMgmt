@@ -68,7 +68,27 @@ export default function DevLogin() {
       }
       // Store user data (normalize to lowercase keys)
       if (result.user) {
-        const normalizedUser = normalizeUser(result.user);
+        // Decode JWT to get role/roles if available
+        let jwtPayload: any = {};
+        if (result.accessToken) {
+          try {
+            const base64Url = result.accessToken.split(".")[1];
+            const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+            jwtPayload = JSON.parse(window.atob(base64));
+          } catch (e) {
+            console.log("[DevLogin] Could not decode JWT");
+          }
+        }
+
+        // Merge JWT payload with user data
+        const mergedUser = {
+          ...result.user,
+          Role: jwtPayload.role || result.user.Role,
+          Roles: jwtPayload.roles || result.user.Roles,
+          ClientId: jwtPayload.clientId || result.user.ClientId,
+        };
+
+        const normalizedUser = normalizeUser(mergedUser);
         setStoredUser(normalizedUser);
       }
       window.location.reload();

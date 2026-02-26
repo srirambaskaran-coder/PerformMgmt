@@ -31,6 +31,7 @@ export const HRSUITE_SESSION_KEYS = {
   activeRoleCode: "activeRoleCode",
   activeRoleId: "activeRoleId",
   isEmployee: "isEmployee",
+  companyId: "CompanyId",
 } as const;
 
 /**
@@ -508,8 +509,8 @@ function extractEssentialLoginResponses(loginResponses: any): any {
 }
 
 /**
- * Decrypt all HRsuite encrypted session values and store them in a single key
- * Only stores essential fields to prevent QuotaExceededError
+ * Decrypt essential HRsuite encrypted session values and store them in a single key
+ * Only decrypts and stores fields needed by PMS to prevent QuotaExceededError
  * @returns true if decryption and storage was successful
  */
 export function decryptAndStoreHRsuiteSession(): boolean {
@@ -525,6 +526,7 @@ export function decryptAndStoreHRsuiteSession(): boolean {
       "currentUser",
       "activeRoleCode",
       "activeRoleId",
+      "companyId",
     ] as const;
 
     Object.entries(HRSUITE_SESSION_KEYS).forEach(([name, key]) => {

@@ -151,9 +151,30 @@ export default function Landing() {
 
         // Store user data (normalize to lowercase keys)
         if (result.user) {
-          const normalizedUser = normalizeUser(result.user);
+          // Decode JWT to get role/roles if available
+          let jwtPayload: any = {};
+          if (result.accessToken) {
+            try {
+              const base64Url = result.accessToken.split(".")[1];
+              const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+              jwtPayload = JSON.parse(window.atob(base64));
+              console.log("[Landing] JWT payload:", jwtPayload);
+            } catch (e) {
+              console.log("[Landing] Could not decode JWT");
+            }
+          }
+
+          // Merge JWT payload with user data (JWT has role/roles/clientId)
+          const mergedUser = {
+            ...result.user,
+            Role: jwtPayload.role || result.user.Role,
+            Roles: jwtPayload.roles || result.user.Roles,
+            ClientId: jwtPayload.clientId || result.user.ClientId,
+          };
+
+          const normalizedUser = normalizeUser(mergedUser);
           setStoredUser(normalizedUser);
-          console.log("[Landing] User stored:", normalizedUser.role);
+          console.log("[Landing] User stored:", normalizedUser);
         }
 
         // Mark login source as PMS (direct login)
@@ -169,11 +190,11 @@ export default function Landing() {
         // Log what's stored for debugging
         console.log(
           "[Landing] Stored accessToken:",
-          localStorage.getItem("pms_access_token"),
+          sessionStorage.getItem("pms_access_token"),
         );
         console.log(
           "[Landing] Stored user:",
-          localStorage.getItem("pms_auth_user"),
+          sessionStorage.getItem("pms_auth_user"),
         );
 
         // Redirect to dashboard with page reload to refresh auth state

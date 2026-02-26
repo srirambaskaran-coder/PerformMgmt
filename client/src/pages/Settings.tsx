@@ -227,10 +227,6 @@ export default function Settings() {
 
   // Handle starting the tour
   const handleStartTour = () => {
-    toast({
-      title: "Starting Application Tour",
-      description: "Let's walk through the key features of the application.",
-    });
     startTour();
   };
 

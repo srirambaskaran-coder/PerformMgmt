@@ -85,6 +85,7 @@ interface Evaluation {
   employeeId: string;
   managerId: string;
   reviewCycleId: string;
+  initiatedAppraisalId?: string;
   selfEvaluationData: any;
   selfEvaluationSubmittedAt: string | null;
   managerEvaluationData: any;
@@ -102,6 +103,12 @@ interface Evaluation {
   directReports: Employee[];
   createdAt: string;
   updatedAt: string;
+  calibratedRating?: number | null;
+  calibrationRemarks?: string | null;
+  calibratedBy?: string | null;
+  calibratedAt?: string | null;
+  createdOn?: string;
+  lastUpdatedOn?: string;
 }
 
 interface PeerEmployee {
@@ -592,7 +599,7 @@ export default function ManagerSubmissions() {
       );
       return response.json();
     },
-    select: (data: any[]) => {
+    select: (data: any[]): Evaluation[] => {
       return data.map((evaluation: any) => ({
         id: evaluation.Id,
         employeeId: evaluation.EmployeeId,
@@ -624,30 +631,62 @@ export default function ManagerSubmissions() {
         status: evaluation.Status,
         createdOn: evaluation.CreatedOn,
         lastUpdatedOn: evaluation.LastUpdatedOn,
-        employee: evaluation.Employee
-          ? {
-              id: evaluation.Employee.Id,
-              firstName: evaluation.Employee.FirstName,
-              lastName: evaluation.Employee.LastName,
-              email: evaluation.Employee.Email,
-              department: evaluation.Employee.Department,
-              designation: evaluation.Employee.Designation,
-            }
-          : null,
+        appraisalType: evaluation.AppraisalType || null,
+        directReports: evaluation.directReports || [],
+        createdAt: evaluation.CreatedOn,
+        updatedAt: evaluation.LastUpdatedOn,
+        employee: {
+          id: evaluation.Employee?.Id || "",
+          firstName:
+            evaluation.Employee?.FirstName ||
+            evaluation.Employee?.Name?.split(" ")[0] ||
+            "",
+          lastName:
+            evaluation.Employee?.LastName ||
+            evaluation.Employee?.Name?.split(" ").slice(1).join(" ") ||
+            "",
+          email:
+            evaluation.Employee?.Email || evaluation.Employee?.EmailId || "",
+          department: evaluation.Employee?.Department || "",
+          designation: evaluation.Employee?.Designation || "",
+        },
         questionnaireTemplate: (
           evaluation.questionnaireTemplate ||
+          evaluation.QuestionnaireTemplate ||
           evaluation.questionnaires ||
+          evaluation.Questionnaires ||
           []
-        ).map((q: any) => ({
-          id: q.Id,
-          name: q.Name,
-          description: q.Description,
-          targetRole: q.TargetRole,
-          questions:
+        ).map((q: any) => {
+          const parsedQuestions =
             typeof q.Questions === "string"
               ? JSON.parse(q.Questions)
-              : q.Questions,
-        })),
+              : typeof q.questions === "string"
+                ? JSON.parse(q.questions)
+                : q.Questions || q.questions;
+
+          // Transform questions to lowercase keys
+          const transformedQuestions = (parsedQuestions || []).map(
+            (question: any) => ({
+              id: question.Id || question.id,
+              text: question.Text || question.text,
+              type: (question.Type || question.type || "text").toLowerCase(),
+              required:
+                question.Required !== undefined
+                  ? question.Required
+                  : question.required,
+              category: question.Category || question.category,
+              weight: question.Weight || question.weight,
+            }),
+          );
+
+          return {
+            id: q.Id,
+            name: q.Name,
+            description: q.Description,
+            targetRole: q.TargetRole,
+            questions: transformedQuestions,
+          };
+        }),
       }));
     },
   });
@@ -982,6 +1021,7 @@ export default function ManagerSubmissions() {
       questionnaireId: string;
       questionnaireName: string;
       questionIndex: number;
+      questionId: string;
     }[] = [];
 
     questionnaireTemplates.forEach((template: any) => {
@@ -989,12 +1029,24 @@ export default function ManagerSubmissions() {
         const questions = Array.isArray(template.questions)
           ? template.questions
           : JSON.parse(template.questions);
-        questions.forEach((question: Question, index: number) => {
+        questions.forEach((question: any, index: number) => {
           allQuestions.push({
-            question,
+            question: {
+              id: question.id || question.Id,
+              text: question.text || question.Text,
+              type: (question.type || question.Type || "text").toLowerCase() as
+                | "text"
+                | "textarea"
+                | "rating",
+              required:
+                question.required !== undefined
+                  ? question.required
+                  : question.Required,
+            },
             questionnaireId: template.id,
             questionnaireName: template.name,
             questionIndex: index,
+            questionId: question.id || question.Id,
           });
         });
       }
@@ -1002,123 +1054,150 @@ export default function ManagerSubmissions() {
 
     return (
       <div className="space-y-6">
-        {allQuestions.map(
-          ({ question, questionnaireId, questionnaireName, questionIndex }) => {
-            const responseKey = `${questionnaireId}_${questionIndex}`;
-            const employeeResponse: EmployeeResponse = responses[responseKey];
+        {allQuestions.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <p>No questions found in the questionnaire template.</p>
+          </div>
+        ) : (
+          allQuestions.map(
+            ({
+              question,
+              questionnaireId,
+              questionnaireName,
+              questionIndex,
+              questionId,
+            }) => {
+              // Try multiple response key formats for backwards compatibility
+              const responseKey = `${questionnaireId}_${questionId}`;
+              const altResponseKey1 = `${questionnaireId}_${questionIndex}`;
+              const altResponseKey2 = questionId;
+              const employeeResponse: EmployeeResponse =
+                responses[responseKey] ||
+                responses[altResponseKey1] ||
+                responses[altResponseKey2];
 
-            if (!employeeResponse) return null;
-
-            return (
-              <div
-                key={responseKey}
-                className="border rounded-lg p-6 space-y-4"
-              >
-                {/* Question */}
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-lg text-gray-900">
-                    {question.text || (question as any).Text}
-                  </h4>
-                  <p className="text-sm text-gray-500">
-                    From: {questionnaireName}
-                  </p>
-                </div>
-
-                {/* Employee Response */}
-                <div className="bg-blue-50 rounded-lg p-4 space-y-3">
-                  <h5 className="font-medium text-blue-900">
-                    Employee's Response
-                  </h5>
+              return (
+                <div
+                  key={responseKey}
+                  className="border rounded-lg p-6 space-y-4"
+                >
+                  {/* Question */}
                   <div className="space-y-2">
-                    <div>
-                      <p className="text-sm font-medium text-blue-800">
-                        Answer:
-                      </p>
-                      <p className="text-gray-700 bg-white p-3 rounded border">
-                        {employeeResponse.response}
+                    <h4 className="font-semibold text-lg text-gray-900">
+                      {question.text}
+                    </h4>
+                    <p className="text-sm text-gray-500">
+                      From: {questionnaireName}
+                    </p>
+                  </div>
+
+                  {/* Employee Response */}
+                  {employeeResponse ? (
+                    <div className="bg-blue-50 rounded-lg p-4 space-y-3">
+                      <h5 className="font-medium text-blue-900">
+                        Employee's Response
+                      </h5>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-sm font-medium text-blue-800">
+                            Answer:
+                          </p>
+                          <p className="text-gray-700 bg-white p-3 rounded border">
+                            {employeeResponse.response ||
+                              "No response provided"}
+                          </p>
+                        </div>
+
+                        {question.type === "rating" &&
+                          employeeResponse.rating && (
+                            <div>
+                              <p className="text-sm font-medium text-blue-800">
+                                Rating:
+                              </p>
+                              <div className="flex items-center space-x-2">
+                                <div className="flex items-center space-x-1">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <Star
+                                      key={star}
+                                      className={cn(
+                                        "h-4 w-4",
+                                        star <= employeeResponse.rating!
+                                          ? "fill-yellow-400 text-yellow-400"
+                                          : "text-gray-300",
+                                      )}
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-sm font-medium">
+                                  {employeeResponse.rating}/5
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                        {employeeResponse.remarks && (
+                          <div>
+                            <p className="text-sm font-medium text-blue-800">
+                              Employee's Remarks:
+                            </p>
+                            <p className="text-gray-700 bg-white p-3 rounded border">
+                              {employeeResponse.remarks}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-gray-500 italic">
+                        No response submitted yet
                       </p>
                     </div>
+                  )}
 
-                    {question.type === "rating" && employeeResponse.rating && (
-                      <div>
-                        <p className="text-sm font-medium text-blue-800">
-                          Rating:
-                        </p>
-                        <div className="flex items-center space-x-2">
-                          <div className="flex items-center space-x-1">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={cn(
-                                  "h-4 w-4",
-                                  star <= employeeResponse.rating!
-                                    ? "fill-yellow-400 text-yellow-400"
-                                    : "text-gray-300",
-                                )}
-                              />
-                            ))}
-                          </div>
-                          <span className="text-sm font-medium">
-                            {employeeResponse.rating}/5
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {employeeResponse.remarks && (
-                      <div>
-                        <p className="text-sm font-medium text-blue-800">
-                          Employee's Remarks:
-                        </p>
-                        <p className="text-gray-700 bg-white p-3 rounded border">
-                          {employeeResponse.remarks}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Manager Remarks Input */}
-                <div className="bg-green-50 rounded-lg p-4 space-y-3">
-                  <h5 className="font-medium text-green-900">
-                    Your Manager Remarks
-                  </h5>
-                  <div>
-                    <Label
-                      htmlFor={`manager-remarks-${responseKey}`}
-                      className="text-sm font-medium text-green-800"
-                    >
-                      Add your feedback and comments for this response:
-                    </Label>
-                    <Textarea
-                      id={`manager-remarks-${responseKey}`}
-                      placeholder="Enter your manager remarks for this question..."
-                      rows={3}
-                      className="mt-2 border-green-200 focus:border-green-400"
-                      data-testid={`manager-remarks-${questionIndex}`}
-                      value={
-                        reviewData.managerEvaluationData.questionRemarks?.[
-                          responseKey
-                        ] || ""
-                      }
-                      onChange={(e) =>
-                        setReviewData((prev) => ({
-                          ...prev,
-                          managerEvaluationData: {
-                            ...prev.managerEvaluationData,
-                            questionRemarks: {
-                              ...prev.managerEvaluationData.questionRemarks,
-                              [responseKey]: e.target.value,
+                  {/* Manager Remarks Input */}
+                  <div className="bg-green-50 rounded-lg p-4 space-y-3">
+                    <h5 className="font-medium text-green-900">
+                      Your Manager Remarks
+                    </h5>
+                    <div>
+                      <Label
+                        htmlFor={`manager-remarks-${responseKey}`}
+                        className="text-sm font-medium text-green-800"
+                      >
+                        Add your feedback and comments for this response:
+                      </Label>
+                      <Textarea
+                        id={`manager-remarks-${responseKey}`}
+                        placeholder="Enter your manager remarks for this question..."
+                        rows={3}
+                        className="mt-2 border-green-200 focus:border-green-400"
+                        data-testid={`manager-remarks-${questionIndex}`}
+                        value={
+                          reviewData.managerEvaluationData?.questionRemarks?.[
+                            responseKey
+                          ] || ""
+                        }
+                        onChange={(e) =>
+                          setReviewData((prev) => ({
+                            ...prev,
+                            managerEvaluationData: {
+                              ...(prev.managerEvaluationData || {}),
+                              questionRemarks: {
+                                ...(prev.managerEvaluationData
+                                  ?.questionRemarks || {}),
+                                [responseKey]: e.target.value,
+                              },
                             },
-                          },
-                        }))
-                      }
-                    />
+                          }))
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          },
+              );
+            },
+          )
         )}
 
         {/* Final Rating */}
@@ -1399,11 +1478,16 @@ export default function ManagerSubmissions() {
                             <Button
                               onClick={() => {
                                 setSelectedEvaluation(evaluation);
+                                // Load existing manager evaluation data if available, otherwise start fresh
+                                const existingData =
+                                  evaluation.managerEvaluationData || {};
                                 setReviewData({
                                   managerEvaluationData: {
-                                    questionRemarks: {},
+                                    ...existingData,
+                                    questionRemarks:
+                                      existingData.questionRemarks || {},
                                   },
-                                  finalRating: 5,
+                                  finalRating: evaluation.overallRating || 5,
                                 });
                                 setIsReviewDialogOpen(true);
                               }}
@@ -1564,77 +1648,46 @@ export default function ManagerSubmissions() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="meeting-date">Meeting Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left"
-                        data-testid="meeting-date-picker"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {meetingData.meetingDate
-                          ? format(meetingData.meetingDate, "PPP")
-                          : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={meetingData.meetingDate}
-                        onSelect={(date) =>
-                          date &&
-                          setMeetingData((prev) => ({
-                            ...prev,
-                            meetingDate: date,
-                          }))
-                        }
-                        initialFocus
-                        disabled={(date) => date < new Date()}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <Input
+                    type="date"
+                    id="meeting-date"
+                    min={new Date().toISOString().split("T")[0]}
+                    value={
+                      meetingData.meetingDate
+                        ? format(meetingData.meetingDate, "yyyy-MM-dd")
+                        : ""
+                    }
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const [year, month, day] = e.target.value
+                          .split("-")
+                          .map(Number);
+                        const newDate = new Date(year, month - 1, day);
+                        setMeetingData((prev) => ({
+                          ...prev,
+                          meetingDate: newDate,
+                        }));
+                      }
+                    }}
+                    className="w-full"
+                    data-testid="meeting-date-picker"
+                  />
                 </div>
                 <div>
                   <Label htmlFor="meeting-time">Meeting Time</Label>
-                  <Select
+                  <Input
+                    type="time"
+                    id="meeting-time"
                     value={meetingData.meetingTime}
-                    onValueChange={(value) =>
+                    onChange={(e) =>
                       setMeetingData((prev) => ({
                         ...prev,
-                        meetingTime: value,
+                        meetingTime: e.target.value,
                       }))
                     }
-                  >
-                    <SelectTrigger
-                      className="w-full"
-                      data-testid="meeting-time-select"
-                    >
-                      <SelectValue placeholder="Select time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="08:00">8:00 AM</SelectItem>
-                      <SelectItem value="08:30">8:30 AM</SelectItem>
-                      <SelectItem value="09:00">9:00 AM</SelectItem>
-                      <SelectItem value="09:30">9:30 AM</SelectItem>
-                      <SelectItem value="10:00">10:00 AM</SelectItem>
-                      <SelectItem value="10:30">10:30 AM</SelectItem>
-                      <SelectItem value="11:00">11:00 AM</SelectItem>
-                      <SelectItem value="11:30">11:30 AM</SelectItem>
-                      <SelectItem value="12:00">12:00 PM</SelectItem>
-                      <SelectItem value="12:30">12:30 PM</SelectItem>
-                      <SelectItem value="13:00">1:00 PM</SelectItem>
-                      <SelectItem value="13:30">1:30 PM</SelectItem>
-                      <SelectItem value="14:00">2:00 PM</SelectItem>
-                      <SelectItem value="14:30">2:30 PM</SelectItem>
-                      <SelectItem value="15:00">3:00 PM</SelectItem>
-                      <SelectItem value="15:30">3:30 PM</SelectItem>
-                      <SelectItem value="16:00">4:00 PM</SelectItem>
-                      <SelectItem value="16:30">4:30 PM</SelectItem>
-                      <SelectItem value="17:00">5:00 PM</SelectItem>
-                      <SelectItem value="17:30">5:30 PM</SelectItem>
-                      <SelectItem value="18:00">6:00 PM</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    className="w-full"
+                    data-testid="meeting-time-select"
+                  />
                 </div>
               </div>
               <div>

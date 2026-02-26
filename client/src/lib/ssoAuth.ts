@@ -8,7 +8,7 @@
  * 3. Calls the PMS auth/login API with user details
  */
 
-import { API_BASE_URL } from "@/config/api.config";
+import { API_BASE_URL, SSO_LOGOUT_URL } from "@/config/api.config";
 import { setStoredUser, setTokens, normalizeUser } from "@/hooks/useAuth";
 import {
   hasHRsuiteSession,
@@ -62,7 +62,7 @@ export function clearSSOAttempted(): void {
  */
 export function getLoginSource(): LoginSource {
   try {
-    const source = localStorage.getItem(SSO_SOURCE_KEY);
+    const source = sessionStorage.getItem(SSO_SOURCE_KEY);
     if (source === "pms" || source === "hrsuite") {
       return source;
     }
@@ -77,10 +77,17 @@ export function getLoginSource(): LoginSource {
  */
 export function setLoginSource(source: LoginSource): void {
   try {
-    localStorage.setItem(SSO_SOURCE_KEY, source);
+    sessionStorage.setItem(SSO_SOURCE_KEY, source);
   } catch (error) {
     console.error("[SSO] Failed to set login source:", error);
   }
+}
+
+/**
+ * Get the SSO logout redirect URL based on current environment
+ */
+export function getSSOLogoutUrl(): string {
+  return SSO_LOGOUT_URL;
 }
 
 /**
@@ -98,6 +105,17 @@ const HRSUITE_TO_PMS_ROLE_MAP: Record<string, string> = {
   SuperAdmin: "superadmin",
   "Super Admin": "superadmin",
 };
+
+/**
+ * Valid PMS roles - only these roles will be used from SSO session
+ */
+const VALID_PMS_ROLES = [
+  "superadmin",
+  "admin",
+  "hrmanager",
+  "manager",
+  "employee",
+];
 
 /**
  * Normalize role for API payload - removes underscores
@@ -130,7 +148,9 @@ function mapHRsuiteRoleToPMS(hrsuiteRole: string): string {
 }
 
 function mapHRsuiteRolesToPMS(hrsuiteRoles: string[]): string[] {
-  return hrsuiteRoles.map(mapHRsuiteRoleToPMS);
+  return hrsuiteRoles
+    .map(mapHRsuiteRoleToPMS)
+    .filter((role) => VALID_PMS_ROLES.includes(role));
 }
 
 /**
@@ -146,7 +166,15 @@ function extractAuthPayload(session: Record<string, any>) {
   const hrsuiteRole =
     session.activeRoleCode || loginResponses.UIRoles?.[0]?.Role?.Code;
   // Map HRsuite role to PMS role format
-  const role = mapHRsuiteRoleToPMS(hrsuiteRole || "");
+  let role = mapHRsuiteRoleToPMS(hrsuiteRole || "");
+
+  // Validate that the active role is a valid PMS role
+  if (!VALID_PMS_ROLES.includes(role)) {
+    console.log(
+      `[SSO] Active role "${role}" is not a valid PMS role, defaulting to employee`,
+    );
+    role = "employee";
+  }
 
   // Full UserCompanyAppliationRoles array for API payload
   const userCompanyRoles = loginResponses.UserCompanyAppliationRoles || [];
@@ -156,11 +184,14 @@ function extractAuthPayload(session: Record<string, any>) {
   const hrsuiteRoleNames: string[] = userCompanyRoles
     .map((item: any) => item?.CompanyApplicationRole?.Role?.Name)
     .filter((name: string | undefined) => name);
-  // Map to PMS role format
+  // Map to PMS role format and filter to valid roles only
   const roleNames = mapHRsuiteRolesToPMS(hrsuiteRoleNames);
 
   const clientList = loginResponses.ClientList || [];
   const clientId = clientList[0]?.Id || null;
+
+  // Get companyId from session (stored with key CompanyId)
+  const companyId = session.companyId || null;
 
   return {
     userId: session.currentUser,
@@ -169,6 +200,7 @@ function extractAuthPayload(session: Record<string, any>) {
     roles: userCompanyRoles, // Full objects for API
     roleNames: roleNames, // Just names for application
     clientId: clientId,
+    companyId: companyId, // camelCase for backend
   };
 }
 
@@ -215,9 +247,7 @@ export async function attemptSSOLogin(): Promise<boolean> {
     console.log("[SSO] No userId found in session");
     return false;
   }
-
-  await new Promise((resolve) => setTimeout(resolve, 10000));
-
+  await new Promise((resolve) => setTimeout(resolve, 10000)); //comment it out after testing
   try {
     // Call PMS auth/login API
     console.log("[SSO] Calling PMS auth API...");
@@ -235,6 +265,7 @@ export async function attemptSSOLogin(): Promise<boolean> {
         role: payload.role,
         roles: payload.roleNames, // Array of strings: ["employee", "manager", etc.]
         clientId: payload.clientId,
+        companyId: payload.companyId, // camelCase for backend
       }),
     });
 
@@ -242,10 +273,8 @@ export async function attemptSSOLogin(): Promise<boolean> {
 
     if (response.ok) {
       const result = await response.json();
-      await new Promise((resolve) => setTimeout(resolve, 10000));
+      await new Promise((resolve) => setTimeout(resolve, 10000)); //comment it out after testing
       console.log("[SSO] Login response:", result);
-
-      // DEBUG: 10 second delay to inspect response
 
       // Store JWT tokens if provided
       if (result.accessToken) {
@@ -293,20 +322,60 @@ export async function attemptSSOLogin(): Promise<boolean> {
 
 /**
  * Check if user should be auto-logged in via SSO
- * Call this on app initialization
+ * Call this on app initialization.
+ * If an HRsuite session exists with a DIFFERENT user than the currently stored
+ * PMS user, clear the old session and re-login with the new user.
+ * This ensures each tab works independently with the correct user.
  */
 export async function checkAndPerformSSOLogin(): Promise<boolean> {
   console.log("[SSO] ========== Starting SSO Check ==========");
 
-  // Don't attempt SSO if already logged in
-  const existingUser = localStorage.getItem("pms_auth_user");
-  if (existingUser) {
-    console.log("[SSO] User already logged in, skipping SSO");
-    return false;
-  }
-  console.log("[SSO] No existing user, proceeding with SSO check");
+  // Check if HRsuite session exists in this tab's sessionStorage
+  const hasSession = hasHRsuiteSession();
+  if (hasSession) {
+    // Decrypt to read the current HRsuite user
+    const decrypted = decryptAndStoreHRsuiteSession();
+    if (decrypted) {
+      const session = getStoredHRsuiteSession();
+      const hrsuiteUserId = session?.currentUser;
 
-  // Don't attempt SSO if already tried this session
+      // Check if PMS already has a logged-in user in this tab
+      const existingUserJson = sessionStorage.getItem("pms_auth_user");
+      if (existingUserJson && hrsuiteUserId) {
+        try {
+          const existingUser = JSON.parse(existingUserJson);
+          // Compare: if the HRsuite session user differs from stored PMS user, re-login
+          const existingId = String(existingUser.id || existingUser.Id || "");
+          const hrId = String(hrsuiteUserId);
+          if (existingId === hrId) {
+            console.log("[SSO] Same user already logged in, skipping SSO");
+            return false;
+          }
+          // Different user — clear old auth and proceed with SSO
+          console.log(
+            `[SSO] Different HRsuite user detected (stored: ${existingId}, hrsuite: ${hrId}). Re-authenticating...`,
+          );
+          // Clear old PMS auth from this tab
+          const { clearAuthData } = await import("@/hooks/useAuth");
+          clearAuthData();
+          clearSSOAttempted();
+        } catch {
+          // parse error — proceed with SSO
+        }
+      }
+    }
+  } else {
+    // No HRsuite session — if PMS user already stored in this tab, nothing to do
+    const existingUser = sessionStorage.getItem("pms_auth_user");
+    if (existingUser) {
+      console.log(
+        "[SSO] User already logged in (no HRsuite session), skipping SSO",
+      );
+      return false;
+    }
+  }
+
+  // Don't attempt SSO if already tried this session (prevents infinite loops)
   if (hasSSOBeenAttempted()) {
     console.log("[SSO] SSO already attempted this session, skipping");
     return false;

@@ -71,8 +71,10 @@ function Router() {
             path="/publish-questionnaires"
             component={PublishQuestionnaires}
           />
+          {/* Levels and Grades routes disabled
           <Route path="/levels" component={LevelManagement} />
           <Route path="/grades" component={GradeManagement} />
+          */}
           <Route
             path="/appraisal-cycles"
             component={AppraisalCycleManagement}

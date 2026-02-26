@@ -1,19 +1,31 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RoleGuard } from "@/components/RoleGuard";
-import { 
-  Calendar, 
-  Clock, 
-  User, 
+import {
+  Calendar,
+  Clock,
+  User,
   CheckCircle,
   CalendarCheck,
   Building2,
   Search,
-  X
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -22,7 +34,7 @@ interface Manager {
   firstName: string;
   lastName: string;
   email: string;
-  department: string;
+  departmentName: string;
 }
 
 interface Employee {
@@ -30,7 +42,7 @@ interface Employee {
   firstName: string;
   lastName: string;
   email: string;
-  department: string;
+  departmentName: string;
   designation: string;
 }
 
@@ -61,8 +73,10 @@ export default function HRMeetingsView() {
   const departments = useMemo(() => {
     const depts = new Set<string>();
     meetings.forEach((meeting) => {
-      if (meeting.employee?.department) depts.add(meeting.employee.department);
-      if (meeting.manager?.department) depts.add(meeting.manager.department);
+      if (meeting.employee?.departmentName)
+        depts.add(meeting.employee.departmentName);
+      if (meeting.manager?.departmentName)
+        depts.add(meeting.manager.departmentName);
     });
     return Array.from(depts).sort();
   }, [meetings]);
@@ -74,12 +88,16 @@ export default function HRMeetingsView() {
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const employeeName = meeting.employee
-          ? `${meeting.employee.firstName} ${meeting.employee.lastName}`.toLowerCase()
+          ? `${meeting.employee.firstName || ""}${meeting.employee.lastName ? " " + meeting.employee.lastName : ""}`
+              .trim()
+              .toLowerCase()
           : "";
         const managerName = meeting.manager
-          ? `${meeting.manager.firstName} ${meeting.manager.lastName}`.toLowerCase()
+          ? `${meeting.manager.firstName || ""}${meeting.manager.lastName ? " " + meeting.manager.lastName : ""}`
+              .trim()
+              .toLowerCase()
           : "";
-        
+
         if (!employeeName.includes(query) && !managerName.includes(query)) {
           return false;
         }
@@ -87,9 +105,12 @@ export default function HRMeetingsView() {
 
       // Department filter
       if (departmentFilter !== "all") {
-        const employeeDept = meeting.employee?.department || "";
-        const managerDept = meeting.manager?.department || "";
-        if (employeeDept !== departmentFilter && managerDept !== departmentFilter) {
+        const employeeDept = meeting.employee?.departmentName || "";
+        const managerDept = meeting.manager?.departmentName || "";
+        if (
+          employeeDept !== departmentFilter &&
+          managerDept !== departmentFilter
+        ) {
           return false;
         }
       }
@@ -99,22 +120,27 @@ export default function HRMeetingsView() {
         if (statusFilter === "completed" && !meeting.meetingCompletedAt) {
           return false;
         }
-        if (statusFilter === "scheduled" && (!meeting.meetingScheduledAt || meeting.meetingCompletedAt)) {
+        if (
+          statusFilter === "scheduled" &&
+          (!meeting.meetingScheduledAt || meeting.meetingCompletedAt)
+        ) {
           return false;
         }
       }
 
       // Date range filter
       if (dateFrom || dateTo) {
-        const meetingDate = meeting.meetingScheduledAt ? new Date(meeting.meetingScheduledAt) : null;
+        const meetingDate = meeting.meetingScheduledAt
+          ? new Date(meeting.meetingScheduledAt)
+          : null;
         if (!meetingDate) return false;
-        
+
         if (dateFrom) {
           const fromDate = new Date(dateFrom);
           fromDate.setHours(0, 0, 0, 0);
           if (meetingDate < fromDate) return false;
         }
-        
+
         if (dateTo) {
           const toDate = new Date(dateTo);
           toDate.setHours(23, 59, 59, 999);
@@ -129,9 +155,11 @@ export default function HRMeetingsView() {
   // Statistics based on filtered data
   const totalMeetings = filteredMeetings.length;
   const scheduledMeetings = filteredMeetings.filter(
-    (m) => m.meetingScheduledAt && !m.meetingCompletedAt
+    (m) => m.meetingScheduledAt && !m.meetingCompletedAt,
   ).length;
-  const completedMeetings = filteredMeetings.filter((m) => m.meetingCompletedAt).length;
+  const completedMeetings = filteredMeetings.filter(
+    (m) => m.meetingCompletedAt,
+  ).length;
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -141,7 +169,12 @@ export default function HRMeetingsView() {
     setDateTo("");
   };
 
-  const hasActiveFilters = searchQuery || departmentFilter !== "all" || statusFilter !== "all" || dateFrom || dateTo;
+  const hasActiveFilters =
+    searchQuery ||
+    departmentFilter !== "all" ||
+    statusFilter !== "all" ||
+    dateFrom ||
+    dateTo;
 
   const getMeetingStatusBadge = (meeting: MeetingData) => {
     if (meeting.meetingCompletedAt) {
@@ -154,7 +187,10 @@ export default function HRMeetingsView() {
     }
     if (meeting.meetingScheduledAt) {
       return (
-        <Badge variant="secondary" data-testid={`badge-scheduled-${meeting.id}`}>
+        <Badge
+          variant="secondary"
+          data-testid={`badge-scheduled-${meeting.id}`}
+        >
           <CalendarCheck className="h-3 w-3 mr-1" />
           Scheduled
         </Badge>
@@ -168,9 +204,12 @@ export default function HRMeetingsView() {
       <div className="space-y-6" data-testid="hr-meetings-view">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold">Scheduled Meetings Overview</h1>
+            <h1 className="text-2xl font-semibold">
+              Scheduled Meetings Overview
+            </h1>
             <p className="text-muted-foreground">
-              View all scheduled performance review meetings across the organization
+              View all scheduled performance review meetings across the
+              organization
             </p>
           </div>
         </div>
@@ -184,8 +223,13 @@ export default function HRMeetingsView() {
                   <Calendar className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Meetings</p>
-                  <p className="text-2xl font-bold" data-testid="total-meetings">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Total Meetings
+                  </p>
+                  <p
+                    className="text-2xl font-bold"
+                    data-testid="total-meetings"
+                  >
                     {totalMeetings}
                   </p>
                 </div>
@@ -200,8 +244,13 @@ export default function HRMeetingsView() {
                   <Clock className="h-5 w-5 text-yellow-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Scheduled</p>
-                  <p className="text-2xl font-bold" data-testid="scheduled-meetings">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Scheduled
+                  </p>
+                  <p
+                    className="text-2xl font-bold"
+                    data-testid="scheduled-meetings"
+                  >
                     {scheduledMeetings}
                   </p>
                 </div>
@@ -216,8 +265,13 @@ export default function HRMeetingsView() {
                   <CheckCircle className="h-5 w-5 text-accent" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Completed</p>
-                  <p className="text-2xl font-bold" data-testid="completed-meetings">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Completed
+                  </p>
+                  <p
+                    className="text-2xl font-bold"
+                    data-testid="completed-meetings"
+                  >
                     {completedMeetings}
                   </p>
                 </div>
@@ -238,13 +292,25 @@ export default function HRMeetingsView() {
                       placeholder="Search by employee or manager name..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 pr-8"
                       data-testid="input-search-meetings"
                     />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="w-full md:w-48">
-                  <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                  <Select
+                    value={departmentFilter}
+                    onValueChange={setDepartmentFilter}
+                  >
                     <SelectTrigger data-testid="select-department-filter">
                       <SelectValue placeholder="All Departments" />
                     </SelectTrigger>
@@ -271,11 +337,13 @@ export default function HRMeetingsView() {
                   </Select>
                 </div>
               </div>
-              
+
               <div className="flex flex-col md:flex-row gap-4 items-end">
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">From Date</label>
+                    <label className="text-sm font-medium mb-2 block">
+                      From Date
+                    </label>
                     <Input
                       type="date"
                       value={dateFrom}
@@ -284,7 +352,9 @@ export default function HRMeetingsView() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-2 block">To Date</label>
+                    <label className="text-sm font-medium mb-2 block">
+                      To Date
+                    </label>
                     <Input
                       type="date"
                       value={dateTo}
@@ -313,14 +383,18 @@ export default function HRMeetingsView() {
           <CardHeader>
             <CardTitle>All Scheduled Meetings</CardTitle>
             <CardDescription>
-              Performance review meetings scheduled between employees and managers
+              Performance review meetings scheduled between employees and
+              managers
             </CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="space-y-4">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex items-center space-x-4 animate-pulse">
+                  <div
+                    key={i}
+                    className="flex items-center space-x-4 animate-pulse"
+                  >
                     <div className="w-10 h-10 bg-muted rounded-full"></div>
                     <div className="flex-1">
                       <div className="h-4 bg-muted rounded w-1/4 mb-2"></div>
@@ -333,10 +407,12 @@ export default function HRMeetingsView() {
               <div className="text-center py-8">
                 <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground text-lg mb-2">
-                  {meetings.length === 0 ? "No meetings scheduled yet" : "No meetings match your filters"}
+                  {meetings.length === 0
+                    ? "No meetings scheduled yet"
+                    : "No meetings match your filters"}
                 </p>
                 <p className="text-muted-foreground text-sm">
-                  {meetings.length === 0 
+                  {meetings.length === 0
                     ? "Meetings will appear here once employees and managers schedule them"
                     : "Try adjusting your filters to see more results"}
                 </p>
@@ -355,13 +431,16 @@ export default function HRMeetingsView() {
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <p className="font-medium" data-testid={`meeting-participants-${meeting.id}`}>
+                          <p
+                            className="font-medium"
+                            data-testid={`meeting-participants-${meeting.id}`}
+                          >
                             {meeting.employee
-                              ? `${meeting.employee.firstName} ${meeting.employee.lastName}`
+                              ? `${meeting.employee.firstName || ""}${meeting.employee.lastName ? " " + meeting.employee.lastName : ""}`.trim()
                               : "Unknown Employee"}{" "}
                             &amp;{" "}
                             {meeting.manager
-                              ? `${meeting.manager.firstName} ${meeting.manager.lastName}`
+                              ? `${meeting.manager.firstName || ""}${meeting.manager.lastName ? " " + meeting.manager.lastName : ""}`.trim()
                               : "Unknown Manager"}
                           </p>
                           {getMeetingStatusBadge(meeting)}
@@ -372,7 +451,8 @@ export default function HRMeetingsView() {
                             <div className="flex items-center gap-2">
                               <User className="h-4 w-4" />
                               <span data-testid={`employee-info-${meeting.id}`}>
-                                {meeting.employee.designation} - {meeting.employee.department}
+                                {meeting.employee.designation} -{" "}
+                                {meeting.employee.departmentName}
                               </span>
                             </div>
                           )}
@@ -388,15 +468,24 @@ export default function HRMeetingsView() {
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4" />
                               <span data-testid={`meeting-time-${meeting.id}`}>
-                                {format(new Date(meeting.meetingScheduledAt), "PPP 'at' p")}
+                                {format(
+                                  new Date(meeting.meetingScheduledAt),
+                                  "PPP 'at' p",
+                                )}
                               </span>
                             </div>
                           )}
                           {meeting.meetingCompletedAt && (
                             <div className="flex items-center gap-2">
                               <CheckCircle className="h-4 w-4" />
-                              <span data-testid={`meeting-completed-time-${meeting.id}`}>
-                                Completed on {format(new Date(meeting.meetingCompletedAt), "PPP")}
+                              <span
+                                data-testid={`meeting-completed-time-${meeting.id}`}
+                              >
+                                Completed on{" "}
+                                {format(
+                                  new Date(meeting.meetingCompletedAt),
+                                  "PPP",
+                                )}
                               </span>
                             </div>
                           )}
@@ -404,8 +493,13 @@ export default function HRMeetingsView() {
 
                         {meeting.meetingCompletedAt && meeting.meetingNotes && (
                           <div className="mt-3 p-3 bg-muted/30 rounded-lg">
-                            <p className="text-sm font-medium mb-1">Meeting Notes:</p>
-                            <p className="text-sm text-muted-foreground" data-testid={`meeting-notes-${meeting.id}`}>
+                            <p className="text-sm font-medium mb-1">
+                              Meeting Notes:
+                            </p>
+                            <p
+                              className="text-sm text-muted-foreground"
+                              data-testid={`meeting-notes-${meeting.id}`}
+                            >
                               {meeting.meetingNotes}
                             </p>
                           </div>

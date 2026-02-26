@@ -307,7 +307,7 @@ export default function AppraisalCycleManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/appraisal-cycles"] });
       toast({
         title: "Success",
-        description: "Appraisal cycle deleted successfully",
+        description: "Appraisal cycle marked as inactive",
       });
     },
     onError: (error) => {
@@ -530,7 +530,17 @@ export default function AppraisalCycleManagement() {
               </DialogHeader>
               <Form {...form}>
                 <form
-                  onSubmit={form.handleSubmit(onSubmit)}
+                  onSubmit={form.handleSubmit(onSubmit, (errors) => {
+                    console.error("Form validation errors:", errors);
+                    const firstError = Object.values(errors)[0];
+                    if (firstError?.message) {
+                      toast({
+                        title: "Validation Error",
+                        description: String(firstError.message),
+                        variant: "destructive",
+                      });
+                    }
+                  })}
                   className="space-y-6"
                 >
                   <div className="grid grid-cols-2 gap-4">
@@ -539,7 +549,7 @@ export default function AppraisalCycleManagement() {
                       name="code"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Cycle Code</FormLabel>
+                          <FormLabel>Cycle Code *</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -583,7 +593,7 @@ export default function AppraisalCycleManagement() {
                       name="fromDate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>From Date</FormLabel>
+                          <FormLabel>From Date *</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -608,7 +618,7 @@ export default function AppraisalCycleManagement() {
                       name="toDate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>To Date</FormLabel>
+                          <FormLabel>To Date *</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -635,7 +645,7 @@ export default function AppraisalCycleManagement() {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description</FormLabel>
+                        <FormLabel>Description *</FormLabel>
                         <FormControl>
                           <Textarea
                             {...field}
@@ -690,11 +700,20 @@ export default function AppraisalCycleManagement() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
               placeholder="Search by code or description..."
-              className="pl-10"
+              className="pl-10 pr-8"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               data-testid="input-search"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <MultiSelect
             options={[
@@ -739,25 +758,23 @@ export default function AppraisalCycleManagement() {
                     : ""
                 }
               >
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Repeat className="w-5 h-5 text-purple-600" />
-                        <CardTitle
-                          className="text-lg"
-                          data-testid={`text-code-${cycle.id}`}
-                        >
-                          {cycle.code}
-                        </CardTitle>
-                        <Badge
-                          variant={
-                            cycle.status === "active" ? "default" : "secondary"
-                          }
-                        >
-                          {cycle.status}
-                        </Badge>
-                      </div>
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Repeat className="w-4 h-4 text-purple-600" />
+                      <CardTitle
+                        className="text-base"
+                        data-testid={`text-code-${cycle.id}`}
+                      >
+                        {cycle.code}
+                      </CardTitle>
+                      <Badge
+                        variant={
+                          cycle.status === "active" ? "default" : "secondary"
+                        }
+                      >
+                        {cycle.status}
+                      </Badge>
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -768,22 +785,24 @@ export default function AppraisalCycleManagement() {
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(cycle.id)}
-                        disabled={deleteCycleMutation.isPending}
-                        data-testid={`button-delete-${cycle.id}`}
-                        title="Mark Inactive"
-                      >
-                        <Ban className="w-4 h-4" />
-                      </Button>
+                      {cycle.status !== "inactive" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(cycle.id)}
+                          disabled={deleteCycleMutation.isPending}
+                          data-testid={`button-delete-${cycle.id}`}
+                          title="Mark Inactive"
+                        >
+                          <Ban className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                    <div className="flex items-center gap-2">
+                <CardContent className="pt-0 pb-3">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-1">
                       <CalendarDays className="w-4 h-4" />
                       <span>
                         Duration: {formatDate(cycle.fromDate)} -{" "}
@@ -791,15 +810,12 @@ export default function AppraisalCycleManagement() {
                       </span>
                     </div>
                     {cycle.description && (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <Tag className="w-4 h-4" />
-                          <span>Description</span>
-                        </div>
-                        <p className="pl-6">{cycle.description}</p>
-                      </>
+                      <div className="flex items-center gap-1">
+                        <Tag className="w-4 h-4" />
+                        <span>Description: {cycle.description}</span>
+                      </div>
                     )}
-                    <div className="flex items-center gap-2 pt-2">
+                    <div className="flex items-center gap-1">
                       <Clock className="w-4 h-4" />
                       <span>
                         Created:{" "}
@@ -829,7 +845,17 @@ export default function AppraisalCycleManagement() {
             </DialogHeader>
             <Form {...form}>
               <form
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={form.handleSubmit(onSubmit, (errors) => {
+                  console.error("Form validation errors:", errors);
+                  const firstError = Object.values(errors)[0];
+                  if (firstError?.message) {
+                    toast({
+                      title: "Validation Error",
+                      description: String(firstError.message),
+                      variant: "destructive",
+                    });
+                  }
+                })}
                 className="space-y-6"
               >
                 <div className="grid grid-cols-2 gap-4">
@@ -838,7 +864,7 @@ export default function AppraisalCycleManagement() {
                     name="code"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Cycle Code</FormLabel>
+                        <FormLabel>Cycle Code *</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
@@ -882,7 +908,7 @@ export default function AppraisalCycleManagement() {
                     name="fromDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>From Date</FormLabel>
+                        <FormLabel>From Date *</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
@@ -905,7 +931,7 @@ export default function AppraisalCycleManagement() {
                     name="toDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>To Date</FormLabel>
+                        <FormLabel>To Date *</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
@@ -930,7 +956,7 @@ export default function AppraisalCycleManagement() {
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description</FormLabel>
+                      <FormLabel>Description *</FormLabel>
                       <FormControl>
                         <Textarea
                           {...field}

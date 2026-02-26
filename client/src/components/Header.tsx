@@ -13,14 +13,38 @@ import {
   clearAuthData,
   getStoredUser,
   setStoredUser,
+  setTokens,
 } from "@/hooks/useAuth";
 import { clearHRsuiteSession } from "@/lib/hrsuiteSession";
-import { clearSSOAttempted, getLoginSource } from "@/lib/ssoAuth";
+import {
+  clearSSOAttempted,
+  getLoginSource,
+  getSSOLogoutUrl,
+} from "@/lib/ssoAuth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/components/SidebarContext";
 import { API_BASE_URL } from "@/config/api.config";
+
+// Reverse map: PMS role code → HRSuite PascalCase role code
+// Must match the inverse of HRSUITE_TO_PMS_ROLE_MAP in ssoAuth.ts
+const PMS_TO_HRSUITE_ROLE_MAP: Record<string, string> = {
+  employee: "Employee",
+  manager: "Manager",
+  hrmanager: "HRManager",
+  admin: "Admin",
+  superadmin: "SuperAdmin",
+};
+
+// Numeric role IDs as defined in the HRSuite database
+// Used to set activeRoleId correctly when switching roles in PMS
+const HRSUITE_ROLE_ID_MAP: Record<string, number> = {
+  employee: 10,
+  manager: 11,
+  hrmanager: 18,
+  admin: 29,
+};
 
 export function Header() {
   const { user } = useAuth();
@@ -38,15 +62,68 @@ export function Header() {
       return response.json();
     },
     onSuccess: (data, role) => {
-      // Update stored user with new active role
+      // 1. Persist the new JWT tokens returned by the switch-role API.
+      //    The old token still carries the previous role claim, so every API
+      //    call after this would be rejected with 403 unless we replace it.
+      if (data?.accessToken) {
+        setTokens(data.accessToken, data.refreshToken || "", data.expiresIn);
+        console.log("[Header] New JWT token stored after role switch");
+      }
+
+      // 2. Update stored user with new active role
       const storedUser = getStoredUser();
       if (storedUser) {
         const updatedUser = {
           ...storedUser,
-          role: role,
+          role: role as typeof storedUser.role,
           activeRole: role,
-        };
+        } as Parameters<typeof setStoredUser>[0];
         setStoredUser(updatedUser);
+      }
+      // 3. Also update sessionStorage for HRsuite session compatibility.
+      // IMPORTANT: use PascalCase role code and numeric roleId so we don't
+      // corrupt the HRSuite session values that other parts of the app rely on.
+      try {
+        // Map PMS lowercase role back to HRSuite PascalCase format (e.g. "hrmanager" → "HRManager")
+        const hrsuiteRoleCode =
+          PMS_TO_HRSUITE_ROLE_MAP[role.toLowerCase()] || role;
+        sessionStorage.setItem("activeRoleCode", hrsuiteRoleCode);
+
+        // Use the numeric roleId returned by the API response, or fall back to
+        // the known HRSuite role ID map. Never store the role string here —
+        // HRSuite expects a numeric value (e.g. 18, not "hrmanager").
+        const numericRoleId =
+          data?.roleId ??
+          data?.RoleId ??
+          data?.user?.roleId ??
+          data?.user?.RoleId ??
+          data?.user?.ActiveRoleId ??
+          data?.user?.activeRoleId ??
+          HRSUITE_ROLE_ID_MAP[role.toLowerCase()];
+        if (numericRoleId != null) {
+          sessionStorage.setItem("activeRoleId", String(numericRoleId));
+        }
+
+        // Also patch the already-stored pms_hrsuite_session so the next SSO
+        // check reads the correct (PascalCase) role without a full re-decrypt.
+        try {
+          const storedSession = sessionStorage.getItem("pms_hrsuite_session");
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            parsed.activeRoleCode = hrsuiteRoleCode;
+            if (numericRoleId != null) {
+              parsed.activeRoleId = numericRoleId;
+            }
+            sessionStorage.setItem(
+              "pms_hrsuite_session",
+              JSON.stringify(parsed),
+            );
+          }
+        } catch {
+          // non-critical: session will be rebuilt on next navigation
+        }
+      } catch (e) {
+        console.warn("[Header] Failed to update sessionStorage:", e);
       }
       // Invalidate and refetch user data
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
@@ -54,8 +131,8 @@ export function Header() {
         title: "Role switched successfully",
         description: "Your active role has been updated.",
       });
-      // Reload the page to apply the new role throughout the app
-      window.location.reload();
+      // Redirect to dashboard to show the appropriate role's dashboard
+      window.location.href = `${import.meta.env.BASE_URL || "/"}`;
     },
     onError: (error: any) => {
       toast({
@@ -82,7 +159,7 @@ export function Header() {
     // Check if user logged in via HRsuite
     const loginSource = getLoginSource();
 
-    // Clear localStorage auth data
+    // Clear sessionStorage auth data (per-tab)
     clearAuthData();
     // Clear SSO attempted flag so next login can try SSO again
     clearSSOAttempted();
@@ -94,13 +171,14 @@ export function Header() {
     // If logged in via HRsuite, redirect back to HRsuite (if applicable)
     // Otherwise, redirect to PMS login page
     if (loginSource === "hrsuite") {
-      // You can customize this URL to redirect back to HRsuite
-      console.log("[Header] User logged in via HRsuite, logging out...");
+      console.log("[Header] User logged in via HRsuite, redirecting to SSO...");
+      const ssoLogoutUrl = getSSOLogoutUrl();
+      window.location.href = ssoLogoutUrl;
+      return;
     }
 
     // Force redirect to login page with page reload
     window.location.href = `${import.meta.env.BASE_URL || "/"}#/login`;
-    window.location.reload();
   };
 
   // Get active role and available roles from user object
@@ -172,10 +250,10 @@ export function Header() {
               >
                 <div className="w-10 h-10 bg-accent rounded-full flex items-center justify-center">
                   <span className="text-accent-foreground text-sm font-medium">
-                    {(user as any)?.firstName && (user as any)?.lastName ? (
-                      `${(user as any).firstName[0]?.toUpperCase()}${(
-                        user as any
-                      ).lastName[0]?.toUpperCase()}`
+                    {(user as any)?.firstName || (user as any)?.lastName ? (
+                      `${(user as any)?.firstName?.[0]?.toUpperCase() || ""}${(user as any)?.lastName?.[0]?.toUpperCase() || ""}`.trim() || (
+                        <User className="h-4 w-4" />
+                      )
                     ) : (
                       <User className="h-4 w-4" />
                     )}
@@ -190,8 +268,8 @@ export function Header() {
                     className="text-sm font-medium leading-none"
                     data-testid="user-name-display"
                   >
-                    {(user as any)?.firstName && (user as any)?.lastName
-                      ? `${(user as any).firstName} ${(user as any).lastName}`
+                    {(user as any)?.firstName || (user as any)?.lastName
+                      ? `${(user as any)?.firstName || ""} ${(user as any)?.lastName || ""}`.trim()
                       : "Loading..."}
                   </p>
                   <p

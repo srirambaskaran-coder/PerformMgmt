@@ -320,7 +320,7 @@ export default function FrequencyCalendarDetailsManagement() {
       });
       toast({
         title: "Success",
-        description: "Calendar details deleted successfully",
+        description: "Calendar details marked as inactive",
       });
     },
     onError: (error: any) => {
@@ -546,7 +546,17 @@ export default function FrequencyCalendarDetailsManagement() {
               </DialogHeader>
               <Form {...form}>
                 <form
-                  onSubmit={form.handleSubmit(onSubmit)}
+                  onSubmit={form.handleSubmit(onSubmit, (errors) => {
+                    console.error("Form validation errors:", errors);
+                    const firstError = Object.values(errors)[0];
+                    if (firstError?.message) {
+                      toast({
+                        title: "Validation Error",
+                        description: String(firstError.message),
+                        variant: "destructive",
+                      });
+                    }
+                  })}
                   className="space-y-4"
                 >
                   <div className="grid grid-cols-2 gap-4">
@@ -555,7 +565,7 @@ export default function FrequencyCalendarDetailsManagement() {
                       name="frequencyCalendarId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Frequency Calendar</FormLabel>
+                          <FormLabel>Frequency Calendar *</FormLabel>
                           <Select
                             onValueChange={field.onChange}
                             value={field.value ?? ""}
@@ -619,7 +629,7 @@ export default function FrequencyCalendarDetailsManagement() {
                     name="displayName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Display Name</FormLabel>
+                        <FormLabel>Display Name *</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
@@ -637,7 +647,7 @@ export default function FrequencyCalendarDetailsManagement() {
                       name="startDate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Start Date</FormLabel>
+                          <FormLabel>Start Date *</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -662,7 +672,7 @@ export default function FrequencyCalendarDetailsManagement() {
                       name="endDate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>End Date</FormLabel>
+                          <FormLabel>End Date *</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -723,9 +733,18 @@ export default function FrequencyCalendarDetailsManagement() {
               placeholder="Search by display name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 pr-8"
               data-testid="input-search"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <MultiSelect
             options={[
@@ -784,28 +803,16 @@ export default function FrequencyCalendarDetailsManagement() {
                   details.id === 9999 && "border-2 border-primary bg-primary/5",
                 )}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <CalendarDays className="h-5 w-5 text-purple-600" />
-                      <div>
-                        <CardTitle
-                          className="text-lg"
-                          data-testid={`text-display-name-${details.id}`}
-                        >
-                          {details.displayName}
-                        </CardTitle>
-                        <Badge
-                          variant={
-                            details.status === "active"
-                              ? "default"
-                              : "secondary"
-                          }
-                          data-testid={`badge-status-${details.id}`}
-                        >
-                          {details.status}
-                        </Badge>
-                      </div>
+                      <CalendarDays className="h-4 w-4 text-purple-600" />
+                      <CardTitle
+                        className="text-base"
+                        data-testid={`text-display-name-${details.id}`}
+                      >
+                        {details.displayName}
+                      </CardTitle>
                     </div>
                     <div className="flex gap-1">
                       <Button
@@ -816,25 +823,37 @@ export default function FrequencyCalendarDetailsManagement() {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(details.id)}
-                        disabled={deleteMutation.isPending}
-                        data-testid={`button-delete-${details.id}`}
-                        title="Mark Inactive"
-                      >
-                        <Ban className="h-4 w-4" />
-                      </Button>
+                      {details.status !== "inactive" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(details.id)}
+                          disabled={deleteMutation.isPending}
+                          data-testid={`button-delete-${details.id}`}
+                          title="Mark Inactive"
+                        >
+                          <Ban className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-0 space-y-2">
-                  <div className="flex flex-col gap-1 text-sm">
-                    <span>
+                <CardContent className="pt-0 pb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-muted-foreground">
                       <strong>Calendar:</strong>{" "}
                       {getCalendarName(details.frequencyCalendarId)}
                     </span>
+                    <Badge
+                      variant={
+                        details.status === "active" ? "default" : "secondary"
+                      }
+                      data-testid={`badge-status-${details.id}`}
+                    >
+                      {details.status}
+                    </Badge>
+                  </div>
+                  <div className="text-sm">
                     <span>
                       <strong>Period:</strong> {formatDate(details.startDate)} -{" "}
                       {formatDate(details.endDate)}

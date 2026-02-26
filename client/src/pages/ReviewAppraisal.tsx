@@ -27,11 +27,16 @@ import {
   Mail,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Users,
   LayoutGrid,
   LayoutList,
   Download,
   FileDown,
+  X,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -53,12 +58,18 @@ export default function ReviewAppraisal() {
     employee: "",
     location: "all",
     department: "all",
-    level: "all",
-    grade: "all",
     manager: "all",
   });
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  // Pagination state for table view
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Sorting state for table view
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   // Fetch initiated appraisals
   const { data: appraisals, isLoading } = useQuery({
@@ -67,6 +78,13 @@ export default function ReviewAppraisal() {
       return data.map((appraisal: any) => ({
         id: appraisal.Id,
         appraisalGroupId: appraisal.AppraisalGroupId,
+        appraisalGroup: appraisal.AppraisalGroup
+          ? {
+              id: appraisal.AppraisalGroup.id,
+              name: appraisal.AppraisalGroup.name,
+              description: appraisal.AppraisalGroup.description,
+            }
+          : null,
         appraisalType: appraisal.AppraisalType,
         questionnaireTemplateId: appraisal.QuestionnaireTemplateId,
         questionnaireTemplateIds: appraisal.QuestionnaireTemplateIds,
@@ -85,41 +103,106 @@ export default function ReviewAppraisal() {
               employeeProgress: (appraisal.progress.employeeProgress || []).map(
                 (ep: any) => ({
                   employee: {
-                    id: ep.employee?.id,
-                    firstName: ep.employee?.firstName,
-                    lastName: ep.employee?.lastName,
-                    designation: ep.employee?.designation,
-                    department: ep.employee?.department,
-                    locationId: ep.employee?.locationId,
-                    levelId: ep.employee?.levelId,
-                    gradeId: ep.employee?.gradeId,
+                    id: ep.employee?.Id || ep.employee?.id,
+                    firstName: ep.employee?.FirstName || ep.employee?.firstName,
+                    lastName: ep.employee?.LastName || ep.employee?.lastName,
+                    designation:
+                      ep.employee?.Designation || ep.employee?.designation,
+                    department:
+                      ep.employee?.Department || ep.employee?.department,
+                    departmentId:
+                      ep.employee?.DepartmentId || ep.employee?.departmentId,
+                    locationId:
+                      ep.employee?.LocationId || ep.employee?.locationId,
+                    levelId: ep.employee?.LevelId || ep.employee?.levelId,
+                    gradeId: ep.employee?.GradeId || ep.employee?.gradeId,
+                    reportingManagerId:
+                      ep.employee?.ReportingManagerId ||
+                      ep.employee?.reportingManagerId,
                   },
                   status: ep.status,
                   isCompleted: ep.isCompleted,
                   evaluation: ep.evaluation
                     ? {
-                        id: ep.evaluation.Id,
-                        employeeId: ep.evaluation.EmployeeId,
-                        managerId: ep.evaluation.ManagerId,
-                        reviewCycleId: ep.evaluation.ReviewCycleId,
+                        id: ep.evaluation.Id || ep.evaluation.id,
+                        employeeId:
+                          ep.evaluation.EmployeeId || ep.evaluation.employeeId,
+                        managerId:
+                          ep.evaluation.ManagerId || ep.evaluation.managerId,
+                        reviewCycleId:
+                          ep.evaluation.ReviewCycleId ||
+                          ep.evaluation.reviewCycleId,
                         initiatedAppraisalId:
-                          ep.evaluation.InitiatedAppraisalId,
-                        selfEvaluationData: ep.evaluation.SelfEvaluationData,
+                          ep.evaluation.InitiatedAppraisalId ||
+                          ep.evaluation.initiatedAppraisalId,
+                        selfEvaluationData:
+                          ep.evaluation.SelfEvaluationData ||
+                          ep.evaluation.selfEvaluationData,
                         selfEvaluationSubmittedAt:
-                          ep.evaluation.SelfEvaluationSubmittedAt,
+                          ep.evaluation.SelfEvaluationSubmittedAt ||
+                          ep.evaluation.selfEvaluationSubmittedAt,
                         managerEvaluationData:
-                          ep.evaluation.ManagerEvaluationData,
+                          ep.evaluation.ManagerEvaluationData ||
+                          ep.evaluation.managerEvaluationData,
                         managerEvaluationSubmittedAt:
-                          ep.evaluation.ManagerEvaluationSubmittedAt,
-                        overallRating: ep.evaluation.OverallRating,
-                        meetingScheduledAt: ep.evaluation.MeetingScheduledAt,
-                        meetingNotes: ep.evaluation.MeetingNotes,
-                        meetingCompletedAt: ep.evaluation.MeetingCompletedAt,
-                        finalizedAt: ep.evaluation.FinalizedAt,
-                        status: ep.evaluation.Status,
+                          ep.evaluation.ManagerEvaluationSubmittedAt ||
+                          ep.evaluation.managerEvaluationSubmittedAt,
+                        overallRating:
+                          ep.evaluation.OverallRating ||
+                          ep.evaluation.overallRating,
+                        meetingScheduledAt:
+                          ep.evaluation.MeetingScheduledAt ||
+                          ep.evaluation.meetingScheduledAt,
+                        meetingNotes:
+                          ep.evaluation.MeetingNotes ||
+                          ep.evaluation.meetingNotes,
+                        meetingCompletedAt:
+                          ep.evaluation.MeetingCompletedAt ||
+                          ep.evaluation.meetingCompletedAt,
+                        finalizedAt:
+                          ep.evaluation.FinalizedAt ||
+                          ep.evaluation.finalizedAt,
+                        status: ep.evaluation.Status || ep.evaluation.status,
+                        calibratedRating:
+                          ep.evaluation.CalibratedRating ||
+                          ep.evaluation.calibratedRating,
+                        calibrationRemarks:
+                          ep.evaluation.CalibrationRemarks ||
+                          ep.evaluation.calibrationRemarks,
+                        calibratedBy:
+                          ep.evaluation.CalibratedBy ||
+                          ep.evaluation.calibratedBy,
+                        calibratedAt:
+                          ep.evaluation.CalibratedAt ||
+                          ep.evaluation.calibratedAt,
+                        manager:
+                          ep.evaluation.manager || ep.evaluation.Manager
+                            ? {
+                                id:
+                                  ep.evaluation.manager?.id ||
+                                  ep.evaluation.Manager?.Id ||
+                                  ep.evaluation.manager?.Id ||
+                                  ep.evaluation.Manager?.id,
+                                firstName:
+                                  ep.evaluation.manager?.firstName ||
+                                  ep.evaluation.Manager?.FirstName ||
+                                  ep.evaluation.manager?.FirstName ||
+                                  ep.evaluation.Manager?.firstName,
+                                lastName:
+                                  ep.evaluation.manager?.lastName ||
+                                  ep.evaluation.Manager?.LastName ||
+                                  ep.evaluation.manager?.LastName ||
+                                  ep.evaluation.Manager?.lastName,
+                                email:
+                                  ep.evaluation.manager?.email ||
+                                  ep.evaluation.Manager?.Email ||
+                                  ep.evaluation.manager?.Email ||
+                                  ep.evaluation.Manager?.email,
+                              }
+                            : null,
                       }
                     : null,
-                })
+                }),
               ),
             }
           : {
@@ -136,44 +219,52 @@ export default function ReviewAppraisal() {
   const { data: appraisalGroups } = useQuery({
     queryKey: ["/api/appraisal-groups"],
     select: (data: any[]) => {
-      return data.map((group: any) => ({
-        id: group.Id,
-        name: group.Name,
-        description: group.Description,
-      }));
+      return data
+        .filter((group: any) => group.Status === true)
+        .map((group: any) => ({
+          id: group.Id,
+          name: group.Name,
+          description: group.Description,
+        }));
     },
   });
 
   const { data: appraisalCycles } = useQuery({
     queryKey: ["/api/appraisal-cycles"],
     select: (data: any[]) => {
-      return data.map((cycle: any) => ({
-        id: cycle.Id,
-        code: cycle.Code,
-        description: cycle.Description,
-      }));
+      return data
+        .filter((cycle: any) => cycle.Status === true)
+        .map((cycle: any) => ({
+          id: cycle.Id,
+          code: cycle.Code,
+          description: cycle.Description,
+        }));
     },
   });
 
   const { data: locations } = useQuery({
     queryKey: ["/api/locations"],
     select: (data: any[]) => {
-      return data.map((location: any) => ({
-        id: location.Id,
-        name: location.Name,
-        code: location.Code,
-      }));
+      return data
+        .filter((location: any) => location.Status === 1)
+        .map((location: any) => ({
+          id: location.Id,
+          name: location.LocationName,
+          code: location.Code,
+        }));
     },
   });
 
   const { data: departments } = useQuery({
     queryKey: ["/api/departments"],
     select: (data: any[]) => {
-      return data.map((dept: any) => ({
-        id: dept.Id,
-        code: dept.Code,
-        description: dept.Description,
-      }));
+      return data
+        .filter((dept: any) => dept.Status === true)
+        .map((dept: any) => ({
+          id: dept.Id,
+          code: dept.Code,
+          description: dept.Description,
+        }));
     },
   });
 
@@ -213,27 +304,61 @@ export default function ReviewAppraisal() {
     },
   });
 
-  // Extract unique managers from users who are reporting managers
+  // Extract unique managers from appraisals evaluation data
   const managers = useMemo(() => {
-    if (!allUsers) return [];
-    const managerIds = new Set(
-      allUsers
-        .filter((u) => u.reportingManagerId)
-        .map((u) => u.reportingManagerId)
-    );
-    return allUsers.filter((u) => managerIds.has(u.id));
-  }, [allUsers]);
+    if (!appraisals) return [];
+    const managerMap = new Map<
+      string,
+      { id: string; firstName: string; lastName: string }
+    >();
+
+    (appraisals as any[]).forEach((appraisal: any) => {
+      const employeeProgress = appraisal.progress?.employeeProgress || [];
+      employeeProgress.forEach((ep: any) => {
+        const manager = ep.evaluation?.manager;
+        if (manager && manager.id) {
+          managerMap.set(manager.id, {
+            id: manager.id,
+            firstName: manager.firstName || "",
+            lastName: manager.lastName || "",
+          });
+        }
+      });
+    });
+
+    return Array.from(managerMap.values());
+  }, [appraisals]);
+
+  // Extract unique departments from appraisals employee progress data
+  const employeeDepartments = useMemo(() => {
+    if (!appraisals) return [];
+    const deptSet = new Set<string>();
+
+    (appraisals as any[]).forEach((appraisal: any) => {
+      const employeeProgress = appraisal.progress?.employeeProgress || [];
+      employeeProgress.forEach((ep: any) => {
+        const dept = ep.employee?.department;
+        if (dept && dept !== "N/A") {
+          deptSet.add(dept);
+        }
+      });
+    });
+
+    return Array.from(deptSet).sort();
+  }, [appraisals]);
 
   // Fetch frequency calendars
   const { data: frequencyCalendars } = useQuery({
     queryKey: ["/api/frequency-calendars"],
     select: (data: any[]) => {
-      return data.map((calendar: any) => ({
-        id: calendar.Id,
-        code: calendar.Code,
-        description: calendar.Description,
-        appraisalCycleId: calendar.AppraisalCycleId,
-      }));
+      return data
+        .filter((calendar: any) => calendar.Status === true)
+        .map((calendar: any) => ({
+          id: calendar.Id,
+          code: calendar.Code,
+          description: calendar.Description,
+          appraisalCycleId: calendar.AppraisalCycleId,
+        }));
     },
   });
 
@@ -296,6 +421,43 @@ export default function ReviewAppraisal() {
       newExpanded.add(groupId);
     }
     setExpandedGroups(newExpanded);
+  };
+
+  // Helper function to format appraisal type
+  const getAppraisalTypeLabel = (type: string | number) => {
+    const typeMap: Record<string, string> = {
+      "1": "Self Evaluation",
+      "2": "Manager Evaluation",
+      "3": "Self & Manager Evaluation",
+      self: "Self Evaluation",
+      manager: "Manager Evaluation",
+      self_and_manager: "Self & Manager Evaluation",
+    };
+    return (
+      typeMap[String(type)] ||
+      String(type)
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (l) => l.toUpperCase())
+    );
+  };
+
+  // Helper function to format status
+  const getStatusLabel = (status: boolean | string) => {
+    if (typeof status === "boolean") {
+      return status ? "Active" : "Inactive";
+    }
+    return String(status)
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase());
+  };
+
+  // Helper function to get appraisal cycle name from frequency calendar ID
+  const getAppraisalCycleName = (frequencyCalendarId: string | null) => {
+    if (!frequencyCalendarId) return null;
+    const appraisalCycleId =
+      frequencyCalendarToCycleMap.get(frequencyCalendarId);
+    if (!appraisalCycleId) return null;
+    return appraisalCyclesMap.get(appraisalCycleId) || null;
   };
 
   const sendReminder = (employeeId: string, initiatedAppraisalId: string) => {
@@ -366,9 +528,7 @@ export default function ReviewAppraisal() {
         Department: row.departmentName,
         Manager: row.managerName,
         "Appraisal Group": row.appraisalGroupName,
-        "Appraisal Type": row.appraisalType
-          .replace(/_/g, " ")
-          .replace(/\b\w/g, (l: string) => l.toUpperCase()),
+        "Appraisal Type": getAppraisalTypeLabel(row.appraisalType),
         "Frequency Calendar": row.frequencyCalendarName,
         Status: row.status
           .replace(/_/g, " ")
@@ -383,6 +543,10 @@ export default function ReviewAppraisal() {
         "Final Manager Rating":
           typeof row.finalManagerRating === "number"
             ? row.finalManagerRating.toFixed(1)
+            : "N/A",
+        "Calibrated Rating":
+          typeof row.calibratedRating === "number"
+            ? row.calibratedRating.toFixed(1)
             : "N/A",
       }));
 
@@ -404,6 +568,7 @@ export default function ReviewAppraisal() {
         { wch: 15 }, // Due Date
         { wch: 18 }, // Member Rating
         { wch: 22 }, // Final Manager Rating
+        { wch: 18 }, // Calibrated Rating
       ];
       worksheet["!cols"] = columnWidths;
 
@@ -434,7 +599,7 @@ export default function ReviewAppraisal() {
       (frequencyCalendars as any[]).map((cal) => [
         cal.id,
         `${cal.code} - ${cal.description}`,
-      ])
+      ]),
     );
   }, [frequencyCalendars]);
 
@@ -442,7 +607,10 @@ export default function ReviewAppraisal() {
   const frequencyCalendarToCycleMap = useMemo(() => {
     if (!frequencyCalendars) return new Map();
     return new Map(
-      (frequencyCalendars as any[]).map((cal) => [cal.id, cal.appraisalCycleId])
+      (frequencyCalendars as any[]).map((cal) => [
+        cal.id,
+        cal.appraisalCycleId,
+      ]),
     );
   }, [frequencyCalendars]);
 
@@ -456,9 +624,17 @@ export default function ReviewAppraisal() {
   const appraisalGroupsMap = useMemo(() => {
     if (!appraisalGroups) return new Map();
     return new Map(
-      (appraisalGroups as any[]).map((group) => [group.id, group.name])
+      (appraisalGroups as any[]).map((group) => [group.id, group.name]),
     );
   }, [appraisalGroups]);
+
+  // Create appraisal cycles lookup map
+  const appraisalCyclesMap = useMemo(() => {
+    if (!appraisalCycles) return new Map();
+    return new Map(
+      (appraisalCycles as any[]).map((cycle) => [cycle.id, cycle.code]),
+    );
+  }, [appraisalCycles]);
 
   // Filter frequency calendar details based on selected frequency calendar
   const filteredFrequencyCalendarDetails = useMemo(() => {
@@ -467,7 +643,7 @@ export default function ReviewAppraisal() {
       return frequencyCalendarDetails as any[];
     }
     return (frequencyCalendarDetails as any[]).filter(
-      (detail: any) => detail.frequencyCalendarId === filters.frequencyCalendar
+      (detail: any) => detail.frequencyCalendarId === filters.frequencyCalendar,
     );
   }, [frequencyCalendarDetails, filters.frequencyCalendar]);
 
@@ -485,17 +661,32 @@ export default function ReviewAppraisal() {
         if (appraisal.createdAt && appraisal.daysToClose) {
           const createdDate = new Date(appraisal.createdAt);
           dueDate = new Date(
-            createdDate.getTime() + appraisal.daysToClose * 24 * 60 * 60 * 1000
+            createdDate.getTime() + appraisal.daysToClose * 24 * 60 * 60 * 1000,
           );
         }
 
         // Extract ratings from evaluation data
-        const memberRating =
-          empProgress.evaluation?.selfEvaluationData?.averageRating ?? null;
+        // Parse selfEvaluationData if it's a string
+        let memberRating = null;
+        if (empProgress.evaluation?.selfEvaluationData) {
+          try {
+            const selfEvalData =
+              typeof empProgress.evaluation.selfEvaluationData === "string"
+                ? JSON.parse(empProgress.evaluation.selfEvaluationData)
+                : empProgress.evaluation.selfEvaluationData;
+            memberRating = selfEvalData?.averageRating ?? null;
+          } catch (e) {
+            memberRating = null;
+          }
+        }
+
+        // Use overallRating for final manager rating
         const finalManagerRating =
-          empProgress.evaluation?.overallRating ??
-          empProgress.evaluation?.managerEvaluationData?.averageRating ??
-          null;
+          empProgress.evaluation?.overallRating ?? null;
+
+        // Get calibrated rating separately
+        const calibratedRating =
+          empProgress.evaluation?.calibratedRating ?? null;
 
         // Get appraisal cycle ID from frequency calendar
         const appraisalCycleId = appraisal.frequencyCalendarId
@@ -507,7 +698,8 @@ export default function ReviewAppraisal() {
           employeeId: empProgress.employee.id,
           initiatedAppraisalId: appraisal.id,
           evaluationId: empProgress.evaluation?.id || null,
-          employeeName: `${empProgress.employee.firstName} ${empProgress.employee.lastName}`,
+          employeeName:
+            `${empProgress.employee.firstName || ""} ${empProgress.employee.lastName || ""}`.trim(),
           employeeFirstName: empProgress.employee.firstName,
           employeeLastName: empProgress.employee.lastName,
           departmentId: empProgress.employee.departmentId || null,
@@ -518,15 +710,15 @@ export default function ReviewAppraisal() {
             : "N/A",
           levelId: empProgress.employee.levelId,
           gradeId: empProgress.employee.gradeId,
-          managerId: empProgress.evaluation?.managerId || null,
-          managerName: empProgress.evaluation?.managerId
-            ? "N/A" // Manager names would need to come from a separate lookup if needed
+          managerId:
+            empProgress.evaluation?.manager?.id ||
+            empProgress.evaluation?.managerId ||
+            null,
+          managerName: empProgress.evaluation?.manager
+            ? `${empProgress.evaluation.manager.firstName || ""} ${empProgress.evaluation.manager.lastName || ""}`.trim()
             : "N/A",
           appraisalGroupId: appraisal.appraisalGroupId,
-          appraisalGroupName: appraisal.appraisalGroupId
-            ? appraisalGroupsMap.get(appraisal.appraisalGroupId) ||
-              "Unknown Group"
-            : "Unknown Group",
+          appraisalGroupName: appraisal.appraisalGroup?.name || "Unknown Group",
           appraisalType: appraisal.appraisalType,
           appraisalCycleId: appraisalCycleId,
           frequencyCalendarId: appraisal.frequencyCalendarId,
@@ -538,6 +730,7 @@ export default function ReviewAppraisal() {
           appraisalStatus: appraisal.status,
           memberRating: memberRating,
           finalManagerRating: finalManagerRating,
+          calibratedRating: calibratedRating,
         });
       });
     });
@@ -596,21 +789,11 @@ export default function ReviewAppraisal() {
         return false;
       }
 
-      // Department filter
+      // Department filter (match by department name from employee progress)
       if (
         filters.department !== "all" &&
-        row.departmentId !== filters.department
+        row.departmentName !== filters.department
       ) {
-        return false;
-      }
-
-      // Level filter
-      if (filters.level !== "all" && row.levelId !== filters.level) {
-        return false;
-      }
-
-      // Grade filter
-      if (filters.grade !== "all" && row.gradeId !== filters.grade) {
         return false;
       }
 
@@ -622,6 +805,75 @@ export default function ReviewAppraisal() {
       return true;
     });
   }, [flattenedRows, filters]);
+
+  // Sorting for table view
+  const sortedRows = useMemo(() => {
+    if (!sortColumn) return filteredRows;
+
+    return [...filteredRows].sort((a, b) => {
+      let aValue = a[sortColumn];
+      let bValue = b[sortColumn];
+
+      // Handle null/undefined values
+      if (aValue == null) aValue = "";
+      if (bValue == null) bValue = "";
+
+      // Handle date sorting
+      if (sortColumn === "dueDate") {
+        aValue = aValue ? new Date(aValue).getTime() : 0;
+        bValue = bValue ? new Date(bValue).getTime() : 0;
+      }
+
+      // String comparison
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        const comparison = aValue
+          .toLowerCase()
+          .localeCompare(bValue.toLowerCase());
+        return sortDirection === "asc" ? comparison : -comparison;
+      }
+
+      // Number comparison
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [filteredRows, sortColumn, sortDirection]);
+
+  // Pagination for table view
+  const totalPages = Math.ceil(sortedRows.length / rowsPerPage);
+  const paginatedRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return sortedRows.slice(startIndex, endIndex);
+  }, [sortedRows, currentPage, rowsPerPage]);
+
+  // Handle column sort
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+    setCurrentPage(1);
+  };
+
+  // Sort indicator component
+  const SortIndicator = ({ column }: { column: string }) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="ml-1 h-4 w-4 opacity-50" />;
+    }
+    return sortDirection === "asc" ? (
+      <ArrowUp className="ml-1 h-4 w-4" />
+    ) : (
+      <ArrowDown className="ml-1 h-4 w-4" />
+    );
+  };
+
+  // Reset to page 1 when filters change
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [filters]);
 
   // Filter appraisals for card view based on filtered rows
   const filteredAppraisals = useMemo(() => {
@@ -640,43 +892,87 @@ export default function ReviewAppraisal() {
 
     return (appraisals as any[])
       .map((appraisal: any) => {
-        // Only include this appraisal if it has matching rows
-        const employeeSet = filteredEmployeesByAppraisal.get(appraisal.id);
-        if (!employeeSet) {
+        // Check if appraisal matches appraisal group filter
+        if (
+          filters.appraisalGroup !== "all" &&
+          appraisal.appraisalGroupId !== filters.appraisalGroup
+        ) {
           return null;
         }
 
-        // Filter the employee progress to only show matching employees using O(1) lookup
-        const filteredEmployeeProgress = (
-          appraisal.progress?.employeeProgress || []
-        ).filter((empProgress: any) => {
-          return employeeSet.has(empProgress.employee.id);
-        });
+        // Check if appraisal matches frequency calendar filter
+        if (
+          filters.frequencyCalendar !== "all" &&
+          appraisal.frequencyCalendarId !== filters.frequencyCalendar
+        ) {
+          return null;
+        }
+
+        // Check if appraisal matches appraisal cycle filter (via frequency calendar)
+        if (filters.appraisalCycle !== "all") {
+          const appraisalCycleId = appraisal.frequencyCalendarId
+            ? frequencyCalendarToCycleMap.get(appraisal.frequencyCalendarId)
+            : null;
+          if (appraisalCycleId !== filters.appraisalCycle) {
+            return null;
+          }
+        }
+
+        // If there are employee rows, filter by them
+        const employeeSet = filteredEmployeesByAppraisal.get(appraisal.id);
+
+        // If there are employee-level filters applied and no matching employees, skip this appraisal
+        const hasEmployeeLevelFilters =
+          filters.employee !== "" ||
+          filters.location !== "all" ||
+          filters.department !== "all" ||
+          filters.manager !== "all";
+
+        // If employee-level filters are applied and this appraisal has no matching employees, exclude it
+        if (hasEmployeeLevelFilters && !employeeSet) {
+          return null;
+        }
+
+        // Filter the employee progress to only show matching employees
+        const filteredEmployeeProgress = employeeSet
+          ? (appraisal.progress?.employeeProgress || []).filter(
+              (empProgress: any) => {
+                return employeeSet.has(empProgress.employee.id);
+              },
+            )
+          : appraisal.progress?.employeeProgress || [];
+
+        // If filtered and no employees match, skip
+        if (hasEmployeeLevelFilters && filteredEmployeeProgress.length === 0) {
+          return null;
+        }
 
         return {
           ...appraisal,
           progress: {
             ...appraisal.progress,
             employeeProgress: filteredEmployeeProgress,
-            totalEmployees: filteredEmployeeProgress.length,
+            totalEmployees:
+              appraisal.progress?.totalEmployees ||
+              filteredEmployeeProgress.length,
             completedEvaluations: filteredEmployeeProgress.filter(
-              (emp: any) => emp.status === "completed"
+              (emp: any) => emp.status === "completed",
             ).length,
             percentage:
               filteredEmployeeProgress.length > 0
                 ? Math.round(
                     (filteredEmployeeProgress.filter(
-                      (emp: any) => emp.status === "completed"
+                      (emp: any) => emp.status === "completed",
                     ).length /
                       filteredEmployeeProgress.length) *
-                      100
+                      100,
                   )
-                : 0,
+                : appraisal.progress?.percentage || 0,
           },
         };
       })
       .filter((appraisal) => appraisal !== null);
-  }, [appraisals, filteredRows]);
+  }, [appraisals, filteredRows, filters, frequencyCalendarToCycleMap]);
 
   if (isLoading) {
     return (
@@ -922,7 +1218,7 @@ export default function ReviewAppraisal() {
                   {(locations || [])?.map((location: any) => (
                     <SelectItem
                       key={location.id}
-                      value={location.id}
+                      value={location.name}
                       data-testid={`location-option-${location.id}`}
                     >
                       {location.name}
@@ -950,69 +1246,13 @@ export default function ReviewAppraisal() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Departments</SelectItem>
-                  {(departments || [])?.map((dept: any) => (
+                  {employeeDepartments.map((dept: string) => (
                     <SelectItem
-                      key={dept.id}
-                      value={dept.id}
-                      data-testid={`department-option-${dept.id}`}
+                      key={dept}
+                      value={dept}
+                      data-testid={`department-option-${dept}`}
                     >
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="level-filter" data-testid="label-level">
-                Level
-              </Label>
-              <Select
-                value={filters.level}
-                onValueChange={(value) =>
-                  setFilters({ ...filters, level: value })
-                }
-              >
-                <SelectTrigger id="level-filter" data-testid="select-level">
-                  <SelectValue placeholder="Select level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Levels</SelectItem>
-                  {(levels || [])?.map((level: any) => (
-                    <SelectItem
-                      key={level.id}
-                      value={level.id}
-                      data-testid={`level-option-${level.id}`}
-                    >
-                      {level.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="grade-filter" data-testid="label-grade">
-                Grade
-              </Label>
-              <Select
-                value={filters.grade}
-                onValueChange={(value) =>
-                  setFilters({ ...filters, grade: value })
-                }
-              >
-                <SelectTrigger id="grade-filter" data-testid="select-grade">
-                  <SelectValue placeholder="Select grade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Grades</SelectItem>
-                  {(grades || [])?.map((grade: any) => (
-                    <SelectItem
-                      key={grade.id}
-                      value={grade.id}
-                      data-testid={`grade-option-${grade.id}`}
-                    >
-                      {grade.name}
+                      {dept}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1046,29 +1286,29 @@ export default function ReviewAppraisal() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
 
-            <div className="flex items-end">
-              <Button
-                variant="outline"
-                onClick={() =>
-                  setFilters({
-                    appraisalGroup: "all",
-                    appraisalCycle: "all",
-                    frequencyCalendar: "all",
-                    frequencyCalendarDetails: "all",
-                    employee: "",
-                    location: "all",
-                    department: "all",
-                    level: "all",
-                    grade: "all",
-                    manager: "all",
-                  })
-                }
-                data-testid="button-clear-filters"
-              >
-                Clear Filters
-              </Button>
-            </div>
+          {/* Clear Filters Button - Right Aligned */}
+          <div className="flex justify-end mt-4">
+            <Button
+              variant="outline"
+              onClick={() =>
+                setFilters({
+                  appraisalGroup: "all",
+                  appraisalCycle: "all",
+                  frequencyCalendar: "all",
+                  frequencyCalendarDetails: "all",
+                  employee: "",
+                  location: "all",
+                  department: "all",
+                  manager: "all",
+                })
+              }
+              data-testid="button-clear-filters"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear Filters
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -1098,7 +1338,7 @@ export default function ReviewAppraisal() {
             </div>
           ) : viewMode === "table" ? (
             /* Table View */
-            <div className="overflow-x-auto" data-testid="table-view">
+            <div className="space-y-4" data-testid="table-view">
               {filteredRows.length === 0 ? (
                 <div
                   className="text-center py-8"
@@ -1114,135 +1354,270 @@ export default function ReviewAppraisal() {
                   </p>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Employee Name</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Manager</TableHead>
-                      <TableHead>Appraisal Group</TableHead>
-                      <TableHead>Appraisal Type</TableHead>
-                      <TableHead>Frequency Calendar</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredRows.map((row: any, index: number) => (
-                      <TableRow
-                        key={`${row.employeeId}-${row.initiatedAppraisalId}`}
-                        data-testid={`table-row-${index}`}
-                      >
-                        <TableCell data-testid={`table-employee-name-${index}`}>
-                          {row.employeeName}
-                        </TableCell>
-                        <TableCell data-testid={`table-location-${index}`}>
-                          {row.locationName}
-                        </TableCell>
-                        <TableCell data-testid={`table-department-${index}`}>
-                          {row.departmentName}
-                        </TableCell>
-                        <TableCell data-testid={`table-manager-${index}`}>
-                          {row.managerName}
-                        </TableCell>
-                        <TableCell
-                          data-testid={`table-appraisal-group-${index}`}
-                        >
-                          {row.appraisalGroupName}
-                        </TableCell>
-                        <TableCell
-                          data-testid={`table-appraisal-type-${index}`}
-                        >
-                          {row.appraisalType
-                            .replace(/_/g, " ")
-                            .replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                        </TableCell>
-                        <TableCell
-                          data-testid={`table-frequency-calendar-${index}`}
-                        >
-                          {row.frequencyCalendarName}
-                        </TableCell>
-                        <TableCell data-testid={`table-status-${index}`}>
-                          <Badge
-                            variant={
-                              row.status === "completed"
-                                ? "default"
-                                : row.status === "in_progress"
-                                ? "secondary"
-                                : row.status === "overdue"
-                                ? "destructive"
-                                : "outline"
-                            }
+                <>
+                  <div className="relative overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead
+                            className="sticky left-0 bg-background z-10 min-w-[200px] border-r-2 border-muted whitespace-nowrap cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleSort("employeeName")}
                           >
-                            {row.status
-                              .replace(/_/g, " ")
-                              .replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                          </Badge>
-                        </TableCell>
-                        <TableCell data-testid={`table-due-date-${index}`}>
-                          {row.dueDate
-                            ? format(new Date(row.dueDate), "MMM dd, yyyy")
-                            : "N/A"}
-                        </TableCell>
-                        <TableCell data-testid={`table-actions-${index}`}>
-                          <div className="flex gap-2">
-                            {row.status !== "completed" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  sendReminder(
-                                    row.employeeId,
-                                    row.initiatedAppraisalId
-                                  )
+                            <div className="flex items-center">
+                              Employee Name
+                              <SortIndicator column="employeeName" />
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="whitespace-nowrap cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleSort("departmentName")}
+                          >
+                            <div className="flex items-center">
+                              Department
+                              <SortIndicator column="departmentName" />
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="whitespace-nowrap cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleSort("managerName")}
+                          >
+                            <div className="flex items-center">
+                              Manager
+                              <SortIndicator column="managerName" />
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="whitespace-nowrap cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleSort("appraisalGroupName")}
+                          >
+                            <div className="flex items-center">
+                              Appraisal Group
+                              <SortIndicator column="appraisalGroupName" />
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="whitespace-nowrap cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleSort("status")}
+                          >
+                            <div className="flex items-center">
+                              Status
+                              <SortIndicator column="status" />
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="whitespace-nowrap cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleSort("dueDate")}
+                          >
+                            <div className="flex items-center">
+                              Due Date
+                              <SortIndicator column="dueDate" />
+                            </div>
+                          </TableHead>
+                          <TableHead className="text-right pr-6 whitespace-nowrap">
+                            Actions
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedRows.map((row: any, index: number) => (
+                          <TableRow
+                            key={`${row.employeeId}-${row.initiatedAppraisalId}`}
+                            data-testid={`table-row-${index}`}
+                          >
+                            <TableCell
+                              className="sticky left-0 bg-background z-10 min-w-[200px] border-r-2 border-muted font-medium whitespace-nowrap"
+                              data-testid={`table-employee-name-${index}`}
+                            >
+                              {row.employeeName}
+                            </TableCell>
+                            <TableCell
+                              className="whitespace-nowrap"
+                              data-testid={`table-department-${index}`}
+                            >
+                              {row.departmentName}
+                            </TableCell>
+                            <TableCell
+                              className="whitespace-nowrap"
+                              data-testid={`table-manager-${index}`}
+                            >
+                              {row.managerName}
+                            </TableCell>
+                            <TableCell
+                              className="whitespace-nowrap"
+                              data-testid={`table-appraisal-group-${index}`}
+                            >
+                              {row.appraisalGroupName}
+                            </TableCell>
+                            <TableCell
+                              className="whitespace-nowrap"
+                              data-testid={`table-status-${index}`}
+                            >
+                              <Badge
+                                variant={
+                                  row.status === "completed"
+                                    ? "default"
+                                    : row.status === "in_progress"
+                                      ? "secondary"
+                                      : row.status === "overdue"
+                                        ? "destructive"
+                                        : "outline"
                                 }
-                                data-testid={`table-button-send-reminder-${index}`}
-                                disabled={sendReminderMutation.isPending}
                               >
-                                <Mail className="h-4 w-4 mr-1" />
-                                Send Reminder
-                              </Button>
-                            )}
-                            {row.status === "completed" && row.evaluationId && (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    downloadEvaluation(row.evaluationId, "pdf")
-                                  }
-                                  data-testid={`table-button-download-pdf-${index}`}
-                                  disabled={
-                                    downloadEvaluationMutation.isPending
-                                  }
-                                >
-                                  <FileDown className="h-4 w-4 mr-1" />
-                                  PDF
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    downloadEvaluation(row.evaluationId, "docx")
-                                  }
-                                  data-testid={`table-button-download-docx-${index}`}
-                                  disabled={
-                                    downloadEvaluationMutation.isPending
-                                  }
-                                >
-                                  <FileDown className="h-4 w-4 mr-1" />
-                                  DOCX
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                                {row.status
+                                  .replace(/_/g, " ")
+                                  .replace(/\b\w/g, (l: string) =>
+                                    l.toUpperCase(),
+                                  )}
+                              </Badge>
+                            </TableCell>
+                            <TableCell
+                              className="whitespace-nowrap"
+                              data-testid={`table-due-date-${index}`}
+                            >
+                              {row.dueDate
+                                ? format(new Date(row.dueDate), "MMM dd, yyyy")
+                                : "N/A"}
+                            </TableCell>
+                            <TableCell
+                              className="text-right pr-6 whitespace-nowrap"
+                              data-testid={`table-actions-${index}`}
+                            >
+                              <div className="flex gap-2 justify-end">
+                                {row.status !== "completed" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      sendReminder(
+                                        row.employeeId,
+                                        row.initiatedAppraisalId,
+                                      )
+                                    }
+                                    data-testid={`table-button-send-reminder-${index}`}
+                                    disabled={sendReminderMutation.isPending}
+                                  >
+                                    <Mail className="h-4 w-4 mr-1" />
+                                    Send Reminder
+                                  </Button>
+                                )}
+                                {row.status === "completed" &&
+                                  row.evaluationId && (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          downloadEvaluation(
+                                            row.evaluationId,
+                                            "pdf",
+                                          )
+                                        }
+                                        data-testid={`table-button-download-pdf-${index}`}
+                                        disabled={
+                                          downloadEvaluationMutation.isPending
+                                        }
+                                      >
+                                        <FileDown className="h-4 w-4 mr-1" />
+                                        PDF
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          downloadEvaluation(
+                                            row.evaluationId,
+                                            "docx",
+                                          )
+                                        }
+                                        data-testid={`table-button-download-docx-${index}`}
+                                        disabled={
+                                          downloadEvaluationMutation.isPending
+                                        }
+                                      >
+                                        <FileDown className="h-4 w-4 mr-1" />
+                                        DOCX
+                                      </Button>
+                                    </>
+                                  )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Pagination Controls */}
+                  <div className="flex items-center justify-between border-t pt-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        Rows per page:
+                      </span>
+                      <Select
+                        value={rowsPerPage.toString()}
+                        onValueChange={(value) => {
+                          setRowsPerPage(Number(value));
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="w-[70px] h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="5">5</SelectItem>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm text-muted-foreground ml-4">
+                        Showing {(currentPage - 1) * rowsPerPage + 1} to{" "}
+                        {Math.min(currentPage * rowsPerPage, sortedRows.length)}{" "}
+                        of {sortedRows.length} entries
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                      >
+                        First
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+                      <span className="text-sm px-2">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                      >
+                        Last
+                      </Button>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           ) : (
@@ -1289,18 +1664,42 @@ export default function ReviewAppraisal() {
                               className="font-semibold"
                               data-testid={`appraisal-title-${appraisal.id}`}
                             >
-                              {appraisal.appraisalGroupId
-                                ? appraisalGroupsMap.get(
-                                    appraisal.appraisalGroupId
-                                  ) || "Unknown Group"
-                                : "Unknown Group"}
+                              {appraisal.appraisalGroup?.name ||
+                                (appraisal.appraisalGroupId
+                                  ? appraisalGroupsMap.get(
+                                      appraisal.appraisalGroupId,
+                                    ) || "Unknown Group"
+                                  : "Unknown Group")}
+                              {getAppraisalCycleName(
+                                appraisal.frequencyCalendarId,
+                              ) && (
+                                <span className="text-muted-foreground font-normal ml-2">
+                                  (
+                                  {getAppraisalCycleName(
+                                    appraisal.frequencyCalendarId,
+                                  )}
+                                  )
+                                </span>
+                              )}
                             </h4>
                             <p
                               className="text-sm text-muted-foreground"
                               data-testid={`appraisal-type-${appraisal.id}`}
                             >
-                              {appraisal.appraisalType} • Status:{" "}
-                              {appraisal.status}
+                              {getAppraisalTypeLabel(appraisal.appraisalType)}
+                              {appraisal.frequencyCalendarId &&
+                                frequencyCalendarMap.get(
+                                  appraisal.frequencyCalendarId,
+                                ) && (
+                                  <>
+                                    {" "}
+                                    •{" "}
+                                    {frequencyCalendarMap.get(
+                                      appraisal.frequencyCalendarId,
+                                    )}
+                                  </>
+                                )}{" "}
+                              • Status: {getStatusLabel(appraisal.status)}
                             </p>
                           </div>
                         </div>
@@ -1324,10 +1723,15 @@ export default function ReviewAppraisal() {
                             data-testid={`progress-bar-${appraisal.id}`}
                           />
                           <Badge
-                            variant="outline"
+                            variant={
+                              appraisal.status === true ||
+                              appraisal.status === "active"
+                                ? "default"
+                                : "outline"
+                            }
                             data-testid={`status-badge-${appraisal.id}`}
                           >
-                            {appraisal.status}
+                            {getStatusLabel(appraisal.status)}
                           </Badge>
                         </div>
                       </div>
@@ -1374,7 +1778,7 @@ export default function ReviewAppraisal() {
                                           {employeeProgress.employee.locationId
                                             ? locationMap.get(
                                                 employeeProgress.employee
-                                                  .locationId
+                                                  .locationId,
                                               ) || "N/A"
                                             : "N/A"}
                                         </TableCell>
@@ -1400,18 +1804,18 @@ export default function ReviewAppraisal() {
                                               "completed"
                                                 ? "default"
                                                 : employeeProgress.status ===
-                                                  "in_progress"
-                                                ? "secondary"
-                                                : employeeProgress.status ===
-                                                  "overdue"
-                                                ? "destructive"
-                                                : "outline"
+                                                    "in_progress"
+                                                  ? "secondary"
+                                                  : employeeProgress.status ===
+                                                      "overdue"
+                                                    ? "destructive"
+                                                    : "outline"
                                             }
                                           >
                                             {employeeProgress.status
                                               .replace(/_/g, " ")
                                               .replace(/\b\w/g, (l: string) =>
-                                                l.toUpperCase()
+                                                l.toUpperCase(),
                                               )}
                                           </Badge>
                                         </TableCell>
@@ -1428,7 +1832,7 @@ export default function ReviewAppraisal() {
                                                   sendReminder(
                                                     employeeProgress.employee
                                                       .id,
-                                                    appraisal.id
+                                                    appraisal.id,
                                                   )
                                                 }
                                                 data-testid={`button-send-reminder-${employeeProgress.employee.id}`}
@@ -1452,7 +1856,7 @@ export default function ReviewAppraisal() {
                                                       downloadEvaluation(
                                                         employeeProgress
                                                           .evaluation.id,
-                                                        "pdf"
+                                                        "pdf",
                                                       )
                                                     }
                                                     data-testid={`button-download-pdf-${employeeProgress.employee.id}`}
@@ -1470,7 +1874,7 @@ export default function ReviewAppraisal() {
                                                       downloadEvaluation(
                                                         employeeProgress
                                                           .evaluation.id,
-                                                        "docx"
+                                                        "docx",
                                                       )
                                                     }
                                                     data-testid={`button-download-docx-${employeeProgress.employee.id}`}
@@ -1486,7 +1890,7 @@ export default function ReviewAppraisal() {
                                           </div>
                                         </TableCell>
                                       </TableRow>
-                                    )
+                                    ),
                                   )
                                 ) : (
                                   <TableRow

@@ -65,13 +65,13 @@ const navItems: NavItem[] = [
     icon: Building2,
     roles: ["admin"],
   },
-  {
-    href: "/levels",
-    label: "Level Management",
-    icon: Layers,
-    roles: ["admin"],
-  },
-  { href: "/grades", label: "Grade Management", icon: Award, roles: ["admin"] },
+  // {
+  //   href: "/levels",
+  //   label: "Level Management",
+  //   icon: Layers,
+  //   roles: ["admin"],
+  // },
+  // { href: "/grades", label: "Grade Management", icon: Award, roles: ["admin"] },
   {
     href: "/users",
     label: "User Management",

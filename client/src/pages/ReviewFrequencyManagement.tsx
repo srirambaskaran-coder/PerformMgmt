@@ -274,7 +274,7 @@ export default function ReviewFrequencyManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/review-frequencies"] });
       toast({
         title: "Success",
-        description: "Review frequency deleted successfully",
+        description: "Review frequency marked as inactive",
       });
     },
     onError: (error: any) => {
@@ -450,7 +450,17 @@ export default function ReviewFrequencyManagement() {
               </DialogHeader>
               <Form {...form}>
                 <form
-                  onSubmit={form.handleSubmit(onSubmit)}
+                  onSubmit={form.handleSubmit(onSubmit, (errors) => {
+                    console.error("Form validation errors:", errors);
+                    const firstError = Object.values(errors)[0];
+                    if (firstError?.message) {
+                      toast({
+                        title: "Validation Error",
+                        description: String(firstError.message),
+                        variant: "destructive",
+                      });
+                    }
+                  })}
                   className="space-y-4"
                 >
                   <div className="grid grid-cols-2 gap-4">
@@ -459,7 +469,7 @@ export default function ReviewFrequencyManagement() {
                       name="code"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Frequency Code</FormLabel>
+                          <FormLabel>Frequency Code *</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -501,7 +511,7 @@ export default function ReviewFrequencyManagement() {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description</FormLabel>
+                        <FormLabel>Description *</FormLabel>
                         <FormControl>
                           <Textarea
                             {...field}
@@ -554,9 +564,18 @@ export default function ReviewFrequencyManagement() {
               placeholder="Search by code or description..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 pr-8"
               data-testid="input-search"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <MultiSelect
             options={[
@@ -616,28 +635,16 @@ export default function ReviewFrequencyManagement() {
                     "border-2 border-primary bg-primary/5",
                 )}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Clock className="h-5 w-5 text-purple-600" />
-                      <div>
-                        <CardTitle
-                          className="text-lg"
-                          data-testid={`text-code-${frequency.id}`}
-                        >
-                          {frequency.code}
-                        </CardTitle>
-                        <Badge
-                          variant={
-                            frequency.status === "active"
-                              ? "default"
-                              : "secondary"
-                          }
-                          data-testid={`badge-status-${frequency.id}`}
-                        >
-                          {frequency.status}
-                        </Badge>
-                      </div>
+                      <Clock className="h-4 w-4 text-purple-600" />
+                      <CardTitle
+                        className="text-base"
+                        data-testid={`text-code-${frequency.id}`}
+                      >
+                        {frequency.code}
+                      </CardTitle>
                     </div>
                     <div className="flex gap-1">
                       <Button
@@ -648,26 +655,39 @@ export default function ReviewFrequencyManagement() {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(frequency.id)}
-                        disabled={deleteMutation.isPending}
-                        data-testid={`button-delete-${frequency.id}`}
-                        title="Mark Inactive"
-                      >
-                        <Ban className="h-4 w-4" />
-                      </Button>
+                      {frequency.status !== "inactive" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(frequency.id)}
+                          disabled={deleteMutation.isPending}
+                          data-testid={`button-delete-${frequency.id}`}
+                          title="Mark Inactive"
+                        >
+                          <Ban className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <p
-                    className="text-sm text-muted-foreground"
-                    data-testid={`text-description-${frequency.id}`}
-                  >
-                    {frequency.description || "No description provided"}
-                  </p>
+                <CardContent className="pt-0 pb-3">
+                  <div className="flex items-center justify-between">
+                    <p
+                      className="text-sm text-muted-foreground"
+                      data-testid={`text-description-${frequency.id}`}
+                    >
+                      Description:{" "}
+                      {frequency.description || "No description provided"}
+                    </p>
+                    <Badge
+                      variant={
+                        frequency.status === "active" ? "default" : "secondary"
+                      }
+                      data-testid={`badge-status-${frequency.id}`}
+                    >
+                      {frequency.status}
+                    </Badge>
+                  </div>
                 </CardContent>
               </Card>
             ))}

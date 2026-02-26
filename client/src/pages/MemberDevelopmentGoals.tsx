@@ -85,8 +85,6 @@ interface FilterState {
   employeeSearch: string;
   location: string;
   department: string;
-  level: string;
-  grade: string;
   manager: string;
 }
 
@@ -97,8 +95,6 @@ export default function MemberDevelopmentGoals() {
     employeeSearch: "",
     location: "all",
     department: "all",
-    level: "all",
-    grade: "all",
     manager: "all",
   });
 
@@ -362,32 +358,6 @@ export default function MemberDevelopmentGoals() {
     }));
   }, [baseGoals]);
 
-  const levels = useMemo(() => {
-    const lvls = new Set<string>();
-    baseGoals.forEach((goal) => {
-      if (goal.employee?.levelId) {
-        lvls.add(goal.employee.levelId);
-      }
-    });
-    return Array.from(lvls).map((id) => ({
-      id,
-      name: `Level ${id.substring(0, 8)}...`,
-    }));
-  }, [baseGoals]);
-
-  const grades = useMemo(() => {
-    const grds = new Set<string>();
-    baseGoals.forEach((goal) => {
-      if (goal.employee?.gradeId) {
-        grds.add(goal.employee.gradeId);
-      }
-    });
-    return Array.from(grds).map((id) => ({
-      id,
-      name: `Grade ${id.substring(0, 8)}...`,
-    }));
-  }, [baseGoals]);
-
   const managers = useMemo(() => {
     const mgrs = new Set<string>();
     baseGoals.forEach((goal) => {
@@ -442,14 +412,6 @@ export default function MemberDevelopmentGoals() {
         filters.department !== "all" &&
         goal.employee?.department !== filters.department
       ) {
-        return false;
-      }
-
-      if (filters.level !== "all" && goal.employee?.levelId !== filters.level) {
-        return false;
-      }
-
-      if (filters.grade !== "all" && goal.employee?.gradeId !== filters.grade) {
         return false;
       }
 
@@ -519,8 +481,6 @@ export default function MemberDevelopmentGoals() {
       employeeSearch: "",
       location: "all",
       department: "all",
-      level: "all",
-      grade: "all",
       manager: "all",
     });
   };
@@ -544,26 +504,26 @@ export default function MemberDevelopmentGoals() {
         <div className="flex items-center justify-between">
           <div>
             <h1
-              className="text-3xl font-bold text-foreground flex items-center gap-2"
+              className="text-2xl font-bold text-foreground flex items-center gap-2"
               data-testid="page-title"
             >
-              <Users className="h-8 w-8 text-primary" />
+              <Users className="h-6 w-6 text-primary" />
               Member Development Goals
             </h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               View and track development goals of your team members
             </p>
           </div>
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
+          <CardHeader className="py-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Filter className="h-4 w-4" />
               Filters
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0 pb-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">
@@ -676,50 +636,6 @@ export default function MemberDevelopmentGoals() {
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Level</label>
-                <Select
-                  value={filters.level}
-                  onValueChange={(value) =>
-                    setFilters({ ...filters, level: value })
-                  }
-                >
-                  <SelectTrigger data-testid="filter-level">
-                    <SelectValue placeholder="All Levels" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Levels</SelectItem>
-                    {levels.map((level: any) => (
-                      <SelectItem key={level.id} value={level.id}>
-                        {level.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-2 block">Grade</label>
-                <Select
-                  value={filters.grade}
-                  onValueChange={(value) =>
-                    setFilters({ ...filters, grade: value })
-                  }
-                >
-                  <SelectTrigger data-testid="filter-grade">
-                    <SelectValue placeholder="All Grades" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Grades</SelectItem>
-                    {grades.map((grade: any) => (
-                      <SelectItem key={grade.id} value={grade.id}>
-                        {grade.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
                 <label className="text-sm font-medium mb-2 block">
                   Reporting Manager
                 </label>
@@ -744,9 +660,10 @@ export default function MemberDevelopmentGoals() {
               </div>
             </div>
 
-            <div className="flex gap-4 mt-6">
+            <div className="flex justify-end mt-4">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={handleClearFilters}
                 data-testid="btn-clear-filters"
               >

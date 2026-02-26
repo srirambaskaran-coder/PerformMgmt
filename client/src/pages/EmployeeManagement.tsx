@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
@@ -84,6 +84,10 @@ import {
   EyeOff,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   X as XIcon,
   LayoutGrid,
   LayoutList,
@@ -187,7 +191,7 @@ function MultiSelect({
 
 export default function EmployeeManagement() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilters, setRoleFilters] = useState<string[]>([]);
+  const [departmentFilters, setDepartmentFilters] = useState<string[]>([]);
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [companyFilters, setCompanyFilters] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"card" | "table">("card");
@@ -199,6 +203,10 @@ export default function EmployeeManagement() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -214,9 +222,21 @@ export default function EmployeeManagement() {
   });
 
   // Normalize users to handle API response with uppercase keys
-  const users: User[] = usersRaw.map(
-    (user: any) => normalizeUser(user) as User,
-  );
+  const users: User[] = useMemo(() => {
+    return usersRaw.map((user: any) => {
+      const normalized = normalizeUser(user) as User;
+      // Add manager info from API response
+      (normalized as any).managerFirstName =
+        user.ManagerFirstName || user.managerFirstName || "";
+      (normalized as any).managerLastName =
+        user.ManagerLastName || user.managerLastName || "";
+      (normalized as any).departmentName =
+        user.DepartmentName || user.departmentName || "";
+      (normalized as any).locationName =
+        user.LocationName || user.locationName || "";
+      return normalized;
+    });
+  }, [usersRaw]);
 
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations"],
@@ -388,12 +408,15 @@ export default function EmployeeManagement() {
       }
       await apiRequest("PUT", `/api/users/${id}`, payload);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setEditingUser(null);
+      const statusChanged = variables.userData.status !== undefined;
       toast({
         title: "Success",
-        description: "User updated successfully",
+        description: statusChanged
+          ? `User status updated to ${variables.userData.status}`
+          : "User updated successfully",
       });
     },
     onError: (error) => {
@@ -883,40 +906,120 @@ export default function EmployeeManagement() {
   };
 
   // Enrich users with company information
-  const enrichedUsers = users.map((user) => {
-    const company = companies.find((c: any) => c.id === user.companyId);
-    return {
-      ...user,
-      companyName: company?.name || null,
-    };
-  });
+  const enrichedUsers = useMemo(() => {
+    return users.map((user) => {
+      const company = companies.find((c: any) => c.id === user.companyId);
+      return {
+        ...user,
+        companyName: company?.name || null,
+      };
+    });
+  }, [users, companies]);
 
-  const filteredUsers = enrichedUsers.filter((user) => {
-    // For non-super admins, only show users from their company
-    if (!isSuperAdmin && currentUser?.companyId) {
-      if (user.companyId !== currentUser.companyId) return false;
+  const filteredUsers = useMemo(() => {
+    if (!enrichedUsers || enrichedUsers.length === 0) return [];
+
+    const searchTerm = searchQuery.trim().toLowerCase();
+
+    return enrichedUsers.filter((user: any) => {
+      // For non-super admins, only show users from their company
+      if (!isSuperAdmin && currentUser?.companyId) {
+        if (user.companyId !== currentUser.companyId) return false;
+      }
+
+      // Search filter - match against firstName, lastName, email, or code
+      const matchesSearch =
+        searchTerm === "" ||
+        (user.firstName && user.firstName.toLowerCase().includes(searchTerm)) ||
+        (user.lastName && user.lastName.toLowerCase().includes(searchTerm)) ||
+        (user.email && user.email.toLowerCase().includes(searchTerm)) ||
+        (user.code && user.code.toLowerCase().includes(searchTerm));
+
+      const matchesDepartment =
+        departmentFilters.length === 0 ||
+        (user.departmentName && departmentFilters.includes(user.departmentName));
+
+      const matchesStatus =
+        statusFilters.length === 0 ||
+        (user.status && statusFilters.includes(user.status));
+
+      const matchesCompany =
+        companyFilters.length === 0 ||
+        (user.companyId && companyFilters.includes(user.companyId));
+
+      return (
+        matchesSearch && matchesDepartment && matchesStatus && matchesCompany
+      );
+    });
+  }, [
+    enrichedUsers,
+    searchQuery,
+    departmentFilters,
+    statusFilters,
+    companyFilters,
+    isSuperAdmin,
+    currentUser?.companyId,
+  ]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, departmentFilters, statusFilters, companyFilters]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const paginatedUsers = useMemo(() => {
+    return filteredUsers.slice(startIndex, endIndex);
+  }, [filteredUsers, startIndex, endIndex]);
+
+  // Pagination handlers
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const goToFirstPage = () => setCurrentPage(1);
+  const goToLastPage = () => setCurrentPage(totalPages);
+  const goToPreviousPage = () =>
+    setCurrentPage((prev) => Math.max(1, prev - 1));
+  const goToNextPage = () =>
+    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    const maxVisiblePages = 5;
+
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push("...");
+        for (let i = totalPages - 3; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        pages.push(1);
+        pages.push("...");
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(totalPages);
+      }
     }
-
-    const matchesSearch =
-      searchQuery === "" ||
-      user.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesRole =
-      roleFilters.length === 0 ||
-      (user.role && roleFilters.includes(user.role));
-
-    const matchesStatus =
-      statusFilters.length === 0 ||
-      (user.status && statusFilters.includes(user.status));
-
-    const matchesCompany =
-      companyFilters.length === 0 ||
-      (user.companyId && companyFilters.includes(user.companyId));
-
-    return matchesSearch && matchesRole && matchesStatus && matchesCompany;
-  });
+    return pages;
+  };
 
   const resetForm = () => {
     setEditingUser(null);
@@ -1038,7 +1141,7 @@ export default function EmployeeManagement() {
                         name="firstName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>First Name</FormLabel>
+                            <FormLabel>First Name *</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
@@ -1055,7 +1158,7 @@ export default function EmployeeManagement() {
                         name="lastName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Last Name</FormLabel>
+                            <FormLabel>Last Name *</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
@@ -1075,7 +1178,7 @@ export default function EmployeeManagement() {
                         name="email"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Email</FormLabel>
+                            <FormLabel>Email *</FormLabel>
                             <FormControl>
                               <Input
                                 type="email"
@@ -1097,7 +1200,7 @@ export default function EmployeeManagement() {
                         name="code"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Employee Code</FormLabel>
+                            <FormLabel>Employee Code *</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
@@ -1978,23 +2081,35 @@ export default function EmployeeManagement() {
                   placeholder="Search employees..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 pr-8"
                   data-testid="search-employees"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </button>
+                )}
               </div>
 
               <MultiSelect
-                options={[
-                  { value: "employee", label: "Employee" },
-                  { value: "manager", label: "Manager" },
-                  { value: "hr_manager", label: "HR Manager" },
-                  { value: "admin", label: "Administrator" },
-                  { value: "super_admin", label: "Super Administrator" },
-                ]}
-                selected={roleFilters}
-                onChange={setRoleFilters}
-                placeholder="All Roles"
-                label="roles"
+                options={Array.from(
+                  new Set(
+                    users
+                      .map((user: any) => user.departmentName)
+                      .filter(Boolean)
+                  )
+                ).map((deptName: string) => ({
+                  value: deptName,
+                  label: deptName,
+                }))}
+                selected={departmentFilters}
+                onChange={setDepartmentFilters}
+                placeholder="All Departments"
+                label="departments"
               />
 
               <MultiSelect
@@ -2033,7 +2148,9 @@ export default function EmployeeManagement() {
               {filteredUsers.length !== 1 ? "s" : ""} found
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent
+            key={`content-${searchQuery}-${departmentFilters.join(",")}-${statusFilters.join(",")}-${companyFilters.join(",")}`}
+          >
             {isLoading ? (
               <div className="space-y-4">
                 {[...Array(5)].map((_, i) => (
@@ -2054,16 +2171,19 @@ export default function EmployeeManagement() {
                 <p className="text-muted-foreground">No employees found</p>
               </div>
             ) : viewMode === "card" ? (
-              <div className="space-y-4">
-                {filteredUsers.map((user) => (
+              <div
+                className="space-y-2"
+                key={`card-list-${filteredUsers.length}`}
+              >
+                {paginatedUsers.map((user) => (
                   <div
                     key={user.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/20 transition-colors"
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/20 transition-colors"
                     data-testid={`user-row-${user.id}`}
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                        <span className="text-primary-foreground font-medium text-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-primary rounded-full flex items-center justify-center">
+                        <span className="text-primary-foreground font-medium text-xs">
                           {user.firstName?.[0]}
                           {user.lastName?.[0]}
                         </span>
@@ -2071,7 +2191,7 @@ export default function EmployeeManagement() {
                       <div>
                         <div className="flex items-center gap-2">
                           <p
-                            className="font-medium"
+                            className="font-medium text-sm"
                             data-testid={`user-name-${user.id}`}
                           >
                             {user.firstName} {user.lastName}
@@ -2085,43 +2205,12 @@ export default function EmployeeManagement() {
                             </Badge>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {user.email}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {user.designation}
+                        <p className="text-xs text-muted-foreground">
+                          {user.email} • {user.designation}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex flex-wrap gap-1">
-                        {((user as any).roles &&
-                        Array.isArray((user as any).roles)
-                          ? (user as any).roles
-                          : [user.role]
-                        ).map((role: string, index: number) => {
-                          // Normalize role for comparison and display
-                          const normalizedRole =
-                            role?.toLowerCase().replace(/_/g, "") || "";
-                          return (
-                            <Badge
-                              key={`${user.id}-${role}-${index}`}
-                              variant={
-                                normalizedRole === "superadmin"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                              data-testid={`user-role-${user.id}-${role}`}
-                            >
-                              {normalizedRole === "hrmanager"
-                                ? "HR Manager"
-                                : normalizedRole === "superadmin"
-                                  ? "Super Admin"
-                                  : role?.replace("_", " ")}
-                            </Badge>
-                          );
-                        })}
-                      </div>
+                    <div className="flex items-center gap-2">
                       <Badge
                         variant={
                           user.status === "active" ? "default" : "secondary"
@@ -2152,20 +2241,19 @@ export default function EmployeeManagement() {
                 ))}
               </div>
             ) : (
-              <Table>
+              <Table key={`table-list-${filteredUsers.length}`}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Employee</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Designation</TableHead>
-                    <TableHead>Roles</TableHead>
+                    <TableHead>Manager</TableHead>
                     {isSuperAdmin && <TableHead>Company</TableHead>}
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers.map((user) => (
+                  {paginatedUsers.map((user) => (
                     <TableRow
                       key={user.id}
                       data-testid={`user-table-row-${user.id}`}
@@ -2194,34 +2282,10 @@ export default function EmployeeManagement() {
                       <TableCell>{user.email}</TableCell>
                       <TableCell>{user.designation}</TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {((user as any).roles &&
-                          Array.isArray((user as any).roles)
-                            ? (user as any).roles
-                            : [user.role]
-                          ).map((role: string, index: number) => {
-                            // Normalize role for comparison and display
-                            const normalizedRole =
-                              role?.toLowerCase().replace(/_/g, "") || "";
-                            return (
-                              <Badge
-                                key={`${user.id}-${role}-${index}`}
-                                variant={
-                                  normalizedRole === "superadmin"
-                                    ? "default"
-                                    : "secondary"
-                                }
-                                data-testid={`user-role-${user.id}-${role}`}
-                              >
-                                {normalizedRole === "hrmanager"
-                                  ? "HR Manager"
-                                  : normalizedRole === "superadmin"
-                                    ? "Super Admin"
-                                    : role?.replace("_", " ")}
-                              </Badge>
-                            );
-                          })}
-                        </div>
+                        {(user as any).managerFirstName ||
+                        (user as any).managerLastName
+                          ? `${(user as any).managerFirstName || ""} ${(user as any).managerLastName || ""}`.trim()
+                          : "-"}
                       </TableCell>
                       {isSuperAdmin && (
                         <TableCell>
@@ -2244,30 +2308,106 @@ export default function EmployeeManagement() {
                           {user.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(user)}
-                            data-testid={`edit-user-${user.id}`}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(user.id)}
-                            data-testid={`delete-user-${user.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+            )}
+
+            {/* Pagination Controls */}
+            {filteredUsers.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t mt-4">
+                {/* Rows per page selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    Rows per page:
+                  </span>
+                  <Select
+                    value={String(rowsPerPage)}
+                    onValueChange={(value) => {
+                      setRowsPerPage(Number(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[70px] h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Page info */}
+                <div className="text-sm text-muted-foreground">
+                  Showing {startIndex + 1} to{" "}
+                  {Math.min(endIndex, filteredUsers.length)} of{" "}
+                  {filteredUsers.length} entries
+                </div>
+
+                {/* Page navigation */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={goToFirstPage}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={goToPreviousPage}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  {getPageNumbers().map((page, index) =>
+                    typeof page === "number" ? (
+                      <Button
+                        key={index}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => goToPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ) : (
+                      <span key={index} className="px-2 text-muted-foreground">
+                        ...
+                      </span>
+                    ),
+                  )}
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={goToNextPage}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={goToLastPage}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>

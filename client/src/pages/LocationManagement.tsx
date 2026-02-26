@@ -331,7 +331,7 @@ export default function LocationManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
       toast({
         title: "Success",
-        description: "Location deleted successfully",
+        description: "Location marked as inactive",
       });
     },
     onError: (error) => {
@@ -711,9 +711,18 @@ export default function LocationManagement() {
                   placeholder="Search locations..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 pr-8"
                   data-testid="search-locations"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </button>
+                )}
               </div>
               <MultiSelect
                 options={[

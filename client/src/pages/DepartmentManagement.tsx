@@ -297,7 +297,7 @@ export default function DepartmentManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/departments"] });
       toast({
         title: "Success",
-        description: "Department deleted successfully",
+        description: "Department marked as inactive",
       });
     },
     onError: (error) => {
@@ -506,9 +506,18 @@ export default function DepartmentManagement() {
                   placeholder="Search departments..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 pr-8"
                   data-testid="input-search-departments"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </button>
+                )}
               </div>
               <MultiSelect
                 options={[

@@ -48,6 +48,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
 
+// Helper function to clean up names that end with "null"
+const cleanName = (name: string | null | undefined): string => {
+  if (!name) return "";
+  return name.replace(/\s+null$/i, "").trim();
+};
+
 export default function CalibrateRatings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -70,8 +76,6 @@ export default function CalibrateRatings() {
     employeeSearch: "",
     location: "all",
     department: "all",
-    level: "all",
-    grade: "all",
     manager: "all",
   });
 
@@ -80,81 +84,64 @@ export default function CalibrateRatings() {
     queryKey: ["/api/evaluations/calibrate"],
   });
 
-  // Fetch filter options
-  const { data: appraisalGroups } = useQuery({
-    queryKey: ["/api/appraisal-groups"],
-  });
+  // Extract unique filter options from evaluations response data
+  const filterOptions = useMemo(() => {
+    if (!evaluations)
+      return {
+        locations: [],
+        departments: [],
+        managers: [],
+        appraisalGroups: [],
+        appraisalCycles: [],
+        frequencyCalendars: [],
+      };
 
-  const { data: appraisalCycles } = useQuery({
-    queryKey: ["/api/appraisal-cycles"],
-  });
+    const locSet = new Map<string, string>();
+    const deptSet = new Set<string>();
+    const mgrMap = new Map<string, string>();
+    const groupMap = new Map<string, string>();
+    const cycleMap = new Map<string, string>();
+    const calMap = new Map<string, string>();
 
-  const { data: locations } = useQuery({
-    queryKey: ["/api/locations"],
-  });
+    (evaluations as any[]).forEach((ev: any) => {
+      if (ev.locationName && ev.locationName !== "N/A")
+        locSet.set(ev.locationName, ev.locationName);
+      if (ev.department && ev.department !== "N/A") deptSet.add(ev.department);
+      if (ev.managerId && ev.managerName)
+        mgrMap.set(ev.managerId, cleanName(ev.managerName));
+      if (ev.appraisalGroupId && ev.appraisalGroupName)
+        groupMap.set(ev.appraisalGroupId, ev.appraisalGroupName);
+      if (
+        ev.appraisalCycleId &&
+        ev.appraisalCycleName &&
+        ev.appraisalCycleName !== "N/A"
+      )
+        cycleMap.set(ev.appraisalCycleId, ev.appraisalCycleName);
+      if (
+        ev.frequencyCalendarId &&
+        ev.frequencyCalendarName &&
+        ev.frequencyCalendarName !== "N/A"
+      )
+        calMap.set(ev.frequencyCalendarId, ev.frequencyCalendarName);
+    });
 
-  const { data: departments } = useQuery({
-    queryKey: ["/api/departments"],
-    select: (data: any[]) => {
-      return data.map((dept: any) => ({
-        id: dept.Id,
-        code: dept.Code,
-        description: dept.Description,
-      }));
-    },
-  });
-
-  const { data: levels } = useQuery({
-    queryKey: ["/api/levels"],
-    select: (data: any[]) => {
-      return data.map((level: any) => ({
-        id: level.Id,
-        code: level.Code,
-        description: level.Description,
-      }));
-    },
-  });
-
-  const { data: grades } = useQuery({
-    queryKey: ["/api/grades"],
-    select: (data: any[]) => {
-      return data.map((grade: any) => ({
-        id: grade.Id,
-        code: grade.Code,
-        description: grade.Description,
-      }));
-    },
-  });
-
-  const { data: managers } = useQuery({
-    queryKey: ["/api/users?role=manager"],
-    select: (data: any[]) => {
-      return data.map((user: any) => ({
-        id: user.Id,
-        firstName: user.FirstName,
-        lastName: user.LastName,
-        email: user.Email,
-      }));
-    },
-  });
-
-  const { data: frequencyCalendars } = useQuery({
-    queryKey: ["/api/frequency-calendars"],
-  });
-
-  const { data: frequencyCalendarDetails } = useQuery({
-    queryKey: ["/api/frequency-calendar-details"],
-  });
-
-  // Filter frequency calendar details based on selected calendar
-  const filteredCalendarDetails = useMemo(() => {
-    if (!frequencyCalendarDetails || filters.frequencyCalendar === "all") {
-      return (frequencyCalendarDetails as any[]) || [];
-    }
-    return (frequencyCalendarDetails as any[]).filter(
-      (detail: any) => detail.frequencyCalendarId === filters.frequencyCalendar
-    );
-  }, [frequencyCalendarDetails, filters.frequencyCalendar]);
+    return {
+      locations: Array.from(locSet.values()).sort(),
+      departments: Array.from(deptSet).sort(),
+      managers: Array.from(mgrMap.entries())
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      appraisalGroups: Array.from(groupMap.entries())
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      appraisalCycles: Array.from(cycleMap.entries())
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      frequencyCalendars: Array.from(calMap.entries())
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    };
+  }, [evaluations]);
 
   // Update calibration mutation
   const updateCalibrationMutation = useMutation({
@@ -168,12 +155,12 @@ export default function CalibrateRatings() {
       calibrationRemarks: string;
     }) => {
       const response = await apiRequest(
-        "PATCH",
+        "PUT",
         `/api/evaluations/${evaluationId}/calibrate`,
         {
           calibratedRating,
           calibrationRemarks,
-        }
+        },
       );
 
       if (!response.ok) {
@@ -210,7 +197,7 @@ export default function CalibrateRatings() {
   const handleEditCalibration = (evaluation: any) => {
     setEditingEvaluation(evaluation);
     setCalibratedRating(
-      evaluation.calibratedRating ?? evaluation.overallRating ?? null
+      evaluation.calibratedRating ?? evaluation.overallRating ?? null,
     );
     setCalibrationRemarks(evaluation.calibrationRemarks || "");
   };
@@ -230,7 +217,7 @@ export default function CalibrateRatings() {
       const response = await apiRequest(
         "POST",
         "/api/evaluations/calibrate/import",
-        { calibrations: data }
+        { calibrations: data },
       );
       if (!response.ok) {
         const errorData = await response
@@ -263,29 +250,12 @@ export default function CalibrateRatings() {
 
   const handleDownloadTemplate = () => {
     try {
-      const selectedCycle =
-        filters.appraisalCycle !== "all"
-          ? (appraisalCycles as any[])?.find(
-              (c: any) => c.id === filters.appraisalCycle
-            )
-          : null;
-      const selectedCalendarDetail =
-        filters.frequencyCalendarDetails !== "all"
-          ? (frequencyCalendarDetails as any[])?.find(
-              (d: any) => d.id === filters.frequencyCalendarDetails
-            )
-          : null;
-
       const templateData = filteredEvaluations.map((evaluation: any) => ({
         "Evaluation ID": evaluation.id,
         "Employee Code": evaluation.employeeCode,
         "Employee Name": evaluation.employeeName,
-        "Appraisal Cycle": selectedCycle
-          ? `${selectedCycle.code} - ${selectedCycle.description}`
-          : evaluation.appraisalCycleCode || "N/A",
-        "Calendar Period": selectedCalendarDetail
-          ? selectedCalendarDetail.displayName
-          : evaluation.calendarPeriodName || "N/A",
+        "Appraisal Cycle": evaluation.appraisalCycleName || "N/A",
+        "Calendar Period": evaluation.frequencyCalendarName || "N/A",
         "Current Manager Rating": evaluation.overallRating ?? "",
         "Calibrated Rating": evaluation.calibratedRating ?? "",
         Remarks: evaluation.calibrationRemarks || "",
@@ -296,12 +266,8 @@ export default function CalibrateRatings() {
           "Evaluation ID": "",
           "Employee Code": "",
           "Employee Name": "",
-          "Appraisal Cycle": selectedCycle
-            ? `${selectedCycle.code} - ${selectedCycle.description}`
-            : "",
-          "Calendar Period": selectedCalendarDetail
-            ? selectedCalendarDetail.displayName
-            : "",
+          "Appraisal Cycle": "",
+          "Calendar Period": "",
           "Current Manager Rating": "",
           "Calibrated Rating": "",
           Remarks: "",
@@ -443,13 +409,12 @@ export default function CalibrateRatings() {
         return false;
       }
 
-      // Frequency calendar details filter
-      if (
-        filters.frequencyCalendarDetails !== "all" &&
-        evaluation.frequencyCalendarDetailId !==
-          filters.frequencyCalendarDetails
-      ) {
-        return false;
+      // Frequency calendar details filter (by date range key)
+      if (filters.frequencyCalendarDetails !== "all") {
+        const evalKey = `${evaluation.frequencyCalendarStartDate}_${evaluation.frequencyCalendarEndDate}`;
+        if (evalKey !== filters.frequencyCalendarDetails) {
+          return false;
+        }
       }
 
       // Employee search filter (code or name)
@@ -466,33 +431,23 @@ export default function CalibrateRatings() {
         }
       }
 
-      // Location filter
+      // Location filter (by name)
       if (
         filters.location !== "all" &&
-        evaluation.locationId !== filters.location
+        evaluation.locationName !== filters.location
       ) {
         return false;
       }
 
-      // Department filter
+      // Department filter (by name)
       if (
         filters.department !== "all" &&
-        evaluation.departmentId !== filters.department
+        evaluation.department !== filters.department
       ) {
         return false;
       }
 
-      // Level filter
-      if (filters.level !== "all" && evaluation.levelId !== filters.level) {
-        return false;
-      }
-
-      // Grade filter
-      if (filters.grade !== "all" && evaluation.gradeId !== filters.grade) {
-        return false;
-      }
-
-      // Manager filter
+      // Manager filter (by id)
       if (
         filters.manager !== "all" &&
         evaluation.managerId !== filters.manager
@@ -589,7 +544,7 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Groups</SelectItem>
-                  {((appraisalGroups as any[]) || [])?.map((group: any) => (
+                  {filterOptions.appraisalGroups.map((group) => (
                     <SelectItem key={group.id} value={group.id}>
                       {group.name}
                     </SelectItem>
@@ -619,9 +574,9 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Cycles</SelectItem>
-                  {((appraisalCycles as any[]) || [])?.map((cycle: any) => (
+                  {filterOptions.appraisalCycles.map((cycle) => (
                     <SelectItem key={cycle.id} value={cycle.id}>
-                      {cycle.code} - {cycle.description}
+                      {cycle.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -653,13 +608,11 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Calendars</SelectItem>
-                  {((frequencyCalendars as any[]) || [])?.map(
-                    (calendar: any) => (
-                      <SelectItem key={calendar.id} value={calendar.id}>
-                        {calendar.code} - {calendar.description}
-                      </SelectItem>
-                    )
-                  )}
+                  {filterOptions.frequencyCalendars.map((calendar) => (
+                    <SelectItem key={calendar.id} value={calendar.id}>
+                      {calendar.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -685,26 +638,38 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Details</SelectItem>
-                  {filteredCalendarDetails.map((detail: any) => {
-                    const formatDate = (date: Date | string) => {
+                  {(() => {
+                    if (!evaluations || filters.frequencyCalendar === "all")
+                      return null;
+                    const detailSet = new Map<
+                      string,
+                      { start: string; end: string }
+                    >();
+                    (evaluations as any[]).forEach((ev: any) => {
+                      if (
+                        ev.frequencyCalendarId === filters.frequencyCalendar &&
+                        ev.frequencyCalendarStartDate &&
+                        ev.frequencyCalendarEndDate
+                      ) {
+                        const key = `${ev.frequencyCalendarStartDate}_${ev.frequencyCalendarEndDate}`;
+                        if (!detailSet.has(key)) {
+                          detailSet.set(key, {
+                            start: ev.frequencyCalendarStartDate,
+                            end: ev.frequencyCalendarEndDate,
+                          });
+                        }
+                      }
+                    });
+                    const formatDate = (date: string) => {
                       const d = new Date(date);
-                      return `${String(d.getDate()).padStart(2, "0")}/${String(
-                        d.getMonth() + 1
-                      ).padStart(2, "0")}/${d.getFullYear()}`;
+                      return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
                     };
-                    const dateRange =
-                      detail.startDate && detail.endDate
-                        ? ` (${formatDate(detail.startDate)} - ${formatDate(
-                            detail.endDate
-                          )})`
-                        : "";
-                    return (
-                      <SelectItem key={detail.id} value={detail.id}>
-                        {detail.displayName}
-                        {dateRange}
+                    return Array.from(detailSet.entries()).map(([key, val]) => (
+                      <SelectItem key={key} value={key}>
+                        {formatDate(val.start)} - {formatDate(val.end)}
                       </SelectItem>
-                    );
-                  })}
+                    ));
+                  })()}
                 </SelectContent>
               </Select>
             </div>
@@ -742,9 +707,9 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Locations</SelectItem>
-                  {((locations as any[]) || [])?.map((location: any) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name}
+                  {filterOptions.locations.map((loc) => (
+                    <SelectItem key={loc} value={loc}>
+                      {loc}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -766,57 +731,9 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Departments</SelectItem>
-                  {((departments as any[]) || [])?.map((dept: any) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="level" data-testid="label-level">
-                Level
-              </Label>
-              <Select
-                value={filters.level}
-                onValueChange={(value) =>
-                  setFilters({ ...filters, level: value })
-                }
-              >
-                <SelectTrigger id="level" data-testid="select-level">
-                  <SelectValue placeholder="Select level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Levels</SelectItem>
-                  {((levels as any[]) || [])?.map((level: any) => (
-                    <SelectItem key={level.id} value={level.id}>
-                      {level.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="grade" data-testid="label-grade">
-                Grade
-              </Label>
-              <Select
-                value={filters.grade}
-                onValueChange={(value) =>
-                  setFilters({ ...filters, grade: value })
-                }
-              >
-                <SelectTrigger id="grade" data-testid="select-grade">
-                  <SelectValue placeholder="Select grade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Grades</SelectItem>
-                  {((grades as any[]) || [])?.map((grade: any) => (
-                    <SelectItem key={grade.id} value={grade.id}>
-                      {grade.name}
+                  {filterOptions.departments.map((dept) => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -838,7 +755,7 @@ export default function CalibrateRatings() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Managers</SelectItem>
-                  {((managers as any[]) || [])?.map((manager: any) => (
+                  {filterOptions.managers.map((manager) => (
                     <SelectItem key={manager.id} value={manager.id}>
                       {manager.name}
                     </SelectItem>
@@ -901,8 +818,8 @@ export default function CalibrateRatings() {
                         data-testid={`appraisal-cycle-${evaluation.id}`}
                         className="text-right font-medium"
                       >
-                        {evaluation.appraisalCycleCode !== "N/A"
-                          ? evaluation.appraisalCycleCode
+                        {evaluation.appraisalCycleName !== "N/A"
+                          ? evaluation.appraisalCycleName
                           : "N/A"}
                       </span>
                     </div>
@@ -916,17 +833,17 @@ export default function CalibrateRatings() {
                       >
                         {evaluation.calendarPeriodName !== "N/A" ? (
                           <>
-                            {evaluation.calendarPeriodName}
-                            {evaluation.calendarPeriodStartDate &&
-                              evaluation.calendarPeriodEndDate && (
+                            {evaluation.frequencyCalendarName}
+                            {evaluation.frequencyCalendarStartDate &&
+                              evaluation.frequencyCalendarEndDate && (
                                 <span className="text-xs text-muted-foreground block">
                                   (
                                   {new Date(
-                                    evaluation.calendarPeriodStartDate
+                                    evaluation.frequencyCalendarStartDate,
                                   ).toLocaleDateString("en-GB")}{" "}
                                   -{" "}
                                   {new Date(
-                                    evaluation.calendarPeriodEndDate
+                                    evaluation.frequencyCalendarEndDate,
                                   ).toLocaleDateString("en-GB")}
                                   )
                                 </span>
@@ -952,7 +869,7 @@ export default function CalibrateRatings() {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Manager:</span>
                       <span data-testid={`manager-${evaluation.id}`}>
-                        {evaluation.managerName}
+                        {cleanName(evaluation.managerName)}
                       </span>
                     </div>
                   </div>
@@ -976,7 +893,7 @@ export default function CalibrateRatings() {
                         </span>
                         <Badge
                           variant={getRatingBadgeColor(
-                            evaluation.calibratedRating
+                            evaluation.calibratedRating,
                           )}
                           data-testid={`calibrated-rating-${evaluation.id}`}
                         >
@@ -1065,11 +982,11 @@ export default function CalibrateRatings() {
                           <span className="text-xs text-muted-foreground block">
                             (
                             {new Date(
-                              evaluation.calendarPeriodStartDate
+                              evaluation.calendarPeriodStartDate,
                             ).toLocaleDateString("en-GB")}{" "}
                             -{" "}
                             {new Date(
-                              evaluation.calendarPeriodEndDate
+                              evaluation.calendarPeriodEndDate,
                             ).toLocaleDateString("en-GB")}
                             )
                           </span>
@@ -1079,7 +996,7 @@ export default function CalibrateRatings() {
                       {evaluation.locationName}
                     </TableCell>
                     <TableCell data-testid={`table-manager-${evaluation.id}`}>
-                      {evaluation.managerName}
+                      {cleanName(evaluation.managerName)}
                     </TableCell>
                     <TableCell
                       data-testid={`table-manager-rating-${evaluation.id}`}
@@ -1096,7 +1013,7 @@ export default function CalibrateRatings() {
                       {evaluation.calibratedRating !== null ? (
                         <Badge
                           variant={getRatingBadgeColor(
-                            evaluation.calibratedRating
+                            evaluation.calibratedRating,
                           )}
                         >
                           {getRatingLabel(evaluation.calibratedRating)}
@@ -1145,7 +1062,7 @@ export default function CalibrateRatings() {
               <div className="p-3 bg-muted rounded-md">
                 <Badge
                   variant={getRatingBadgeColor(
-                    editingEvaluation?.overallRating
+                    editingEvaluation?.overallRating,
                   )}
                 >
                   {getRatingLabel(editingEvaluation?.overallRating)}

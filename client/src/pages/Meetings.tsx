@@ -55,8 +55,40 @@ import {
 import type { Evaluation, User as UserType } from "@shared/schema";
 
 interface EvaluationWithDetails extends Evaluation {
-  employee?: UserType;
-  manager?: UserType;
+  employee?: Partial<UserType> & {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    code?: string;
+    department?: string;
+    designation?: string;
+  };
+  manager?: Partial<UserType> & {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    code?: string;
+    department?: string;
+    designation?: string;
+  };
+  reviewCycle?: {
+    id: string;
+    name: string;
+    description?: string;
+    fromDate?: string;
+    toDate?: string;
+  };
+  frequencyCalendar?: {
+    id: string;
+    code?: string;
+    description?: string;
+  };
+  questionnaires?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    questions?: any[];
+  }>;
 }
 
 interface MeetingNotesData {
@@ -480,32 +512,104 @@ export default function Meetings() {
     status: evaluation.Status || evaluation.status,
     createdOn: evaluation.CreatedOn || evaluation.createdOn,
     lastUpdatedOn: evaluation.LastUpdatedOn || evaluation.lastUpdatedOn,
+    // Handle employee - API returns Name field instead of FirstName/LastName
     employee: evaluation.employee
       ? {
           id: evaluation.employee.Id || evaluation.employee.id,
           firstName:
-            evaluation.employee.FirstName || evaluation.employee.firstName,
+            evaluation.employee.FirstName ||
+            evaluation.employee.firstName ||
+            evaluation.employee.Name?.split(" ")[0] ||
+            "",
           lastName:
-            evaluation.employee.LastName || evaluation.employee.lastName,
-          email: evaluation.employee.Email || evaluation.employee.email,
+            evaluation.employee.LastName ||
+            evaluation.employee.lastName ||
+            evaluation.employee.Name?.split(" ").slice(1).join(" ") ||
+            "",
+          email:
+            evaluation.employee.Email ||
+            evaluation.employee.email ||
+            evaluation.employee.EmailId ||
+            "",
+          code:
+            evaluation.employee.SystemUserCode ||
+            evaluation.employee.code ||
+            "",
           department:
             evaluation.employee.Department || evaluation.employee.department,
           designation:
             evaluation.employee.Designation || evaluation.employee.designation,
         }
       : undefined,
+    // Handle manager - API returns Name field instead of FirstName/LastName
     manager: evaluation.manager
       ? {
           id: evaluation.manager.Id || evaluation.manager.id,
           firstName:
-            evaluation.manager.FirstName || evaluation.manager.firstName,
-          lastName: evaluation.manager.LastName || evaluation.manager.lastName,
-          email: evaluation.manager.Email || evaluation.manager.email,
+            evaluation.manager.FirstName ||
+            evaluation.manager.firstName ||
+            evaluation.manager.Name?.split(" ")[0] ||
+            "",
+          lastName:
+            evaluation.manager.LastName ||
+            evaluation.manager.lastName ||
+            evaluation.manager.Name?.split(" ").slice(1).join(" ") ||
+            "",
+          email:
+            evaluation.manager.Email ||
+            evaluation.manager.email ||
+            evaluation.manager.EmailId ||
+            "",
+          code:
+            evaluation.manager.SystemUserCode || evaluation.manager.code || "",
           department:
             evaluation.manager.Department || evaluation.manager.department,
           designation:
             evaluation.manager.Designation || evaluation.manager.designation,
         }
+      : undefined,
+    // Handle appraisalCycle and frequencyCalendar
+    reviewCycle: evaluation.appraisalCycle
+      ? {
+          id: evaluation.appraisalCycle.Id || evaluation.appraisalCycle.id,
+          name:
+            evaluation.appraisalCycle.Code ||
+            evaluation.appraisalCycle.code ||
+            evaluation.appraisalCycle.Description ||
+            "",
+          description:
+            evaluation.appraisalCycle.Description ||
+            evaluation.appraisalCycle.description,
+          fromDate:
+            evaluation.appraisalCycle.FromDate ||
+            evaluation.appraisalCycle.fromDate,
+          toDate:
+            evaluation.appraisalCycle.ToDate ||
+            evaluation.appraisalCycle.toDate,
+        }
+      : undefined,
+    frequencyCalendar: evaluation.frequencyCalendar
+      ? {
+          id:
+            evaluation.frequencyCalendar.Id || evaluation.frequencyCalendar.id,
+          code:
+            evaluation.frequencyCalendar.Code ||
+            evaluation.frequencyCalendar.code,
+          description:
+            evaluation.frequencyCalendar.Description ||
+            evaluation.frequencyCalendar.description,
+        }
+      : undefined,
+    questionnaires: evaluation.questionnaires
+      ? evaluation.questionnaires.map((q: any) => ({
+          id: q.Id || q.id,
+          name: q.Name || q.name,
+          description: q.Description || q.description,
+          questions:
+            typeof q.Questions === "string"
+              ? JSON.parse(q.Questions)
+              : q.Questions || q.questions,
+        }))
       : undefined,
   });
 
@@ -526,44 +630,14 @@ export default function Meetings() {
       return data as EvaluationWithDetails[];
     },
     select: (data: any[]) => {
-      // Normalize data from PascalCase to camelCase
+      // Normalize data from PascalCase to camelCase - no filtering, show all data
       const normalizedData = data.map(normalizeEvaluation);
       console.log(
-        "[Meetings] All evaluations before filter:",
+        "[Meetings] All evaluations:",
         normalizedData.length,
+        normalizedData,
       );
-      const filtered = normalizedData.filter(
-        (evaluation: EvaluationWithDetails) => {
-          console.log(
-            "[Meetings] Checking evaluation:",
-            evaluation.id,
-            "Employee:",
-            evaluation.employeeId,
-            "Manager:",
-            evaluation.managerId,
-          );
-          if (activeRole === "manager") {
-            // As Manager: show meetings with reporting members (where user is the manager)
-            const match = evaluation.managerId === user?.id;
-            console.log("[Meetings] Manager match:", match);
-            return match;
-          } else {
-            // As Employee: show meetings where user is the employee
-            const match = evaluation.employeeId === user?.id;
-            console.log(
-              "[Meetings] Employee match:",
-              match,
-              "comparing",
-              evaluation.employeeId,
-              "===",
-              user?.id,
-            );
-            return match;
-          }
-        },
-      );
-      console.log("[Meetings] Filtered evaluations:", filtered.length);
-      return filtered;
+      return normalizedData;
     },
   });
 

@@ -70,16 +70,16 @@ export const adminTourSteps: TourStep[] = [
       "Manage your organizational departments here. Each department can have multiple employees and helps structure your organization.",
     placement: "top",
   },
-  {
-    id: "levels",
-    route: "/levels",
-    title: "Level Management",
-    content:
-      "Define job levels for your organization (e.g., Junior, Senior, Lead, Manager). Levels help categorize employees and set up appropriate review criteria.\n\nLet's see how to create a new level!",
-    placement: "top",
-    showActions: true,
-    actionText: "Click 'Next' to see how to create a level.",
-  },
+  // {
+  //   id: "levels",
+  //   route: "/levels",
+  //   title: "Level Management",
+  //   content:
+  //     "Define job levels for your organization (e.g., Junior, Senior, Lead, Manager). Levels help categorize employees and set up appropriate review criteria.\n\nLet's see how to create a new level!",
+  //   placement: "top",
+  //   showActions: true,
+  //   actionText: "Click 'Next' to see how to create a level.",
+  // },
   // {
   //   id: "levels-create-button",
   //   route: "/levels",
@@ -125,63 +125,63 @@ export const adminTourSteps: TourStep[] = [
   //   action: "saveLevelAndClose",
   // },
   // Grade Management - Interactive
-  {
-    id: "grades",
-    route: "/grades",
-    title: "Grade Management",
-    content:
-      "Grades define employee pay bands and responsibility levels (e.g., Grade 1, Grade 2).\n\nThis is essential for salary structures and career progression.",
-    placement: "right",
-  },
-  {
-    id: "grades-create-button",
-    route: "/grades",
-    title: "Create Grade Button",
-    content:
-      "Click this button to create a new grade. Let's walk through the form together!",
-    targetSelector: "[data-testid='button-create-grade']",
-    placement: "bottom",
-  },
-  {
-    id: "grades-form",
-    route: "/grades",
-    title: "Grade Creation Form",
-    content:
-      "This is the form to create a new grade:\n\n• Grade Code: A unique identifier (e.g., 'G1' for Grade 1)\n• Description: What this grade means\n• Status: Active or Inactive\n\nWe've pre-filled sample data for you!",
-    targetSelector: "[data-testid='dialog-create-grade']",
-    placement: "left",
-    action: "openGradeForm",
-    showActions: true,
-    actionText: "Review the sample data. Click 'Next' to proceed!",
-  },
-  {
-    id: "grades-ready-create",
-    route: "/grades",
-    title: "Ready to Create",
-    content:
-      "Now we'll save this demo grade by clicking the 'Create' button.\n\nIn the real application, this would save to your database.",
-    targetSelector: "[data-testid='button-submit']",
-    placement: "top",
-    showActions: true,
-    actionText: "Click 'Next' to save the demo grade!",
-  },
-  {
-    id: "grades-created",
-    route: "/grades",
-    title: "Grade Created! ✅",
-    content:
-      "The demo grade 'DEMO-G1' was created successfully!\n\nYou can see it highlighted at the top of the list.",
-    targetSelector: "[data-testid='tour-demo-grade']",
-    placement: "bottom",
-    action: "saveGradeAndClose",
-  },
+  // {
+  //   id: "grades",
+  //   route: "/grades",
+  //   title: "Grade Management",
+  //   content:
+  //     "Grades define employee pay bands and responsibility levels (e.g., Grade 1, Grade 2).\n\nThis is essential for salary structures and career progression.",
+  //   placement: "right",
+  // },
+  // {
+  //   id: "grades-create-button",
+  //   route: "/grades",
+  //   title: "Create Grade Button",
+  //   content:
+  //     "Click this button to create a new grade. Let's walk through the form together!",
+  //   targetSelector: "[data-testid='button-create-grade']",
+  //   placement: "bottom",
+  // },
+  // {
+  //   id: "grades-form",
+  //   route: "/grades",
+  //   title: "Grade Creation Form",
+  //   content:
+  //     "This is the form to create a new grade:\n\n• Grade Code: A unique identifier (e.g., 'G1' for Grade 1)\n• Description: What this grade means\n• Status: Active or Inactive\n\nWe've pre-filled sample data for you!",
+  //   targetSelector: "[data-testid='dialog-create-grade']",
+  //   placement: "left",
+  //   action: "openGradeForm",
+  //   showActions: true,
+  //   actionText: "Review the sample data. Click 'Next' to proceed!",
+  // },
+  // {
+  //   id: "grades-ready-create",
+  //   route: "/grades",
+  //   title: "Ready to Create",
+  //   content:
+  //     "Now we'll save this demo grade by clicking the 'Create' button.\n\nIn the real application, this would save to your database.",
+  //   targetSelector: "[data-testid='button-submit']",
+  //   placement: "top",
+  //   showActions: true,
+  //   actionText: "Click 'Next' to save the demo grade!",
+  // },
+  // {
+  //   id: "grades-created",
+  //   route: "/grades",
+  //   title: "Grade Created! ✅",
+  //   content:
+  //     "The demo grade 'DEMO-G1' was created successfully!\n\nYou can see it highlighted at the top of the list.",
+  //   targetSelector: "[data-testid='tour-demo-grade']",
+  //   placement: "bottom",
+  //   action: "saveGradeAndClose",
+  // },
   // User Management
   {
     id: "users",
     route: "/users",
     title: "User Management",
     content:
-      "This is where you manage all employees in your organization.\n\nYou can add new users, assign them to departments, set their roles, and manage profiles.",
+      "This is where you manage all employees in your organization.\n\nYou can see all users, filter them based on departments.",
     placement: "top",
   },
   // Appraisal Cycles - Interactive
@@ -487,7 +487,7 @@ export const hrManagerTourSteps: TourStep[] = [
     content:
       "This is your Dashboard. It shows an overview of:\n\n• Active appraisal cycles\n• Pending reviews and submissions\n• Recent activities\n• Quick actions and metrics",
     targetSelector: "[data-testid='nav-dashboard']",
-    placement: "right",
+    placement: "bottom",
   },
   {
     id: "appraisal-groups-menu",
@@ -504,7 +504,7 @@ export const hrManagerTourSteps: TourStep[] = [
     title: "Create Group Button",
     content: "Click this button to create a new appraisal group.",
     targetSelector: "[data-testid='create-group-btn']",
-    placement: "bottom",
+    placement: "left",
   },
   {
     id: "appraisal-groups-form-open",
@@ -535,7 +535,7 @@ export const hrManagerTourSteps: TourStep[] = [
     content:
       "The demo group 'DEMO-HR-GROUP' was created!\n\nYou can see it in the list below. Now let's add employees to this group.",
     targetSelector: "[data-testid='tour-demo-group']",
-    placement: "bottom",
+    placement: "top",
     action: "saveAppraisalGroupAndClose",
   },
   {
@@ -554,7 +554,7 @@ export const hrManagerTourSteps: TourStep[] = [
     content:
       "This dialog allows you to select employees:\n\n• Filter by name, location, department\n• Use checkboxes to select employees",
     targetSelector: "[role='dialog']",
-    placement: "left",
+    placement: "right",
     action: "openAddEmployeesDialog",
     showActions: true,
     actionText: "Click 'Next' to see the employee list!",
@@ -566,7 +566,7 @@ export const hrManagerTourSteps: TourStep[] = [
     content:
       "Here's the employee list. Use checkboxes to select employees you want to add to the group.\n\nYou can select multiple employees at once.",
     targetSelector: "[data-testid='employee-list-container']",
-    placement: "left",
+    placement: "top",
     action: "keepEmployeeDialogOpen",
     showActions: true,
     actionText: "Click 'Next' to see the Add button!",
@@ -628,7 +628,7 @@ export const hrManagerTourSteps: TourStep[] = [
     content:
       "Select the appraisal type:\n\n• SMART Objectives\n• KPI Based\n• 360 Degree Feedback\n• OKR Based",
     targetSelector: "[data-testid='select-appraisal-type']",
-    placement: "left",
+    placement: "top",
     showActions: true,
     actionText: "Click 'Next' to see publish options!",
   },
@@ -639,7 +639,7 @@ export const hrManagerTourSteps: TourStep[] = [
     content:
       "Choose when to publish:\n\n• Publish Now - Start immediately\n• As Per Calendar - Follow schedule",
     targetSelector: "[data-testid='publish-options-section']",
-    placement: "left",
+    placement: "top",
     showActions: true,
     actionText: "Click 'Next' to see the submit button!",
   },
@@ -715,7 +715,7 @@ export const hrManagerTourSteps: TourStep[] = [
     content:
       "Click this button to create a new questionnaire template. Let's create one!",
     targetSelector: "[data-testid='button-create-questionnaire']",
-    placement: "bottom",
+    placement: "left",
   },
   {
     id: "questionnaires-form",
@@ -736,7 +736,7 @@ export const hrManagerTourSteps: TourStep[] = [
     content:
       "A questionnaire needs questions! Click the 'Add Question' button to add a question to this template.",
     targetSelector: "[data-testid='add-question']",
-    placement: "left",
+    placement: "top",
     showActions: true,
     actionText: "Click 'Next' to add a sample question!",
   },
@@ -747,7 +747,7 @@ export const hrManagerTourSteps: TourStep[] = [
     content:
       "Each question has:\n\n• Question Text: The question to ask\n• Type: Text, Long Text, or Rating (1-5)\n• Drag handle: Reorder questions\n\nA sample question has been added!",
     targetSelector: "[data-testid^='drag-handle-']",
-    placement: "right",
+    placement: "top",
     action: "addQuestionnaireQuestion",
     showActions: true,
     actionText: "Review the question. Click 'Next' to save!",
@@ -1100,7 +1100,7 @@ export const employeeTourSteps: TourStep[] = [
     title: "Your Dashboard",
     content:
       "Welcome to your dashboard! This is your command center where you can:\n\n• See your current evaluation status\n• View upcoming meetings and tasks\n• Track development goals progress\n• Access quick actions to complete evaluations",
-    placement: "top",
+    placement: "bottom",
   },
   // Evaluations Section
   {
@@ -1340,7 +1340,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
 
   // Select tour steps based on user role
   const tourSteps = React.useMemo(() => {
-    const userRole = user?.activeRole || user?.role;
+    const userRole = user?.role;
     console.log("Tour: User role detected:", userRole);
 
     if (userRole) {

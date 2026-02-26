@@ -90,7 +90,7 @@ export default function CompanyManagement() {
 
   // Normalize companies to handle API response with uppercase keys
   const companies: Company[] = companiesRaw.map((company: any) =>
-    normalizeCompany(company)
+    normalizeCompany(company),
   );
 
   const createCompanyMutation = useMutation({
@@ -102,8 +102,8 @@ export default function CompanyManagement() {
           companyData.status === "active"
             ? true
             : companyData.status === "inactive"
-            ? false
-            : companyData.status,
+              ? false
+              : companyData.status,
       };
       await apiRequest("POST", "/api/companies", payload);
     },
@@ -139,8 +139,8 @@ export default function CompanyManagement() {
           companyData.status === "active"
             ? true
             : companyData.status === "inactive"
-            ? false
-            : companyData.status,
+              ? false
+              : companyData.status,
       };
       await apiRequest("PUT", `/api/companies/${id}`, payload);
     },
@@ -169,7 +169,7 @@ export default function CompanyManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
       toast({
         title: "Success",
-        description: "Company deleted successfully",
+        description: "Company marked as inactive",
       });
     },
     onError: (error) => {

@@ -298,7 +298,7 @@ export default function GradeManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
       toast({
         title: "Success",
-        description: "Grade deleted successfully",
+        description: "Grade marked as inactive",
       });
     },
     onError: (error) => {
@@ -581,11 +581,20 @@ export default function GradeManagement() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
               placeholder="Search by code or description..."
-              className="pl-10"
+              className="pl-10 pr-8"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               data-testid="input-search"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <MultiSelect
             options={[
@@ -666,16 +675,18 @@ export default function GradeManagement() {
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(grade.id)}
-                        disabled={deleteGradeMutation.isPending}
-                        data-testid={`button-delete-${grade.id}`}
-                        title="Mark Inactive"
-                      >
-                        <Ban className="w-4 h-4" />
-                      </Button>
+                      {grade.status !== "inactive" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(grade.id)}
+                          disabled={deleteGradeMutation.isPending}
+                          data-testid={`button-delete-${grade.id}`}
+                          title="Mark Inactive"
+                        >
+                          <Ban className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>

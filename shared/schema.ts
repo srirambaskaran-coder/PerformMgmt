@@ -150,7 +150,7 @@ export interface QuestionnaireTemplate {
   id: string;
   name: string;
   description?: string | null;
-  targetRole: UserRole;
+  targetRole?: UserRole | null;
   applicableCategory?: Category | null;
   applicableLevelId?: string | null;
   applicableGradeId?: string | null;
@@ -767,7 +767,7 @@ export const insertLocationSchema = z.object({
 
 // Questionnaire Template schema
 export const insertQuestionnaireTemplateSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1, "Template name is required"),
   description: z.string().optional().nullable(),
   targetRole: z.enum(UserRoles).optional().nullable(),
   applicableCategory: z.enum(CategoryValues).optional().nullable(),
@@ -911,47 +911,47 @@ export const insertDepartmentSchema = z.object({
 
 // Appraisal Cycle schema
 export const insertAppraisalCycleSchema = z.object({
-  code: z.string().min(1),
-  description: z.string().min(1),
-  fromDate: z.preprocess((val) => new Date(val as string), z.date()),
-  toDate: z.preprocess((val) => new Date(val as string), z.date()),
+  code: z.string().min(1, "Cycle code is required"),
+  description: z.string().min(1, "Description is required"),
+  fromDate: z.preprocess((val) => new Date(val as string), z.date({ required_error: "From date is required" })),
+  toDate: z.preprocess((val) => new Date(val as string), z.date({ required_error: "To date is required" })),
   companyId: z.string().optional().nullable(),
   status: z.enum(StatusValues).optional().nullable(),
 });
 
 // Review Frequency schema
 export const insertReviewFrequencySchema = z.object({
-  code: z.string().min(1),
-  description: z.string().min(1),
+  code: z.string().min(1, "Frequency code is required"),
+  description: z.string().min(1, "Description is required"),
   companyId: z.string().optional().nullable(),
   status: z.enum(StatusValues).optional().nullable(),
 });
 
 // Frequency Calendar schema
 export const insertFrequencyCalendarSchema = z.object({
-  code: z.string().min(1),
-  description: z.string().min(1),
-  appraisalCycleId: z.string().min(1),
-  reviewFrequencyId: z.string().min(1),
+  code: z.string().min(1, "Calendar code is required"),
+  description: z.string().min(1, "Description is required"),
+  appraisalCycleId: z.string().min(1, "Appraisal cycle is required"),
+  reviewFrequencyId: z.string().min(1, "Review frequency is required"),
   companyId: z.string().optional().nullable(),
   status: z.enum(StatusValues).optional().nullable(),
 });
 
 // Frequency Calendar Details schema
 export const insertFrequencyCalendarDetailsSchema = z.object({
-  frequencyCalendarId: z.string().min(1),
-  displayName: z.string().min(1),
-  startDate: z.preprocess((val) => new Date(val as string), z.date()),
-  endDate: z.preprocess((val) => new Date(val as string), z.date()),
+  frequencyCalendarId: z.string().min(1, "Frequency calendar is required"),
+  displayName: z.string().min(1, "Display name is required"),
+  startDate: z.preprocess((val) => new Date(val as string), z.date({ required_error: "Start date is required" })),
+  endDate: z.preprocess((val) => new Date(val as string), z.date({ required_error: "End date is required" })),
   companyId: z.string().optional().nullable(),
   status: z.enum(StatusValues).optional().nullable(),
 });
 
 // Publish Questionnaire schema
 export const insertPublishQuestionnaireSchema = z.object({
-  code: z.string().min(1),
-  displayName: z.string().min(1),
-  templateId: z.string().min(1),
+  code: z.string().min(1, "Code is required"),
+  displayName: z.string().min(1, "Display name is required"),
+  templateId: z.string().min(1, "Template is required"),
   frequencyCalendarId: z.string().optional().nullable(),
   companyId: z.string().optional().nullable(),
   status: z.enum(StatusValues).optional().nullable(),

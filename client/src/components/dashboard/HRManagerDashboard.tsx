@@ -21,8 +21,11 @@ import {
   FileText,
   Target,
   CheckCircle2,
+  CalendarCheck,
+  User,
 } from "lucide-react";
 import { Link } from "wouter";
+import { format } from "date-fns";
 
 interface HRMetrics {
   activeAppraisalCycles: number;
@@ -65,6 +68,22 @@ interface UpcomingDeadline {
   priority: "high" | "medium" | "low";
 }
 
+interface MeetingData {
+  id: string;
+  meetingScheduledAt: string | null;
+  meetingCompletedAt: string | null;
+  employee: {
+    firstName: string;
+    lastName: string | null;
+    email: string;
+  } | null;
+  manager: {
+    firstName: string;
+    lastName: string | null;
+    email: string;
+  } | null;
+}
+
 export default function HRManagerDashboard() {
   const { data: metrics, isLoading: metricsLoading } = useQuery<HRMetrics>({
     queryKey: ["/api/dashboard/hr-manager/metrics"],
@@ -103,7 +122,7 @@ export default function HRManagerDashboard() {
 
         return {
           id: String(item.Id),
-          name: `Appraisal #${item.Id}`,
+          name: item.AppraisalGroup?.name || `Appraisal #${item.Id}`,
           startDate: createdOn.toLocaleDateString(),
           endDate: endDate.toLocaleDateString(),
           status,
@@ -125,6 +144,25 @@ export default function HRManagerDashboard() {
     useQuery<UpcomingDeadline[]>({
       queryKey: ["/api/dashboard/hr-manager/deadlines"],
     });
+
+  // Fetch scheduled meetings
+  const { data: meetings = [], isLoading: meetingsLoading } = useQuery<
+    MeetingData[]
+  >({
+    queryKey: ["/api/hr-manager/scheduled-meetings"],
+  });
+
+  // Calculate meeting statistics
+  const completedMeetings = meetings.filter((m) => m.meetingCompletedAt).length;
+  const scheduledMeetings = meetings.filter(
+    (m) => m.meetingScheduledAt && !m.meetingCompletedAt,
+  );
+
+  // Helper to clean names with trailing "null"
+  const cleanName = (name: string | null | undefined): string => {
+    if (!name) return "";
+    return name.replace(/\s+null$/i, "").trim();
+  };
 
   if (metricsLoading) {
     return (
@@ -239,24 +277,22 @@ export default function HRManagerDashboard() {
           </CardContent>
         </Card>
 
-        <Card data-testid="overdue-evaluations-card">
+        <Card data-testid="completed-meetings-card">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
-                  Overdue Items
+                  Completed Meetings
                 </p>
-                <p className="text-2xl font-bold">
-                  {metrics?.overdueEvaluations || 0}
-                </p>
+                <p className="text-2xl font-bold">{completedMeetings}</p>
               </div>
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
+              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
               </div>
             </div>
             <div className="mt-4">
-              <span className="text-xs text-red-600">
-                Requires immediate attention
+              <span className="text-xs text-green-600">
+                {scheduledMeetings.length} meetings scheduled
               </span>
             </div>
           </CardContent>
@@ -306,22 +342,20 @@ export default function HRManagerDashboard() {
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge
-                        variant={
-                          cycle.status === "active"
-                            ? "default"
-                            : cycle.status === "completed"
-                              ? "secondary"
-                              : "outline"
-                        }
-                      >
-                        {cycle.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">
+                  <div className="flex flex-col items-end gap-1 min-w-[100px]">
+                    <Badge
+                      variant={
+                        cycle.status === "active"
+                          ? "default"
+                          : cycle.status === "completed"
+                            ? "secondary"
+                            : "outline"
+                      }
+                    >
+                      {cycle.status}
+                    </Badge>
+                    <div className="flex items-center gap-2 w-full justify-end">
+                      <span className="text-sm font-medium min-w-[32px] text-right">
                         {cycle.completionPercentage}%
                       </span>
                       <Progress
@@ -394,80 +428,70 @@ export default function HRManagerDashboard() {
         </Card>
       </div>
 
-      {/* Upcoming Deadlines */}
+      {/* Scheduled Meetings */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Upcoming Deadlines</CardTitle>
+            <CardTitle>Scheduled Meetings</CardTitle>
             <CardDescription>
-              Evaluations due soon - send reminders if needed
+              Upcoming performance review meetings
             </CardDescription>
           </div>
-          <Badge variant="outline">
-            {upcomingDeadlines.filter((d) => d.priority === "high").length} high
-            priority
-          </Badge>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/hr-meetings">View All</Link>
+          </Button>
         </CardHeader>
         <CardContent>
-          {deadlinesLoading ? (
+          {meetingsLoading ? (
             <div className="animate-pulse space-y-3">
-              {[...Array(4)].map((_, i) => (
+              {[...Array(3)].map((_, i) => (
                 <div key={i} className="h-12 bg-muted rounded-lg"></div>
               ))}
             </div>
-          ) : upcomingDeadlines.length > 0 ? (
+          ) : scheduledMeetings.length > 0 ? (
             <div className="space-y-3">
-              {upcomingDeadlines.slice(0, 8).map((deadline) => (
+              {scheduledMeetings.slice(0, 3).map((meeting) => (
                 <div
-                  key={deadline.id}
+                  key={meeting.id}
                   className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
                 >
                   <div className="flex items-center gap-3">
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        deadline.priority === "high"
-                          ? "bg-red-500"
-                          : deadline.priority === "medium"
-                            ? "bg-yellow-500"
-                            : "bg-green-500"
-                      }`}
-                    ></div>
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                      <User className="h-4 w-4 text-primary-foreground" />
+                    </div>
                     <div>
-                      <p className="font-medium">{deadline.employeeName}</p>
-                      <p className="text-sm text-muted-foreground capitalize">
-                        {deadline.evaluationType} evaluation due{" "}
-                        {deadline.dueDate}
+                      <p className="font-medium text-sm">
+                        {meeting.employee
+                          ? cleanName(
+                              `${meeting.employee.firstName} ${meeting.employee.lastName || ""}`,
+                            )
+                          : "Unknown Employee"}{" "}
+                        &amp;{" "}
+                        {meeting.manager
+                          ? cleanName(
+                              `${meeting.manager.firstName} ${meeting.manager.lastName || ""}`,
+                            )
+                          : "Unknown Manager"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {meeting.meetingScheduledAt &&
+                          format(
+                            new Date(meeting.meetingScheduledAt),
+                            "PPP 'at' p",
+                          )}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p
-                        className={`text-sm font-medium ${
-                          deadline.daysRemaining <= 2
-                            ? "text-red-600"
-                            : deadline.daysRemaining <= 5
-                              ? "text-yellow-600"
-                              : "text-green-600"
-                        }`}
-                      >
-                        {deadline.daysRemaining === 0
-                          ? "Due today"
-                          : deadline.daysRemaining === 1
-                            ? "1 day left"
-                            : `${deadline.daysRemaining} days left`}
-                      </p>
-                    </div>
-                    <Button size="sm" variant="outline">
-                      Send Reminder
-                    </Button>
-                  </div>
+                  <Badge variant="secondary">
+                    <CalendarCheck className="h-3 w-3 mr-1" />
+                    Scheduled
+                  </Badge>
                 </div>
               ))}
             </div>
           ) : (
             <p className="text-center text-muted-foreground py-4">
-              No upcoming deadlines
+              No scheduled meetings
             </p>
           )}
         </CardContent>
@@ -509,14 +533,14 @@ export default function HRManagerDashboard() {
                 Manage Cycles
               </Link>
             </Button>
-            <Button variant="outline">
+            {/* <Button variant="outline">
               <FileText className="h-4 w-4 mr-2" />
               Send Reminders
-            </Button>
-            <Button variant="outline">
+            </Button> */}
+            {/* <Button variant="outline">
               <Target className="h-4 w-4 mr-2" />
               Performance Reports
-            </Button>
+            </Button> */}
           </div>
         </CardContent>
       </Card>

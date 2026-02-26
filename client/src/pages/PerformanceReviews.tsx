@@ -16,7 +16,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Plus, Search, Calendar, Users, Send, Eye } from "lucide-react";
+import { Plus, Search, Calendar, Users, Send, Eye, X } from "lucide-react";
 
 export default function PerformanceReviews() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -315,9 +315,18 @@ export default function PerformanceReviews() {
                   placeholder="Search review cycles..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 pr-8"
                   data-testid="search-cycles"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[180px]" data-testid="filter-status">

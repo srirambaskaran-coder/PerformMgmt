@@ -315,10 +315,15 @@ export default function Evaluations() {
         employee: evaluation.employee
           ? {
               id: evaluation.employee.Id,
-              email: evaluation.employee.Email,
-              firstName: evaluation.employee.FirstName,
-              lastName: evaluation.employee.LastName,
-              code: evaluation.employee.Code,
+              email: evaluation.employee.Email || evaluation.employee.EmailId,
+              firstName:
+                evaluation.employee.FirstName ||
+                evaluation.employee.Name?.split(" ")[0],
+              lastName:
+                evaluation.employee.LastName ||
+                evaluation.employee.Name?.split(" ").slice(1).join(" "),
+              code:
+                evaluation.employee.Code || evaluation.employee.SystemUserCode,
               designation: evaluation.employee.Designation,
               department: evaluation.employee.Department,
               locationId: evaluation.employee.LocationId,
@@ -332,23 +337,47 @@ export default function Evaluations() {
         manager: evaluation.manager
           ? {
               id: evaluation.manager.Id,
-              email: evaluation.manager.Email,
-              firstName: evaluation.manager.FirstName,
-              lastName: evaluation.manager.LastName,
-              code: evaluation.manager.Code,
+              email: evaluation.manager.Email || evaluation.manager.EmailId,
+              firstName:
+                evaluation.manager.FirstName ||
+                evaluation.manager.Name?.split(" ")[0],
+              lastName:
+                evaluation.manager.LastName ||
+                evaluation.manager.Name?.split(" ").slice(1).join(" "),
+              code:
+                evaluation.manager.Code || evaluation.manager.SystemUserCode,
               designation: evaluation.manager.Designation,
             }
           : null,
-        questionnaires: (evaluation.questionnaires || []).map((q: any) => ({
-          id: q.Id,
-          name: q.Name,
-          description: q.Description,
-          targetRole: q.TargetRole,
-          questions:
+        questionnaires: (evaluation.questionnaires || []).map((q: any) => {
+          const parsedQuestions =
             typeof q.Questions === "string"
               ? JSON.parse(q.Questions)
-              : q.Questions,
-        })),
+              : q.Questions;
+
+          // Transform questions to lowercase keys
+          const transformedQuestions = (parsedQuestions || []).map(
+            (question: any) => ({
+              id: question.Id || question.id,
+              text: question.Text || question.text,
+              type: question.Type || question.type,
+              required:
+                question.Required !== undefined
+                  ? question.Required
+                  : question.required,
+              category: question.Category || question.category,
+              weight: question.Weight || question.weight,
+            }),
+          );
+
+          return {
+            id: q.Id,
+            name: q.Name,
+            description: q.Description,
+            targetRole: q.TargetRole,
+            questions: transformedQuestions,
+          };
+        }),
         appraisalCycle: evaluation.appraisalCycle
           ? {
               id: evaluation.appraisalCycle.Id,
@@ -1029,7 +1058,8 @@ export default function Evaluations() {
                       {/* Manager Feedback Section - visible when manager has provided feedback */}
                       {((evaluation.managerEvaluationData as any)
                         ?.managerRemarks ||
-                        evaluation.meetingNotes ||
+                        (evaluation.meetingNotes &&
+                          evaluation.showNotesToEmployee) ||
                         evaluation.finalizedAt) && (
                         <div className="mt-4 pt-4 border-t border-border space-y-3">
                           <h4 className="font-medium text-sm text-muted-foreground">
@@ -1062,27 +1092,28 @@ export default function Evaluations() {
                             </div>
                           )}
 
-                          {/* Meeting Notes */}
-                          {evaluation.meetingNotes && (
-                            <div className="bg-green-50 p-3 rounded-lg space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-green-600" />
-                                <span className="text-sm font-medium text-green-800">
-                                  One-on-One Meeting Notes
-                                </span>
-                                {evaluation.meetingCompletedAt && (
-                                  <span className="text-xs text-green-600">
-                                    {new Date(
-                                      evaluation.meetingCompletedAt,
-                                    ).toLocaleDateString()}
+                          {/* Meeting Notes - only show if showNotesToEmployee is true */}
+                          {evaluation.meetingNotes &&
+                            evaluation.showNotesToEmployee && (
+                              <div className="bg-green-50 p-3 rounded-lg space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-green-600" />
+                                  <span className="text-sm font-medium text-green-800">
+                                    One-on-One Meeting Notes
                                   </span>
-                                )}
+                                  {evaluation.meetingCompletedAt && (
+                                    <span className="text-xs text-green-600">
+                                      {new Date(
+                                        evaluation.meetingCompletedAt,
+                                      ).toLocaleDateString()}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-green-900 whitespace-pre-wrap">
+                                  {evaluation.meetingNotes}
+                                </p>
                               </div>
-                              <p className="text-sm text-green-900 whitespace-pre-wrap">
-                                {evaluation.meetingNotes}
-                              </p>
-                            </div>
-                          )}
+                            )}
 
                           {/* Completion Status */}
                           {evaluation.finalizedAt && (

@@ -164,13 +164,16 @@ export default function AppraisalGroups() {
         updatedAt: group.LastUpdatedOn,
         createdById: group.CreatedBy || "",
         members: (group.members || []).map((member: any) => ({
-          id: member.UserId,
-          firstName: member.FirstName,
-          lastName: member.LastName,
-          email: member.Email,
-          code: member.Code,
-          role: member.Role || "employee",
-          status: member.Status ? "active" : "inactive",
+          id: member.userId || member.UserId || member.Id,
+          firstName: member.FirstName || member.firstName || "",
+          lastName: member.LastName || member.lastName || "",
+          email: member.EmailId || member.Email || member.email || "",
+          code: member.Code || member.code || "",
+          designation: member.Designation || member.designation || "",
+          department: member.DepartmentName || member.departmentName || "",
+          role: member.Role || member.role || "employee",
+          status:
+            member.Status === 1 || member.status === 1 ? "active" : "inactive",
         })),
       }));
     },
@@ -184,22 +187,25 @@ export default function AppraisalGroups() {
     select: (data: any[]) => {
       return data.map((user: any) => ({
         id: String(user.Id),
-        email: user.EmailId,
+        email: user.EmailId || "",
         status: user.Status === 1 ? "active" : "inactive",
-        // Set other fields to empty/null as they're not provided
-        firstName: "",
-        lastName: "",
+        firstName: user.FirstName || "",
+        lastName: user.LastName || "",
         profileImageUrl: null,
-        code: String(user.Id), // Use Id as employee code
-        designation: null,
-        department: null,
-        dateOfJoining: null,
-        mobileNumber: null,
-        reportingManagerId: null,
+        code: user.Code || String(user.Id),
+        designation: user.Designation || null,
+        department: user.DepartmentName || null,
+        departmentId: user.DepartmentId || null,
+        dateOfJoining: user.StartDate || null,
+        mobileNumber: user.MobileNumber || null,
+        reportingManagerName: user.ManagerFirstName
+          ? `${user.ManagerFirstName}${user.ManagerLastName ? " " + user.ManagerLastName : ""}`.trim()
+          : null,
+        locationName: user.LocationName || null,
         locationId: null,
         companyId: null,
-        levelId: null,
-        gradeId: null,
+        levelId: user.Level || null,
+        gradeId: user.Grade || null,
         role: null,
         roles: [],
         createdAt: null,
@@ -214,9 +220,9 @@ export default function AppraisalGroups() {
     queryKey: ["/api/locations"],
     select: (data: any[]) => {
       return data.map((location: any) => ({
-        id: location.Id,
-        name: location.Name,
-        code: location.Code,
+        id: String(location.Id),
+        name: location.LocationName || location.Name,
+        code: location.LocationCode || location.Code,
       }));
     },
   });
@@ -320,7 +326,7 @@ export default function AppraisalGroups() {
     },
   });
 
-  // Delete group mutation
+  // Delete group mutation (marks as inactive)
   const deleteGroupMutation = useMutation({
     mutationFn: async (id: string) => {
       return apiRequest("DELETE", `/api/appraisal-groups/${id}`);
@@ -329,7 +335,7 @@ export default function AppraisalGroups() {
       queryClient.invalidateQueries({ queryKey: ["/api/appraisal-groups"] });
       toast({
         title: "Success",
-        description: "Appraisal group deleted successfully",
+        description: "Appraisal group marked as inactive",
       });
     },
     onError: (error: any) => {
@@ -623,23 +629,36 @@ export default function AppraisalGroups() {
   // Extract unique filter options from all users
   const getUniqueOptions = (
     field:
-      | "locationId"
+      | "locationName"
       | "department"
+      | "departmentId"
       | "levelId"
       | "gradeId"
-      | "reportingManagerId"
+      | "reportingManagerName"
       | "role",
   ) => {
     const values = allUsers
       .flatMap((user) => {
         switch (field) {
-          case "locationId":
-            return user.locationId
+          case "locationName":
+            return (user as any).locationName
               ? [
                   {
-                    value: user.locationId,
-                    label: locations.find((loc) => loc.id === user.locationId)
-                      ?.name,
+                    value: (user as any).locationName,
+                    label: (user as any).locationName,
+                  },
+                ]
+              : [];
+          case "department":
+            return user.department
+              ? [{ value: user.department, label: user.department }]
+              : [];
+          case "departmentId":
+            return (user as any).departmentId
+              ? [
+                  {
+                    value: (user as any).departmentId,
+                    label: user.department || (user as any).departmentId,
                   },
                 ]
               : [];
@@ -665,19 +684,12 @@ export default function AppraisalGroups() {
                   },
                 ]
               : [];
-          case "reportingManagerId":
-            return user.reportingManagerId
+          case "reportingManagerName":
+            return (user as any).reportingManagerName
               ? [
                   {
-                    value: user.reportingManagerId,
-                    label:
-                      allUsers.find(
-                        (manager) => manager.id === user.reportingManagerId,
-                      )?.firstName +
-                        " " +
-                        allUsers.find(
-                          (manager) => manager.id === user.reportingManagerId,
-                        )?.lastName || user.reportingManagerId,
+                    value: (user as any).reportingManagerName,
+                    label: (user as any).reportingManagerName,
                   },
                 ]
               : [];
@@ -694,10 +706,6 @@ export default function AppraisalGroups() {
                   (r || "").charAt(0).toUpperCase() +
                   (r || "").slice(1).replace("_", " "),
               }));
-          case "department":
-            return user.department
-              ? [{ value: user.department, label: user.department }]
-              : [];
           default:
             return [];
         }
@@ -748,22 +756,24 @@ export default function AppraisalGroups() {
       if (!matchesName && !matchesCode) return false;
     }
 
-    // Department filter
+    // Department filter (using department name)
     if (appliedFilters.department.length > 0) {
       if (!appliedFilters.department.includes(user.department ?? ""))
         return false;
     }
 
-    // Location filter
+    // Location filter (using location name)
     if (appliedFilters.location.length > 0) {
-      if (!appliedFilters.location.includes(user.locationId ?? ""))
+      if (!appliedFilters.location.includes((user as any).locationName ?? ""))
         return false;
     }
 
-    // Reporting Manager filter
+    // Reporting Manager filter (using manager name)
     if (appliedFilters.reportingManager.length > 0) {
       if (
-        !appliedFilters.reportingManager.includes(user.reportingManagerId ?? "")
+        !appliedFilters.reportingManager.includes(
+          (user as any).reportingManagerName ?? "",
+        )
       )
         return false;
     }
@@ -791,7 +801,7 @@ export default function AppraisalGroups() {
     return true;
   });
 
-  // Multi-select component
+  // Multi-select component with search
   const MultiSelect = ({
     options,
     value,
@@ -806,6 +816,12 @@ export default function AppraisalGroups() {
     testId: string;
   }) => {
     const [open, setOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+
+    // Filter options based on search term
+    const filteredOptions = options.filter((option) =>
+      option.label.toLowerCase().includes(searchTerm.toLowerCase()),
+    );
 
     const handleToggle = (optionValue: string) => {
       const newValue = value.includes(optionValue)
@@ -815,17 +831,28 @@ export default function AppraisalGroups() {
     };
 
     const handleSelectAll = () => {
-      if (value.length === options.length) {
-        // If all are selected, deselect all
-        onChange([]);
+      // Select/deselect only filtered options
+      const filteredValues = filteredOptions.map((option) => option.value);
+      const allFilteredSelected = filteredValues.every((v) =>
+        value.includes(v),
+      );
+
+      if (allFilteredSelected) {
+        // Deselect all filtered options
+        onChange(value.filter((v) => !filteredValues.includes(v)));
       } else {
-        // Select all options
-        onChange(options.map((option) => option.value));
+        // Select all filtered options (add to existing selection)
+        const newValue = Array.from(new Set([...value, ...filteredValues]));
+        onChange(newValue);
       }
     };
 
-    const allSelected = options.length > 0 && value.length === options.length;
-    const someSelected = value.length > 0 && value.length < options.length;
+    const filteredValues = filteredOptions.map((option) => option.value);
+    const allFilteredSelected =
+      filteredOptions.length > 0 &&
+      filteredValues.every((v) => value.includes(v));
+    const someFilteredSelected =
+      filteredValues.some((v) => value.includes(v)) && !allFilteredSelected;
 
     const displayValue =
       value.length > 0
@@ -835,7 +862,15 @@ export default function AppraisalGroups() {
         : placeholder;
 
     return (
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover
+        open={open}
+        onOpenChange={(isOpen) => {
+          setOpen(isOpen);
+          if (!isOpen) {
+            setSearchTerm(""); // Clear search when closing
+          }
+        }}
+      >
         <PopoverTrigger asChild>
           <Button
             variant="outline"
@@ -848,44 +883,58 @@ export default function AppraisalGroups() {
             <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-full p-0" align="start">
-          <div className="max-h-60 overflow-auto p-1">
-            {options.length > 0 && (
+        <PopoverContent className="w-[250px] p-0" align="start">
+          {/* Search input */}
+          <div className="p-2 border-b border-border">
+            <Input
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-8"
+              autoFocus
+            />
+          </div>
+          <div
+            className="max-h-[200px] overflow-y-auto p-1"
+            onWheel={(e) => e.stopPropagation()}
+          >
+            {filteredOptions.length > 0 && (
               <>
                 {/* Select All option */}
                 <div className="flex items-center space-x-2 rounded-md px-2 py-1 hover:bg-accent border-b border-border mb-1">
                   <Checkbox
-                    id="select-all"
+                    id={`${testId}-select-all`}
                     checked={
-                      allSelected
+                      allFilteredSelected
                         ? true
-                        : someSelected
+                        : someFilteredSelected
                           ? "indeterminate"
                           : false
                     }
                     onCheckedChange={handleSelectAll}
                   />
                   <label
-                    htmlFor="select-all"
+                    htmlFor={`${testId}-select-all`}
                     className="flex-1 cursor-pointer text-sm font-medium"
                   >
-                    Select All
+                    Select All{" "}
+                    {searchTerm && `(${filteredOptions.length} matching)`}
                   </label>
                 </div>
 
                 {/* Individual options */}
-                {options.map((option) => (
+                {filteredOptions.map((option) => (
                   <div
                     key={option.value}
                     className="flex items-center space-x-2 rounded-md px-2 py-1 hover:bg-accent"
                   >
                     <Checkbox
-                      id={option.value}
+                      id={`${testId}-${option.value}`}
                       checked={value.includes(option.value)}
                       onCheckedChange={() => handleToggle(option.value)}
                     />
                     <label
-                      htmlFor={option.value}
+                      htmlFor={`${testId}-${option.value}`}
                       className="flex-1 cursor-pointer text-sm"
                     >
                       {option.label}
@@ -894,9 +943,9 @@ export default function AppraisalGroups() {
                 ))}
               </>
             )}
-            {options.length === 0 && (
+            {filteredOptions.length === 0 && (
               <div className="px-2 py-3 text-center text-sm text-muted-foreground">
-                No options available
+                {searchTerm ? "No matching options" : "No options available"}
               </div>
             )}
           </div>
@@ -1019,9 +1068,18 @@ export default function AppraisalGroups() {
                 placeholder="Search by group name or description..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 pr-8"
                 data-testid="search-groups"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1215,11 +1273,20 @@ export default function AppraisalGroups() {
                                 >
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">
-                                      {member.firstName} {member.lastName}
+                                      {member.firstName || member.lastName
+                                        ? `${member.firstName} ${member.lastName}`.trim()
+                                        : member.email}
                                     </p>
-                                    <p className="text-xs text-muted-foreground truncate">
-                                      {member.email}
-                                    </p>
+                                    {(member.firstName || member.lastName) && (
+                                      <p className="text-xs text-muted-foreground truncate">
+                                        {member.email}
+                                      </p>
+                                    )}
+                                    {(member as any).designation && (
+                                      <p className="text-xs text-muted-foreground truncate">
+                                        {(member as any).designation}
+                                      </p>
+                                    )}
                                     {member.code && (
                                       <p className="text-xs text-muted-foreground truncate">
                                         Code: {member.code}
@@ -1233,7 +1300,9 @@ export default function AppraisalGroups() {
                                       handleRemoveMember(
                                         group.id,
                                         member.id,
-                                        `${member.firstName} ${member.lastName}`,
+                                        member.firstName || member.lastName
+                                          ? `${member.firstName} ${member.lastName}`.trim()
+                                          : member.email,
                                       )
                                     }
                                     className="h-6 w-6 p-0 ml-2"
@@ -1391,7 +1460,7 @@ export default function AppraisalGroups() {
                       Location
                     </label>
                     <MultiSelect
-                      options={getUniqueOptions("locationId")}
+                      options={getUniqueOptions("locationName")}
                       value={draftFilters.location}
                       onChange={(value) =>
                         setDraftFilters({ ...draftFilters, location: value })
@@ -1409,7 +1478,7 @@ export default function AppraisalGroups() {
                       Reporting Manager
                     </label>
                     <MultiSelect
-                      options={getUniqueOptions("reportingManagerId")}
+                      options={getUniqueOptions("reportingManagerName")}
                       value={draftFilters.reportingManager}
                       onChange={(value) =>
                         setDraftFilters({
@@ -1426,70 +1495,50 @@ export default function AppraisalGroups() {
                     <label className="block text-sm font-medium mb-2">
                       DOJ From Date
                     </label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                          data-testid="dialog-filter-doj-from"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {draftFilters.dojFromDate ? (
-                            format(draftFilters.dojFromDate, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={draftFilters.dojFromDate}
-                          onSelect={(date) =>
-                            setDraftFilters({
-                              ...draftFilters,
-                              dojFromDate: date,
-                            })
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <Input
+                      type="date"
+                      className="w-full"
+                      value={
+                        draftFilters.dojFromDate
+                          ? format(draftFilters.dojFromDate, "yyyy-MM-dd")
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const dateValue = e.target.value
+                          ? new Date(e.target.value + "T00:00:00")
+                          : undefined;
+                        setDraftFilters({
+                          ...draftFilters,
+                          dojFromDate: dateValue,
+                        });
+                      }}
+                      data-testid="dialog-filter-doj-from"
+                    />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       DOJ Till Date
                     </label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                          data-testid="dialog-filter-doj-till"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {draftFilters.dojTillDate ? (
-                            format(draftFilters.dojTillDate, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={draftFilters.dojTillDate}
-                          onSelect={(date) =>
-                            setDraftFilters({
-                              ...draftFilters,
-                              dojTillDate: date,
-                            })
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <Input
+                      type="date"
+                      className="w-full"
+                      value={
+                        draftFilters.dojTillDate
+                          ? format(draftFilters.dojTillDate, "yyyy-MM-dd")
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const dateValue = e.target.value
+                          ? new Date(e.target.value + "T00:00:00")
+                          : undefined;
+                        setDraftFilters({
+                          ...draftFilters,
+                          dojTillDate: dateValue,
+                        });
+                      }}
+                      data-testid="dialog-filter-doj-till"
+                    />
                   </div>
                 </div>
 
@@ -1530,13 +1579,13 @@ export default function AppraisalGroups() {
 
               {/* Employee List */}
               <div
-                className="border rounded-lg max-h-96 overflow-y-auto"
+                className="border rounded-lg max-h-96 overflow-y-auto overflow-x-hidden"
                 data-testid="employee-list-container"
               >
-                <Table>
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>
+                      <TableHead className="w-10">
                         <input
                           type="checkbox"
                           checked={
@@ -1556,16 +1605,15 @@ export default function AppraisalGroups() {
                           data-testid="select-all-employees"
                         />
                       </TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Code</TableHead>
+                      <TableHead className="w-[35%]">Name</TableHead>
+                      <TableHead className="w-[35%]">Email</TableHead>
+                      <TableHead className="w-[20%]">Code</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {availableEmployees.map((employee) => (
                       <TableRow key={employee.id}>
-                        <TableCell>
+                        <TableCell className="w-10">
                           <input
                             type="checkbox"
                             checked={selectedEmployees.includes(employee.id)}
@@ -1575,19 +1623,22 @@ export default function AppraisalGroups() {
                             data-testid={`select-employee-${employee.id}`}
                           />
                         </TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">
+                        <TableCell className="w-[35%]">
+                          <div className="truncate">
+                            <div className="font-medium truncate">
                               {employee.firstName} {employee.lastName}
                             </div>
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-sm text-muted-foreground truncate">
                               {employee.designation}
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{employee.email}</TableCell>
-                        <TableCell>{employee.department || "-"}</TableCell>
-                        <TableCell>{employee.code || "-"}</TableCell>
+                        <TableCell className="w-[35%] truncate">
+                          {employee.email}
+                        </TableCell>
+                        <TableCell className="w-[20%]">
+                          {employee.code || "-"}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

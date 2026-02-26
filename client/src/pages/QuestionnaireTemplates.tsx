@@ -373,6 +373,7 @@ export default function QuestionnaireTemplates() {
               template.ApplicableLocationId || template.applicableLocationId,
             )
           : null,
+      targetRole: template.TargetRole || template.targetRole || null,
       // sendOnMail: template.SendOnMail || template.sendOnMail,
       status: template.Status ? "active" : "inactive",
       questions:
@@ -583,7 +584,7 @@ export default function QuestionnaireTemplates() {
       });
       toast({
         title: "Success",
-        description: "Questionnaire template deleted successfully",
+        description: "Questionnaire template marked as inactive",
       });
     },
     onError: (error) => {
@@ -849,7 +850,7 @@ export default function QuestionnaireTemplates() {
       resetForm();
       // Add demo questionnaire to display
       setTourDemoQuestionnaire({
-        id: 9999,
+        id: "9999",
         name: "DEMO-ANNUAL-REVIEW",
         description:
           "Annual Performance Review - Demo data created during tour",
@@ -860,6 +861,7 @@ export default function QuestionnaireTemplates() {
         applicableLevelId: null,
         applicableGradeId: null,
         applicableLocationId: null,
+        targetRole: null,
         questions: questions, // Include the questions that were added during tour
         status: "active",
         createdOn: new Date().toISOString(),
@@ -999,6 +1001,14 @@ export default function QuestionnaireTemplates() {
                 <form
                   onSubmit={form.handleSubmit(onSubmit, (errors) => {
                     console.error("Form validation errors:", errors);
+                    const firstError = Object.values(errors)[0];
+                    if (firstError?.message) {
+                      toast({
+                        title: "Validation Error",
+                        description: String(firstError.message),
+                        variant: "destructive",
+                      });
+                    }
                   })}
                   className="space-y-4"
                 >
@@ -1007,7 +1017,7 @@ export default function QuestionnaireTemplates() {
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Template Name</FormLabel>
+                        <FormLabel>Template Name *</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
@@ -1064,136 +1074,39 @@ export default function QuestionnaireTemplates() {
                     )}
                   />
 
-                  {/* Enhanced Fields */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">
-                      Applicability Settings
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="companyId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Company</FormLabel>
-                            <Select
-                              onValueChange={(v) => field.onChange(v || null)}
-                              value={field.value ?? ""}
-                              disabled={!isSuperAdmin}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-company">
-                                  <SelectValue placeholder="Select Company" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {companies.map((company: any) => (
-                                  <SelectItem
-                                    key={company.id}
-                                    value={String(company.id)}
-                                  >
-                                    {company.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="applicableLevelId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Applicable Level</FormLabel>
-                            <Select
-                              onValueChange={(v) => field.onChange(v || null)}
-                              value={field.value ?? ""}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-applicable-level">
-                                  <SelectValue placeholder="All Levels" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="all">All Levels</SelectItem>
-                                {filteredLevels.map((level: any) => (
-                                  <SelectItem key={level.id} value={level.id}>
-                                    {level.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="applicableGradeId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Applicable Grade</FormLabel>
-                            <Select
-                              onValueChange={(v) => field.onChange(v || null)}
-                              value={field.value ?? ""}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-applicable-grade">
-                                  <SelectValue placeholder="All Grades" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="all">All Grades</SelectItem>
-                                {filteredGrades.map((grade: any) => (
-                                  <SelectItem key={grade.id} value={grade.id}>
-                                    {grade.description} ({grade.code})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="applicableLocationId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Applicable Location</FormLabel>
-                            <Select
-                              onValueChange={(v) => field.onChange(v || null)}
-                              value={field.value ?? ""}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-applicable-location">
-                                  <SelectValue placeholder="All Locations" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="all">
-                                  All Locations
+                  {/* Company Selection - Only for Super Admin */}
+                  {isSuperAdmin && (
+                    <FormField
+                      control={form.control}
+                      name="companyId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Applicable Company</FormLabel>
+                          <Select
+                            onValueChange={(v) => field.onChange(v || null)}
+                            value={field.value ?? ""}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-company">
+                                <SelectValue placeholder="Select Company" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {companies.map((company: any) => (
+                                <SelectItem
+                                  key={company.id}
+                                  value={String(company.id)}
+                                >
+                                  {company.name}
                                 </SelectItem>
-                                {filteredLocations.map((location: any) => (
-                                  <SelectItem
-                                    key={location.id}
-                                    value={location.id}
-                                  >
-                                    {location.name} ({location.code})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
                   {/* Questions Section */}
                   <div className="space-y-4">
@@ -1296,9 +1209,18 @@ export default function QuestionnaireTemplates() {
                   placeholder="Search templates..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 pr-8"
                   data-testid="search-templates"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </button>
+                )}
               </div>
 
               <MultiSelect
@@ -1355,77 +1277,79 @@ export default function QuestionnaireTemplates() {
               <Card
                 key={template.id}
                 data-testid={
-                  template.id === 9999
+                  template.id === "9999"
                     ? "tour-demo-questionnaire"
                     : `template-card-${template.id}`
                 }
                 className={cn(
                   "relative",
-                  template.id === 9999 &&
+                  template.id === "9999" &&
                     "border-2 border-primary bg-primary/5",
                 )}
               >
-                <CardContent className="p-6 pt-12">
-                  {/* Action buttons positioned at top-right corner */}
-                  <div className="absolute top-4 right-4 flex gap-2">
-                    <RoleGuard
-                      allowedRoles={["super_admin", "admin", "hr_manager"]}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCopy(template.id)}
-                        disabled={copyTemplateMutation.isPending}
-                        data-testid={`copy-template-${template.id}`}
-                        title="Copy Template"
-                        className="h-8 w-8 p-0"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </RoleGuard>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(template)}
-                      data-testid={`edit-template-${template.id}`}
-                      title="Edit Template"
-                      className="h-8 w-8 p-0"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(template.id)}
-                      data-testid={`delete-template-${template.id}`}
-                      title="Make Inactive"
-                      className="h-8 w-8 p-0"
-                    >
-                      <Ban className="h-4 w-4" />
-                    </Button>
-                  </div>
-
+                <CardContent className="p-4">
                   {/* Card content */}
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                      <FileText className="h-6 w-6 text-primary-foreground" />
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                      <FileText className="h-5 w-5 text-primary-foreground" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center justify-between gap-2">
                         <h3
                           className="font-semibold truncate"
                           data-testid={`template-name-${template.id}`}
+                          title={template.name}
                         >
                           {template.name}
                         </h3>
-                        {(template as any).companyName && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs flex-shrink-0"
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {isSuperAdmin && (template as any).companyName && (
+                            <Badge variant="outline" className="text-xs">
+                              {(template as any).companyName}
+                            </Badge>
+                          )}
+                          <RoleGuard
+                            allowedRoles={[
+                              "super_admin",
+                              "admin",
+                              "hr_manager",
+                            ]}
                           >
-                            {(template as any).companyName}
-                          </Badge>
-                        )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCopy(template.id)}
+                              disabled={copyTemplateMutation.isPending}
+                              data-testid={`copy-template-${template.id}`}
+                              title="Copy Template"
+                              className="h-8 w-8 p-0"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </RoleGuard>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(template)}
+                            data-testid={`edit-template-${template.id}`}
+                            title="Edit Template"
+                            className="h-8 w-8 p-0"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          {template.status !== "inactive" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(template.id)}
+                              data-testid={`delete-template-${template.id}`}
+                              title="Make Inactive"
+                              className="h-8 w-8 p-0"
+                            >
+                              <Ban className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       <div className="flex gap-2 mt-1">
                         <Badge
@@ -1441,8 +1365,12 @@ export default function QuestionnaireTemplates() {
                     </div>
                   </div>
 
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    {template.description && <p>{template.description}</p>}
+                  <div className="space-y-1 text-sm text-muted-foreground">
+                    {template.description && (
+                      <p className="truncate" title={template.description}>
+                        Description: {template.description}
+                      </p>
+                    )}
                     <p>
                       Questions:{" "}
                       {Array.isArray(template.questions)

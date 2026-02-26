@@ -38,17 +38,6 @@ export const adminTourSteps: Step[] = [
     placement: "right",
   },
   {
-    target: '[href="/grades"]',
-    content:
-      "Define employee grades and levels for your organization hierarchy.",
-    placement: "right",
-  },
-  {
-    target: '[href="/levels"]',
-    content: "Manage job levels and classifications for your employees.",
-    placement: "right",
-  },
-  {
     target: '[href="/employees"]',
     content:
       "The heart of your system - manage employee profiles, assignments, and details here.",

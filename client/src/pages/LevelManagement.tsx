@@ -389,7 +389,7 @@ export default function LevelManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/levels"] });
       toast({
         title: "Success",
-        description: "Level deleted successfully",
+        description: "Level marked as inactive",
       });
     },
     onError: (error) => {
@@ -466,11 +466,20 @@ export default function LevelManagement() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
               placeholder="Search by code or description..."
-              className="pl-10"
+              className="pl-10 pr-8"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               data-testid="input-search"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <MultiSelect
             options={[

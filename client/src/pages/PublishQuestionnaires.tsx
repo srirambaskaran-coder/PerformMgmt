@@ -63,6 +63,7 @@ import {
   Calendar,
   Clock,
   FileText,
+  X,
 } from "lucide-react";
 
 export default function PublishQuestionnaires() {
@@ -173,7 +174,7 @@ export default function PublishQuestionnaires() {
       });
       toast({
         title: "Success",
-        description: "Publish questionnaire deleted successfully",
+        description: "Published questionnaire marked as inactive",
       });
     },
     onError: (error) => {
@@ -522,11 +523,20 @@ export default function PublishQuestionnaires() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
               placeholder="Search by name or code..."
-              className="pl-10"
+              className="pl-10 pr-8"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               data-testid="input-search"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-40" data-testid="filter-status">
@@ -823,16 +833,18 @@ export default function PublishQuestionnaires() {
                           </Form>
                         </DialogContent>
                       </Dialog>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(questionnaire.id)}
-                        disabled={deleteQuestionnaireMutation.isPending}
-                        data-testid={`button-delete-${questionnaire.id}`}
-                        title="Mark Inactive"
-                      >
-                        <Ban className="w-4 h-4" />
-                      </Button>
+                      {questionnaire.status !== "inactive" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(questionnaire.id)}
+                          disabled={deleteQuestionnaireMutation.isPending}
+                          data-testid={`button-delete-${questionnaire.id}`}
+                          title="Mark Inactive"
+                        >
+                          <Ban className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>

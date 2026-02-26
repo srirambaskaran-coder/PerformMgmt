@@ -44,7 +44,6 @@ import {
   BarChart3,
   Building2,
   MapPin,
-  Layers,
   Star,
   Target,
   Calendar,
@@ -84,16 +83,6 @@ interface AnalyticsData {
   }[];
   locationStats: {
     location: string;
-    employeeCount: number;
-    averageRating: number;
-  }[];
-  levelStats: {
-    level: string;
-    employeeCount: number;
-    averageRating: number;
-  }[];
-  gradeStats: {
-    grade: string;
     employeeCount: number;
     averageRating: number;
   }[];
@@ -179,8 +168,6 @@ export default function Analytics() {
     cyclePerformance,
     departmentStats,
     locationStats,
-    levelStats,
-    gradeStats,
     managerStats,
   } = data;
 
@@ -366,9 +353,6 @@ export default function Analytics() {
             <TabsTrigger value="locations" data-testid="tab-locations">
               By Location
             </TabsTrigger>
-            <TabsTrigger value="levels" data-testid="tab-levels">
-              By Level/Grade
-            </TabsTrigger>
             <TabsTrigger value="managers" data-testid="tab-managers">
               By Manager
             </TabsTrigger>
@@ -468,7 +452,7 @@ export default function Analytics() {
                             const item = pieData.find((p) => p.name === value);
                             const total = pieData.reduce(
                               (sum, p) => sum + p.value,
-                              0
+                              0,
                             );
                             const percent =
                               item && total > 0
@@ -493,7 +477,7 @@ export default function Analytics() {
                   {ratingDistribution.map((item) => {
                     const total = ratingDistribution.reduce(
                       (sum, r) => sum + r.count,
-                      0
+                      0,
                     );
                     const percentage =
                       total > 0 ? Math.round((item.count / total) * 100) : 0;
@@ -764,86 +748,6 @@ export default function Analytics() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="levels" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Layers className="h-5 w-5" />
-                    Performance by Level
-                  </CardTitle>
-                  <CardDescription>
-                    Average ratings across organizational levels
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {levelStats.length > 0 ? (
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={levelStats} layout="vertical">
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis type="number" domain={[0, 5]} />
-                          <YAxis dataKey="level" type="category" width={120} />
-                          <Tooltip />
-                          <Bar
-                            dataKey="averageRating"
-                            name="Average Rating"
-                            fill="#8b5cf6"
-                            radius={[0, 4, 4, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <div className="h-80 flex items-center justify-center">
-                      <p className="text-muted-foreground">
-                        No level data available
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Award className="h-5 w-5" />
-                    Performance by Grade
-                  </CardTitle>
-                  <CardDescription>
-                    Average ratings across job grades
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {gradeStats.length > 0 ? (
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={gradeStats} layout="vertical">
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis type="number" domain={[0, 5]} />
-                          <YAxis dataKey="grade" type="category" width={120} />
-                          <Tooltip />
-                          <Bar
-                            dataKey="averageRating"
-                            name="Average Rating"
-                            fill="#f59e0b"
-                            radius={[0, 4, 4, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <div className="h-80 flex items-center justify-center">
-                      <p className="text-muted-foreground">
-                        No grade data available
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
 
           <TabsContent value="managers" className="space-y-4">

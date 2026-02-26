@@ -10,29 +10,32 @@ export function getEnvType(): Environment {
   }
 
   // Otherwise, detect from URL
-  const origin = window.location.origin;
   const hostname = window.location.hostname;
 
-  // Development: localhost, 127.0.0.1, smeqc, or smedev (dev server)
+  // Development: localhost, 127.0.0.1, or smedev (dev server)
   if (
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
-    hostname.includes("smeqc") ||
     hostname.includes("smedev")
   ) {
     return "development";
   }
 
-  // QC: check for qc/staging in hostname or specific domains (but not smeqc which is dev)
+  // QC: smeqc is the QC server
+  if (hostname.includes("smeqc")) {
+    return "qc";
+  }
+
+  // QC: check for qc/staging in hostname or specific domains
   if (
-    (hostname.includes("qc") && !hostname.includes("smeqc")) ||
+    hostname.includes("qc") ||
     hostname.includes("staging") ||
     hostname.includes("test")
   ) {
     return "qc";
   }
 
-  // Production: everything else
+  // Production: everything else (sme.hfactor.app, etc.)
   return "production";
 }
 
@@ -41,6 +44,7 @@ export function getEnvType(): Environment {
 interface ApiConfig {
   baseUrl: string;
   timeout: number;
+  ssoLogoutUrl: string;
 }
 
 // Get base URL from environment variable or use defaults
@@ -55,26 +59,36 @@ function getBaseUrl(env: Environment): string {
   const defaultUrls: Record<Environment, string> = {
     development: "https://dev.hfactor.app:8443/PerformanceMgt",
     // development: "http://localhost:3000",
-    qc: import.meta.env.VITE_QC_API_URL || "http://your-qc-backend-url.com",
+    qc: import.meta.env.VITE_QC_API_URL || "https://smeqc.hfactor.app:8443/PMS_API",
     production:
-      import.meta.env.VITE_PROD_API_URL || "https://your-prod-backend-url.com",
+      import.meta.env.VITE_PROD_API_URL || "https://sme.hfactor.app/PerformanceMgt",
   };
 
   return defaultUrls[env];
 }
 
+// SSO/HRsuite logout redirect URLs for each environment
+const ssoLogoutUrls: Record<Environment, string> = {
+  development: "https://smedev.hfactor.app:8443/hrsuidevsme/#/login/default",
+  qc: "https://smeqc.hfactor.app:8443/hrsuiteqcsme/#/login/default",
+  production: "https://sme.hfactor.app/#/login/default",
+};
+
 const apiConfigs: Record<Environment, ApiConfig> = {
   development: {
     baseUrl: getBaseUrl("development"),
     timeout: 30000,
+    ssoLogoutUrl: ssoLogoutUrls.development,
   },
   qc: {
     baseUrl: getBaseUrl("qc"),
     timeout: 30000,
+    ssoLogoutUrl: ssoLogoutUrls.qc,
   },
   production: {
     baseUrl: getBaseUrl("production"),
     timeout: 30000,
+    ssoLogoutUrl: ssoLogoutUrls.production,
   },
 };
 
@@ -87,6 +101,7 @@ export function getApiConfig(): ApiConfig {
 // Export API base URL
 export const API_BASE_URL = getApiConfig().baseUrl;
 export const API_TIMEOUT = getApiConfig().timeout;
+export const SSO_LOGOUT_URL = getApiConfig().ssoLogoutUrl;
 export const CURRENT_ENV = getEnvType();
 
 // API endpoints helper

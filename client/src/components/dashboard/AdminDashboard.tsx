@@ -61,12 +61,15 @@ interface CompanyUser {
   Id: string;
   FirstName: string | null;
   LastName: string | null;
-  Email: string;
+  EmailId: string;
   Role: string;
   Department?: string | null;
   ProfileImageUrl?: string | null;
   Designation?: string | null;
   Code?: string | null;
+  LocationName?: string | null;
+  ManagerFirstName?: string | null;
+  ManagerLastName?: string | null;
 }
 
 // Route mapping for setup items
@@ -104,7 +107,12 @@ export default function AdminDashboard() {
           name: dept.name || dept.Name || dept.departmentName || "Unknown",
           employeeCount:
             dept.employeeCount || dept.EmployeeCount || dept.totalUsers || 0,
-          managersCount: dept.managersCount || dept.ManagersCount || 0,
+          managersCount:
+            dept.managersCount ||
+            dept.ManagersCount ||
+            dept.managerCount ||
+            dept.ManagerCount ||
+            0,
           completionRate: completionRateValue,
         };
       });
@@ -289,26 +297,31 @@ export default function AdminDashboard() {
                       />
                       <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                         {user.FirstName?.charAt(0) ||
-                          (user.Email || "?").charAt(0).toUpperCase()}
+                          (user.EmailId || "?").charAt(0).toUpperCase()}
                         {user.LastName?.charAt(0) || ""}
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <p className="font-medium text-sm">
-                        {user.FirstName && user.LastName
-                          ? `${user.FirstName} ${user.LastName}`
-                          : user.FirstName ||
-                            user.LastName ||
-                            (user.Email || "Unknown").split("@")[0]}
+                        {user.FirstName || user.LastName
+                          ? `${user.FirstName || ""} ${user.LastName || ""}`.trim()
+                          : (user.EmailId || "Unknown").split("@")[0]}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {user.Email || "No email"}
+                        {user.EmailId || "No email"}
                       </p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-xs capitalize">
-                    {user.Role?.replace("_", " ")}
-                  </Badge>
+                  <div className="text-right">
+                    <Badge variant="outline" className="text-xs">
+                      {user.Designation || user.Department || "Employee"}
+                    </Badge>
+                    {user.LocationName && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {user.LocationName}
+                      </p>
+                    )}
+                  </div>
                 </div>
               ))
             ) : (
@@ -339,7 +352,7 @@ export default function AdminDashboard() {
                 ))}
               </div>
             ) : departments.length > 0 ? (
-              departments.slice(0, 5).map((dept) => (
+              departments.slice(0, 6).map((dept) => (
                 <div
                   key={dept.id}
                   className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
@@ -408,6 +421,7 @@ export default function AdminDashboard() {
                 Locations
               </Link>
             </Button>
+            {/* Levels and Grades buttons disabled
             <Button variant="outline" asChild>
               <Link href="/levels">
                 <Layers className="h-4 w-4 mr-2" />
@@ -420,6 +434,7 @@ export default function AdminDashboard() {
                 Grades
               </Link>
             </Button>
+            */}
             <Button variant="outline" asChild>
               <Link href="/questionnaires">
                 <FileText className="h-4 w-4 mr-2" />

@@ -453,3 +453,69 @@ body.tour-active [data-radix-portal] > div {
 body.tour-active [role="dialog"] {
   z-index: 51 !important;
 }
+
+/* Calendar dropdown styles for year/month selection */
+.rdp-caption_dropdowns {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.rdp-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.rdp-dropdown select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  min-width: 100px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+}
+
+.rdp-dropdown_month select {
+  min-width: 110px;
+}
+
+.rdp-dropdown_year select {
+  min-width: 80px;
+}
+
+.rdp-dropdown select:hover {
+  border-color: hsl(var(--primary));
+}
+
+.rdp-dropdown select:focus {
+  outline: none;
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
+}
+
+.rdp-vhidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Hide the default caption label when using dropdowns */
+.rdp-caption_label {
+  display: none;
+}

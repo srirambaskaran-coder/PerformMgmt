@@ -30,6 +30,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Form,
   FormControl,
   FormDescription,
@@ -208,6 +218,15 @@ const initiateAppraisalSchema = z
 type CalendarDetailTiming = z.infer<typeof calendarDetailTimingSchema>;
 type InitiateAppraisalForm = z.infer<typeof initiateAppraisalSchema>;
 
+// Interface for already initiated employees
+interface AlreadyInitiatedEmployee {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  code?: string;
+}
+
 export default function InitiateAppraisal() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGroup, setSelectedGroup] =
@@ -217,6 +236,15 @@ export default function InitiateAppraisal() {
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(
     null,
   );
+  // State for already initiated employees confirmation
+  const [alreadyInitiatedEmployees, setAlreadyInitiatedEmployees] = useState<
+    AlreadyInitiatedEmployee[]
+  >([]);
+  const [showAlreadyInitiatedDialog, setShowAlreadyInitiatedDialog] =
+    useState(false);
+  const [pendingFormData, setPendingFormData] = useState<
+    (InitiateAppraisalForm & { appraisalGroupId: string }) | null
+  >(null);
   const { toast } = useToast();
   const { isRunning: isTourMode, currentAction, clearAction } = useTour();
 
@@ -257,13 +285,14 @@ export default function InitiateAppraisal() {
         lastUpdatedBy: group.LastUpdatedBy,
         lastUpdatedOn: group.LastUpdatedOn,
         members: (group.members || []).map((member: any) => ({
-          id: member.UserId,
-          firstName: member.FirstName,
-          lastName: member.LastName,
-          email: member.Email,
-          code: member.Code,
-          role: member.Role || "employee",
-          status: member.Status ? "active" : "inactive",
+          id: member.UserId || member.userId || member.id,
+          firstName: member.FirstName || member.firstName || "",
+          lastName: member.LastName || member.lastName || "",
+          email: member.Email || member.email || "",
+          code: member.Code || member.code || "",
+          role: member.Role || member.role || "employee",
+          status:
+            member.Status === 1 || member.status === 1 ? "active" : "inactive",
         })),
       }));
     },
@@ -378,7 +407,10 @@ export default function InitiateAppraisal() {
   // Mutation for initiating appraisal
   const initiateMutation = useMutation({
     mutationFn: async (
-      data: InitiateAppraisalForm & { appraisalGroupId: string },
+      data: InitiateAppraisalForm & {
+        appraisalGroupId: string;
+        forceReinitiate?: boolean;
+      },
     ) => {
       // For now, send as JSON since file upload is not fully implemented
       // TODO: Implement proper file upload with FormData when needed
@@ -390,15 +422,39 @@ export default function InitiateAppraisal() {
 
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
+      // Check if backend returned already initiated employees
+      if (
+        response?.alreadyInitiatedEmployees &&
+        response.alreadyInitiatedEmployees.length > 0 &&
+        !response.initiated
+      ) {
+        // Store the already initiated employees and pending form data
+        setAlreadyInitiatedEmployees(
+          response.alreadyInitiatedEmployees.map((emp: any) => ({
+            id: emp.id || emp.Id,
+            firstName: emp.firstName || emp.FirstName || "",
+            lastName: emp.lastName || emp.LastName || "",
+            email: emp.email || emp.Email || emp.EmailId || "",
+            code: emp.code || emp.Code || "",
+          })),
+        );
+        setPendingFormData(initiateMutation.variables as any);
+        setShowAlreadyInitiatedDialog(true);
+        return;
+      }
+
       toast({
         title: "Appraisal Initiated",
-        description: "The appraisal has been successfully initiated.",
+        description:
+          response?.message || "The appraisal has been successfully initiated.",
       });
       setIsInitiateFormOpen(false);
       setSelectedGroup(null);
       form.reset();
       setUploadedFile(null);
+      setAlreadyInitiatedEmployees([]);
+      setPendingFormData(null);
       queryClient.invalidateQueries({
         queryKey: ["/api/initiated-appraisals"],
       });
@@ -412,6 +468,44 @@ export default function InitiateAppraisal() {
       console.error("Failed to initiate appraisal:", error);
     },
   });
+
+  // Handle confirmation to re-initiate for all employees (including already initiated)
+  const handleConfirmReinitiateAll = () => {
+    if (pendingFormData) {
+      initiateMutation.mutate({
+        ...pendingFormData,
+        forceReinitiate: true,
+      });
+    }
+    setShowAlreadyInitiatedDialog(false);
+  };
+
+  // Handle confirmation to initiate only for new employees
+  const handleInitiateOnlyNew = () => {
+    if (pendingFormData) {
+      // Add the already initiated employee IDs to the excluded list
+      const alreadyInitiatedIds = alreadyInitiatedEmployees.map(
+        (emp) => emp.id,
+      );
+      const currentExcluded = pendingFormData.excludedEmployeeIds || [];
+      const newExcluded = Array.from(
+        new Set([...currentExcluded, ...alreadyInitiatedIds]),
+      );
+
+      initiateMutation.mutate({
+        ...pendingFormData,
+        excludedEmployeeIds: newExcluded,
+      });
+    }
+    setShowAlreadyInitiatedDialog(false);
+  };
+
+  // Handle cancel - close the dialog without initiating
+  const handleCancelInitiation = () => {
+    setShowAlreadyInitiatedDialog(false);
+    setAlreadyInitiatedEmployees([]);
+    setPendingFormData(null);
+  };
 
   const handleInitiateAppraisal = (group: AppraisalGroupWithMembers) => {
     setSelectedGroup(group);
@@ -532,14 +626,23 @@ export default function InitiateAppraisal() {
 
         {/* Search Bar */}
         <div className="flex gap-4 mb-6">
-          <div className="flex-1">
+          <div className="flex-1 relative">
             <Input
               placeholder="Search appraisal groups..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-md"
+              className="max-w-md pr-8"
               data-testid="search-groups"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -646,7 +749,9 @@ export default function InitiateAppraisal() {
                             variant="outline"
                             className="text-xs"
                           >
-                            {member.firstName} {member.lastName}
+                            {member.firstName || member.lastName
+                              ? `${member.firstName} ${member.lastName}`.trim()
+                              : member.email || "Unknown"}
                           </Badge>
                         ))}
                         {group.members.length > 5 && (
@@ -1279,35 +1384,24 @@ export default function InitiateAppraisal() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>DOJ From Date</FormLabel>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <FormControl>
-                                    <Button
-                                      variant="outline"
-                                      className="w-full justify-start text-left font-normal"
-                                      data-testid="exclude-doj-from-date"
-                                    >
-                                      <CalendarIcon className="mr-2 h-4 w-4" />
-                                      {field.value ? (
-                                        format(field.value, "PPP")
-                                      ) : (
-                                        <span>Pick a date</span>
-                                      )}
-                                    </Button>
-                                  </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent
-                                  className="w-auto p-0"
-                                  align="start"
-                                >
-                                  <CalendarComponent
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={field.onChange}
-                                    initialFocus
-                                  />
-                                </PopoverContent>
-                              </Popover>
+                              <FormControl>
+                                <Input
+                                  type="date"
+                                  className="w-full"
+                                  data-testid="exclude-doj-from-date"
+                                  value={
+                                    field.value
+                                      ? format(field.value, "yyyy-MM-dd")
+                                      : ""
+                                  }
+                                  onChange={(e) => {
+                                    const dateValue = e.target.value
+                                      ? new Date(e.target.value + "T00:00:00")
+                                      : undefined;
+                                    field.onChange(dateValue);
+                                  }}
+                                />
+                              </FormControl>
                               <FormDescription>
                                 Exclude employees who joined from this date
                               </FormDescription>
@@ -1321,35 +1415,24 @@ export default function InitiateAppraisal() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>DOJ Till Date</FormLabel>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <FormControl>
-                                    <Button
-                                      variant="outline"
-                                      className="w-full justify-start text-left font-normal"
-                                      data-testid="exclude-doj-till-date"
-                                    >
-                                      <CalendarIcon className="mr-2 h-4 w-4" />
-                                      {field.value ? (
-                                        format(field.value, "PPP")
-                                      ) : (
-                                        <span>Pick a date</span>
-                                      )}
-                                    </Button>
-                                  </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent
-                                  className="w-auto p-0"
-                                  align="start"
-                                >
-                                  <CalendarComponent
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={field.onChange}
-                                    initialFocus
-                                  />
-                                </PopoverContent>
-                              </Popover>
+                              <FormControl>
+                                <Input
+                                  type="date"
+                                  className="w-full"
+                                  data-testid="exclude-doj-till-date"
+                                  value={
+                                    field.value
+                                      ? format(field.value, "yyyy-MM-dd")
+                                      : ""
+                                  }
+                                  onChange={(e) => {
+                                    const dateValue = e.target.value
+                                      ? new Date(e.target.value + "T00:00:00")
+                                      : undefined;
+                                    field.onChange(dateValue);
+                                  }}
+                                />
+                              </FormControl>
                               <FormDescription>
                                 Exclude employees who joined till this date
                               </FormDescription>
@@ -1613,6 +1696,66 @@ export default function InitiateAppraisal() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Already Initiated Employees Confirmation Dialog */}
+        <AlertDialog
+          open={showAlreadyInitiatedDialog}
+          onOpenChange={setShowAlreadyInitiatedDialog}
+        >
+          <AlertDialogContent className="max-w-lg">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Appraisal Already Initiated</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3">
+                  <p>
+                    The following {alreadyInitiatedEmployees.length} employee
+                    {alreadyInitiatedEmployees.length !== 1 ? "s" : ""} already
+                    have an appraisal initiated:
+                  </p>
+                  <div className="max-h-48 overflow-y-auto border rounded-md p-2 bg-muted/50">
+                    {alreadyInitiatedEmployees.map((emp) => (
+                      <div
+                        key={emp.id}
+                        className="py-1 px-2 text-sm border-b last:border-b-0"
+                      >
+                        <span className="font-medium">
+                          {emp.firstName} {emp.lastName}
+                        </span>
+                        {emp.code && (
+                          <span className="text-muted-foreground ml-2">
+                            ({emp.code})
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="font-medium">
+                    Do you want to re-initiate the appraisal for all employees
+                    including those listed above?
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <AlertDialogCancel onClick={handleCancelInitiation}>
+                Cancel
+              </AlertDialogCancel>
+              <Button
+                variant="outline"
+                onClick={handleInitiateOnlyNew}
+                disabled={initiateMutation.isPending}
+              >
+                No, Only New Employees
+              </Button>
+              <AlertDialogAction
+                onClick={handleConfirmReinitiateAll}
+                disabled={initiateMutation.isPending}
+              >
+                Yes, Initiate for All
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </RoleGuard>
   );

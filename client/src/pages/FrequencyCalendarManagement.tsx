@@ -328,7 +328,7 @@ export default function FrequencyCalendarManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/frequency-calendars"] });
       toast({
         title: "Success",
-        description: "Frequency calendar deleted successfully",
+        description: "Frequency calendar marked as inactive",
       });
     },
     onError: (error: any) => {
@@ -538,7 +538,17 @@ export default function FrequencyCalendarManagement() {
               </DialogHeader>
               <Form {...form}>
                 <form
-                  onSubmit={form.handleSubmit(onSubmit)}
+                  onSubmit={form.handleSubmit(onSubmit, (errors) => {
+                    console.error("Form validation errors:", errors);
+                    const firstError = Object.values(errors)[0];
+                    if (firstError?.message) {
+                      toast({
+                        title: "Validation Error",
+                        description: String(firstError.message),
+                        variant: "destructive",
+                      });
+                    }
+                  })}
                   className="space-y-4"
                 >
                   <div className="grid grid-cols-2 gap-4">
@@ -547,7 +557,7 @@ export default function FrequencyCalendarManagement() {
                       name="code"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Calendar Code</FormLabel>
+                          <FormLabel>Calendar Code *</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -590,7 +600,7 @@ export default function FrequencyCalendarManagement() {
                       name="appraisalCycleId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Appraisal Cycle</FormLabel>
+                          <FormLabel>Appraisal Cycle *</FormLabel>
                           <Select
                             onValueChange={field.onChange}
                             value={field.value ?? ""}
@@ -617,7 +627,7 @@ export default function FrequencyCalendarManagement() {
                       name="reviewFrequencyId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Review Frequency</FormLabel>
+                          <FormLabel>Review Frequency *</FormLabel>
                           <Select
                             onValueChange={field.onChange}
                             value={field.value ?? ""}
@@ -648,7 +658,7 @@ export default function FrequencyCalendarManagement() {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description</FormLabel>
+                        <FormLabel>Description *</FormLabel>
                         <FormControl>
                           <Textarea
                             {...field}
@@ -701,9 +711,18 @@ export default function FrequencyCalendarManagement() {
               placeholder="Search by code or description..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 pr-8"
               data-testid="input-search"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <MultiSelect
             options={[
@@ -763,28 +782,16 @@ export default function FrequencyCalendarManagement() {
                     "border-2 border-primary bg-primary/5",
                 )}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5 text-purple-600" />
-                      <div>
-                        <CardTitle
-                          className="text-lg"
-                          data-testid={`text-code-${calendar.id}`}
-                        >
-                          {calendar.code}
-                        </CardTitle>
-                        <Badge
-                          variant={
-                            calendar.status === "active"
-                              ? "default"
-                              : "secondary"
-                          }
-                          data-testid={`badge-status-${calendar.id}`}
-                        >
-                          {calendar.status}
-                        </Badge>
-                      </div>
+                      <Calendar className="h-4 w-4 text-purple-600" />
+                      <CardTitle
+                        className="text-base"
+                        data-testid={`text-code-${calendar.id}`}
+                      >
+                        {calendar.code}
+                      </CardTitle>
                     </div>
                     <div className="flex gap-1">
                       <Button
@@ -795,27 +802,40 @@ export default function FrequencyCalendarManagement() {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(calendar.id)}
-                        disabled={deleteMutation.isPending}
-                        data-testid={`button-delete-${calendar.id}`}
-                        title="Mark Inactive"
-                      >
-                        <Ban className="h-4 w-4" />
-                      </Button>
+                      {calendar.status !== "inactive" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(calendar.id)}
+                          disabled={deleteMutation.isPending}
+                          data-testid={`button-delete-${calendar.id}`}
+                          title="Mark Inactive"
+                        >
+                          <Ban className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-0 space-y-2">
-                  <p
-                    className="text-sm text-muted-foreground"
-                    data-testid={`text-description-${calendar.id}`}
-                  >
-                    {calendar.description || "No description provided"}
-                  </p>
-                  <div className="flex flex-col gap-1 text-sm">
+                <CardContent className="pt-0 pb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p
+                      className="text-sm text-muted-foreground"
+                      data-testid={`text-description-${calendar.id}`}
+                    >
+                      Description:{" "}
+                      {calendar.description || "No description provided"}
+                    </p>
+                    <Badge
+                      variant={
+                        calendar.status === "active" ? "default" : "secondary"
+                      }
+                      data-testid={`badge-status-${calendar.id}`}
+                    >
+                      {calendar.status}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
                     <span>
                       <strong>Cycle:</strong>{" "}
                       {getAppraisalCycleName(calendar.appraisalCycleId)}
