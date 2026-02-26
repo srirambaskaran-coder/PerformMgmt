@@ -1,17 +1,49 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertReviewCycleSchema, type ReviewCycle, type InsertReviewCycle, type User, type QuestionnaireTemplate } from "@shared/schema";
+import {
+  insertReviewCycleSchema,
+  type ReviewCycle,
+  type InsertReviewCycle,
+  type User,
+  type QuestionnaireTemplate,
+} from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RoleGuard } from "@/components/RoleGuard";
@@ -61,8 +93,17 @@ export default function PerformanceReviews() {
   });
 
   const sendInvitationsMutation = useMutation({
-    mutationFn: async ({ employeeIds, reviewCycleId }: { employeeIds: string[]; reviewCycleId: string }) => {
-      await apiRequest("POST", "/api/send-review-invitations", { employeeIds, reviewCycleId });
+    mutationFn: async ({
+      employeeIds,
+      reviewCycleId,
+    }: {
+      employeeIds: string[];
+      reviewCycleId: string;
+    }) => {
+      await apiRequest("POST", "/api/send-review-invitations", {
+        employeeIds,
+        reviewCycleId,
+      });
     },
     onSuccess: () => {
       toast({
@@ -104,7 +145,10 @@ export default function PerformanceReviews() {
       });
       return;
     }
-    sendInvitationsMutation.mutate({ employeeIds: selectedEmployees, reviewCycleId });
+    sendInvitationsMutation.mutate({
+      employeeIds: selectedEmployees,
+      reviewCycleId,
+    });
   };
 
   const resetForm = () => {
@@ -120,12 +164,13 @@ export default function PerformanceReviews() {
   };
 
   const filteredReviewCycles = reviewCycles.filter((cycle) => {
-    const matchesSearch = searchQuery === "" || 
+    const matchesSearch =
+      searchQuery === "" ||
       cycle.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       cycle.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const matchesStatus = statusFilter === "" || cycle.status === statusFilter;
-    
+
     return matchesSearch && matchesStatus;
   });
 
@@ -135,11 +180,16 @@ export default function PerformanceReviews() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Performance Reviews</h1>
-            <p className="text-muted-foreground">Manage performance review cycles and send invitations</p>
+            <p className="text-muted-foreground">
+              Manage performance review cycles and send invitations
+            </p>
           </div>
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => setIsCreateModalOpen(true)} data-testid="start-review-cycle-button">
+              <Button
+                onClick={() => setIsCreateModalOpen(true)}
+                data-testid="start-review-cycle-button"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Start Review Cycle
               </Button>
@@ -148,11 +198,15 @@ export default function PerformanceReviews() {
               <DialogHeader>
                 <DialogTitle>Start New Review Cycle</DialogTitle>
                 <DialogDescription>
-                  Create a new performance review cycle and select employees to participate
+                  Create a new performance review cycle and select employees to
+                  participate
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="space-y-4"
+                >
                   <FormField
                     control={form.control}
                     name="name"
@@ -160,7 +214,11 @@ export default function PerformanceReviews() {
                       <FormItem>
                         <FormLabel>Review Cycle Name</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Q4 2023 Performance Review" data-testid="input-cycle-name" />
+                          <Input
+                            {...field}
+                            placeholder="Q4 2023 Performance Review"
+                            data-testid="input-cycle-name"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -174,7 +232,11 @@ export default function PerformanceReviews() {
                       <FormItem>
                         <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <Textarea {...field} placeholder="Description of the review cycle..." data-testid="input-description" />
+                          <Textarea
+                            {...field}
+                            placeholder="Description of the review cycle..."
+                            data-testid="input-description"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -189,11 +251,17 @@ export default function PerformanceReviews() {
                         <FormItem>
                           <FormLabel>Start Date</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="date" 
+                            <Input
+                              type="date"
                               {...field}
-                              value={field.value ? field.value.toISOString().split('T')[0] : ''}
-                              onChange={(e) => field.onChange(new Date(e.target.value))}
+                              value={
+                                field.value
+                                  ? field.value.toISOString().split("T")[0]
+                                  : ""
+                              }
+                              onChange={(e) =>
+                                field.onChange(new Date(e.target.value))
+                              }
                               data-testid="input-start-date"
                             />
                           </FormControl>
@@ -208,11 +276,17 @@ export default function PerformanceReviews() {
                         <FormItem>
                           <FormLabel>End Date</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="date" 
+                            <Input
+                              type="date"
                               {...field}
-                              value={field.value ? field.value.toISOString().split('T')[0] : ''}
-                              onChange={(e) => field.onChange(new Date(e.target.value))}
+                              value={
+                                field.value
+                                  ? field.value.toISOString().split("T")[0]
+                                  : ""
+                              }
+                              onChange={(e) =>
+                                field.onChange(new Date(e.target.value))
+                              }
                               data-testid="input-end-date"
                             />
                           </FormControl>
@@ -228,7 +302,10 @@ export default function PerformanceReviews() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Questionnaire Template</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-template">
                               <SelectValue placeholder="Select template" />
@@ -252,26 +329,41 @@ export default function PerformanceReviews() {
                     <h3 className="text-lg font-medium">Select Employees</h3>
                     <div className="max-h-60 overflow-y-auto border rounded-lg p-4 space-y-2">
                       {employees.map((employee) => (
-                        <div key={employee.id} className="flex items-center space-x-2">
+                        <div
+                          key={employee.id}
+                          className="flex items-center space-x-2"
+                        >
                           <Checkbox
                             id={employee.id}
                             checked={selectedEmployees.includes(employee.id)}
                             onCheckedChange={(checked) => {
                               if (checked) {
-                                setSelectedEmployees([...selectedEmployees, employee.id]);
+                                setSelectedEmployees([
+                                  ...selectedEmployees,
+                                  employee.id,
+                                ]);
                               } else {
-                                setSelectedEmployees(selectedEmployees.filter(id => id !== employee.id));
+                                setSelectedEmployees(
+                                  selectedEmployees.filter(
+                                    (id) => id !== employee.id,
+                                  ),
+                                );
                               }
                             }}
                           />
-                          <label htmlFor={employee.id} className="text-sm font-medium cursor-pointer">
-                            {employee.firstName} {employee.lastName} - {employee.designation}
+                          <label
+                            htmlFor={employee.id}
+                            className="text-sm font-medium cursor-pointer"
+                          >
+                            {employee.firstName} {employee.lastName} -{" "}
+                            {employee.designation}
                           </label>
                         </div>
                       ))}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {selectedEmployees.length} employee{selectedEmployees.length !== 1 ? 's' : ''} selected
+                      {selectedEmployees.length} employee
+                      {selectedEmployees.length !== 1 ? "s" : ""} selected
                     </p>
                   </div>
 
@@ -329,7 +421,10 @@ export default function PerformanceReviews() {
                 )}
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]" data-testid="filter-status">
+                <SelectTrigger
+                  className="w-[180px]"
+                  data-testid="filter-status"
+                >
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -356,8 +451,12 @@ export default function PerformanceReviews() {
             <Card>
               <CardContent className="text-center py-12">
                 <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground text-lg mb-2">No review cycles found</p>
-                <p className="text-muted-foreground text-sm">Start your first performance review cycle</p>
+                <p className="text-muted-foreground text-lg mb-2">
+                  No review cycles found
+                </p>
+                <p className="text-muted-foreground text-sm">
+                  Start your first performance review cycle
+                </p>
               </CardContent>
             </Card>
           ) : (
@@ -367,21 +466,31 @@ export default function PerformanceReviews() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold" data-testid={`cycle-name-${cycle.id}`}>
+                        <h3
+                          className="text-lg font-semibold"
+                          data-testid={`cycle-name-${cycle.id}`}
+                        >
                           {cycle.name}
                         </h3>
-                        <Badge variant={cycle.status === 'active' ? 'default' : 'secondary'}>
+                        <Badge
+                          variant={
+                            cycle.status === "active" ? "default" : "secondary"
+                          }
+                        >
                           {cycle.status}
                         </Badge>
                       </div>
                       {cycle.description && (
-                        <p className="text-muted-foreground mb-3">{cycle.description}</p>
+                        <p className="text-muted-foreground mb-3">
+                          {cycle.description}
+                        </p>
                       )}
                       <div className="flex items-center gap-6 text-sm text-muted-foreground">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
                           <span>
-                            {new Date(cycle.startDate).toLocaleDateString()} - {new Date(cycle.endDate).toLocaleDateString()}
+                            {new Date(cycle.startDate).toLocaleDateString()} -{" "}
+                            {new Date(cycle.endDate).toLocaleDateString()}
                           </span>
                         </div>
                       </div>

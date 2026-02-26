@@ -59,9 +59,12 @@ function getBaseUrl(env: Environment): string {
   const defaultUrls: Record<Environment, string> = {
     development: "https://dev.hfactor.app:8443/PerformanceMgt",
     // development: "http://localhost:3000",
-    qc: import.meta.env.VITE_QC_API_URL || "https://smeqc.hfactor.app:8443/PMS_API",
+    qc:
+      import.meta.env.VITE_QC_API_URL ||
+      "https://smeqc.hfactor.app:8443/PMS_API",
     production:
-      import.meta.env.VITE_PROD_API_URL || "https://sme.hfactor.app/PerformanceMgt",
+      import.meta.env.VITE_PROD_API_URL ||
+      "https://sme.hfactor.app/PerformanceMgt",
   };
 
   return defaultUrls[env];

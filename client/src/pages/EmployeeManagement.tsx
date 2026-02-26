@@ -937,7 +937,8 @@ export default function EmployeeManagement() {
 
       const matchesDepartment =
         departmentFilters.length === 0 ||
-        (user.departmentName && departmentFilters.includes(user.departmentName));
+        (user.departmentName &&
+          departmentFilters.includes(user.departmentName));
 
       const matchesStatus =
         statusFilters.length === 0 ||
@@ -2100,8 +2101,8 @@ export default function EmployeeManagement() {
                   new Set(
                     users
                       .map((user: any) => user.departmentName)
-                      .filter(Boolean)
-                  )
+                      .filter(Boolean),
+                  ),
                 ).map((deptName: string) => ({
                   value: deptName,
                   label: deptName,

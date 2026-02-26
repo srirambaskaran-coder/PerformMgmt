@@ -913,8 +913,14 @@ export const insertDepartmentSchema = z.object({
 export const insertAppraisalCycleSchema = z.object({
   code: z.string().min(1, "Cycle code is required"),
   description: z.string().min(1, "Description is required"),
-  fromDate: z.preprocess((val) => new Date(val as string), z.date({ required_error: "From date is required" })),
-  toDate: z.preprocess((val) => new Date(val as string), z.date({ required_error: "To date is required" })),
+  fromDate: z.preprocess(
+    (val) => new Date(val as string),
+    z.date({ required_error: "From date is required" }),
+  ),
+  toDate: z.preprocess(
+    (val) => new Date(val as string),
+    z.date({ required_error: "To date is required" }),
+  ),
   companyId: z.string().optional().nullable(),
   status: z.enum(StatusValues).optional().nullable(),
 });
@@ -941,8 +947,14 @@ export const insertFrequencyCalendarSchema = z.object({
 export const insertFrequencyCalendarDetailsSchema = z.object({
   frequencyCalendarId: z.string().min(1, "Frequency calendar is required"),
   displayName: z.string().min(1, "Display name is required"),
-  startDate: z.preprocess((val) => new Date(val as string), z.date({ required_error: "Start date is required" })),
-  endDate: z.preprocess((val) => new Date(val as string), z.date({ required_error: "End date is required" })),
+  startDate: z.preprocess(
+    (val) => new Date(val as string),
+    z.date({ required_error: "Start date is required" }),
+  ),
+  endDate: z.preprocess(
+    (val) => new Date(val as string),
+    z.date({ required_error: "End date is required" }),
+  ),
   companyId: z.string().optional().nullable(),
   status: z.enum(StatusValues).optional().nullable(),
 });

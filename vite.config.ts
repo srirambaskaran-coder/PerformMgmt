@@ -4,13 +4,13 @@ import path from "path";
 
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
-  const env = loadEnv(mode, process.cwd(), '');
-  
+  const env = loadEnv(mode, process.cwd(), "");
+
   // Determine base path: use VITE_BASE_PATH env var or default to "./"
   // For QC deployment: /PMSUI/
   // For local development: ./
   const basePath = env.VITE_BASE_PATH || "./";
-  
+
   return {
     plugins: [react()],
     base: basePath,
